@@ -19,6 +19,11 @@ interface Slot {
   wasReady: boolean;
   hovered: boolean;
   pressed: boolean;
+  /** Last drawn state keys: Graphics are only cleared and redrawn when these change. */
+  baseKey: number;
+  sweepKey: number;
+  ringKey: number;
+  lastTime: string;
 }
 
 /** Orbital Strike + Reinforcements buttons with radial cooldown sweep, ready glow and hotkeys. */
@@ -52,7 +57,7 @@ export class AbilityBar {
       c.add([glow, base, icon, sweep, ring, timeText, badge, keyText]);
       c.setSize(R * 2, R * 2).setInteractive({ useHandCursor: true, hitArea: new Phaser.Geom.Circle(R, R, R), hitAreaCallback: Phaser.Geom.Circle.Contains });
       markHud(c);
-      const slot: Slot = { id: d.id, c, glow, base, sweep, timeText, ring, wasReady: true, hovered: false, pressed: false };
+      const slot: Slot = { id: d.id, c, glow, base, sweep, timeText, ring, wasReady: true, hovered: false, pressed: false, baseKey: -1, sweepKey: -1, ringKey: -1, lastTime: '' };
       c.on('pointerover', () => {
         slot.hovered = true;
         scene.tweens.add({ targets: c, scale: 1.08, duration: 110, ease: 'Quad.easeOut' });
@@ -126,31 +131,45 @@ export class AbilityBar {
       const armed = this.armed === s.id;
       const f = ab.cooldownMax > 0 ? Phaser.Math.Clamp(ab.cooldown / ab.cooldownMax, 0, 1) : 0;
       // base disc
-      const base = s.base;
-      base.clear();
-      const fill = armed ? 0x6f5aa0 : ready ? 0x4b3b6b : 0x2f2540;
-      base.fillStyle(COLORS.ink, 1).fillCircle(0, 0, R + 4);
-      base.fillStyle(fill, 1).fillCircle(0, 0, R);
-      base.fillStyle(0xffffff, ready ? 0.12 : 0.06).fillEllipse(0, -R * 0.45, R * 1.5, R * 0.8);
-      // cooldown sweep
-      const sw = s.sweep;
-      sw.clear();
-      if (f > 0.001) {
-        sw.fillStyle(0x0d0816, 0.68);
-        sw.slice(0, 0, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f, false);
-        sw.fillPath();
-      } else if (!usable) {
-        sw.fillStyle(0x0d0816, 0.5).fillCircle(0, 0, R);
+      const baseKey = armed ? 2 : ready ? 1 : 0;
+      if (baseKey !== s.baseKey) {
+        s.baseKey = baseKey;
+        const base = s.base;
+        base.clear();
+        const fill = armed ? 0x6f5aa0 : ready ? 0x4b3b6b : 0x2f2540;
+        base.fillStyle(COLORS.ink, 1).fillCircle(0, 0, R + 4);
+        base.fillStyle(fill, 1).fillCircle(0, 0, R);
+        base.fillStyle(0xffffff, ready ? 0.12 : 0.06).fillEllipse(0, -R * 0.45, R * 1.5, R * 0.8);
       }
-      s.timeText.setText(f > 0.001 ? String(Math.ceil(ab.cooldown)) : '');
-      // ring
-      const ring = s.ring;
-      ring.clear();
-      if (armed) {
-        ring.lineStyle(5, 0xffe27a, 1).strokeCircle(0, 0, R + 6);
-      } else if (ready) {
-        ring.lineStyle(3, 0xffe27a, 0.5 + 0.4 * Math.sin(time * 0.006)).strokeCircle(0, 0, R + 5);
+      // cooldown sweep (quantised to ~1 degree so it only redraws when it visibly moves)
+      const sweepKey = f > 0.001 ? 1 + Math.round(f * 360) : usable ? 0 : -2;
+      if (sweepKey !== s.sweepKey) {
+        s.sweepKey = sweepKey;
+        const sw = s.sweep;
+        sw.clear();
+        if (f > 0.001) {
+          sw.fillStyle(0x0d0816, 0.68);
+          sw.slice(0, 0, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f, false);
+          sw.fillPath();
+        } else if (!usable) {
+          sw.fillStyle(0x0d0816, 0.5).fillCircle(0, 0, R);
+        }
       }
+      const secs = f > 0.001 ? String(Math.ceil(ab.cooldown)) : '';
+      if (secs !== s.lastTime) {
+        s.lastTime = secs;
+        s.timeText.setText(secs);
+      }
+      // ring: drawn once per state, pulsed through its alpha
+      const ringKey = armed ? 2 : ready ? 1 : 0;
+      if (ringKey !== s.ringKey) {
+        s.ringKey = ringKey;
+        const ring = s.ring;
+        ring.clear();
+        if (armed) ring.lineStyle(5, 0xffe27a, 1).strokeCircle(0, 0, R + 6);
+        else if (ready) ring.lineStyle(3, 0xffe27a, 1).strokeCircle(0, 0, R + 5);
+      }
+      s.ring.setAlpha(ready && !armed ? 0.5 + 0.4 * Math.sin(time * 0.006) : 1);
       s.glow.setAlpha(armed ? 0.6 : ready ? 0.22 + 0.18 * Math.sin(time * 0.006) : 0);
       if (ready && !s.wasReady && st.status === 'running') {
         this.scene.tweens.add({ targets: s.c, scale: { from: 1.35, to: s.hovered ? 1.08 : 1 }, duration: 380, ease: 'Back.easeOut' });

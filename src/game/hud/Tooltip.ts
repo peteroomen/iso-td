@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_H, GAME_W, FONT } from '../ui/theme';
-import { DEPTH, drawPanel } from './widgets';
+import { DEPTH } from './widgets';
 
 export interface TipRow {
   text?: string;
@@ -24,6 +24,9 @@ export interface TipSpec {
   cost?: { amount: number; ok: boolean; label?: string };
   minWidth?: number;
 }
+
+/** Panel look shared with the menu tooltip in ui/widgets.ts: soft drop shadow, ink outline, plum fill, thin gold inner line. */
+const TIP_FILL = 0x2b2140;
 
 /** One shared tooltip panel (rebuilt on each show). */
 export class Tooltip {
@@ -52,11 +55,11 @@ export class Tooltip {
     this.scene.tweens.killTweensOf(this.box);
     this.box.removeAll(true);
     const s = this.scene;
-    const pad = 12;
+    const pad = 14;
     const items: Phaser.GameObjects.GameObject[] = [];
     const g = s.add.graphics();
     items.push(g);
-    let y = pad;
+    let y = pad - 2;
     let w = spec.minWidth ?? 120;
 
     const place = (o: Phaser.GameObjects.GameObject & { x: number; y: number }, x: number, yy: number) => {
@@ -84,8 +87,8 @@ export class Tooltip {
         h = Math.max(h, ih + 2);
         x += icon.displayWidth + 6;
       }
-      const l = row.text !== undefined ? s.add.text(0, 0, row.text, { fontFamily: FONT, fontSize: `${size}px`, color: row.color ?? '#e9dfff', stroke: '#2e222f', strokeThickness: 3 }) : undefined;
-      const r = row.right !== undefined ? s.add.text(0, 0, row.right, { fontFamily: FONT, fontSize: `${size}px`, color: row.rightColor ?? COLORS.text, stroke: '#2e222f', strokeThickness: 3 }) : undefined;
+      const l = row.text !== undefined ? s.add.text(0, 0, row.text, { fontFamily: FONT, fontSize: `${size}px`, color: row.color ?? COLORS.text, stroke: '#2e222f', strokeThickness: 2 }) : undefined;
+      const r = row.right !== undefined ? s.add.text(0, 0, row.right, { fontFamily: FONT, fontSize: `${size}px`, color: row.rightColor ?? COLORS.text, stroke: '#2e222f', strokeThickness: 2 }) : undefined;
       const rowW = x + (l?.width ?? 0) + (r ? 18 + r.width : 0) + pad;
       w = Math.max(w, rowW);
       rowLayout.push({ l, r, icon, y, h });
@@ -96,7 +99,7 @@ export class Tooltip {
     }
     if (spec.note) {
       const maxW = Math.max(w - pad * 2, 200);
-      const n = s.add.text(0, 0, spec.note, { fontFamily: FONT, fontSize: '16px', color: spec.noteColor ?? '#cfc3ee', wordWrap: { width: maxW }, lineSpacing: 2 });
+      const n = s.add.text(0, 0, spec.note, { fontFamily: FONT, fontSize: '17px', color: spec.noteColor ?? COLORS.text, wordWrap: { width: maxW }, lineSpacing: 2 });
       place(n, pad, y + 2);
       y += n.height + 6;
       w = Math.max(w, n.width + pad * 2);
@@ -115,7 +118,10 @@ export class Tooltip {
     for (const r of rowLayout) {
       if (r.r) r.r.setPosition(w - pad - r.r.width, r.y + (r.h - r.r.height) / 2);
     }
-    drawPanel(g, 0, 0, w, y, { r: 12, fill: 0x2c2240, border: COLORS.ink, bw: 3.5, alpha: 0.97 });
+    g.fillStyle(COLORS.ink, 0.35).fillRoundedRect(3, 6, w, y, 12);
+    g.fillStyle(COLORS.ink, 1).fillRoundedRect(0, 0, w, y, 12);
+    g.fillStyle(TIP_FILL, 0.97).fillRoundedRect(4, 4, w - 8, y - 8, 9.6);
+    g.lineStyle(2, COLORS.gold, 0.55).strokeRoundedRect(5, 5, w - 10, y - 10, 8);
     this.box.add(items);
 
     let x = ax;
