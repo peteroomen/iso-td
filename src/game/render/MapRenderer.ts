@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { Biome, BiomeChar, LevelDef } from '../../core';
+import { buildRoadRibbon } from './RoadRibbon';
 import { TILE_ORIGIN_X, TILE_ORIGIN_Y, depthOf, hash2, isoX, isoY, stringSeed } from './iso';
 
 type Edge = 'NW' | 'NE' | 'SE' | 'SW';
@@ -74,6 +75,10 @@ export class MapRenderer {
   readonly height: number;
   private readonly tileImages = new Map<string, Phaser.GameObjects.Image>();
   readonly decorations: Phaser.GameObjects.Image[] = [];
+  /** The baked road ribbon (drawn once). */
+  readonly roadGfx: Phaser.GameObjects.Graphics;
+  /** Cells covered by the ribbon (never decorated). */
+  readonly roadCells: ReadonlySet<string>;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -84,6 +89,11 @@ export class MapRenderer {
     this.height = level.tiles.length;
     this.width = level.tiles.reduce((m, r) => Math.max(m, r.length), 0);
     this.buildGround(groundC);
+    // Roads are one continuous ribbon above the ground tiles (road cells use the plain ground tile).
+    const road = buildRoadRibbon(scene, level, this.width, this.height);
+    groundC.add(road.gfx);
+    this.roadGfx = road.gfx;
+    this.roadCells = road.geo.cells;
     this.buildDecor(entityC);
   }
 
@@ -104,33 +114,7 @@ export class MapRenderer {
     return this.level.tiles[row]?.[col] ?? ' ';
   }
 
-  /** Extra open edges for spawn/exit cells (off-map neighbour counts as connected). */
-  private endpointEdges(): Map<string, Set<Edge>> {
-    const out = new Map<string, Set<Edge>>();
-    const edgeOf = (dx: number, dy: number): Edge => (dx > 0 ? 'SE' : dx < 0 ? 'NW' : dy > 0 ? 'SW' : 'NE');
-    const add = (col: number, row: number, e: Edge) => {
-      const k = `${col},${row}`;
-      if (!out.has(k)) out.set(k, new Set());
-      out.get(k)!.add(e);
-    };
-    for (const path of this.level.paths) {
-      if (path.length < 2) continue;
-      const n = (a: { x: number; y: number }, b: { x: number; y: number }) => {
-        const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-        return { x: Math.round((b.x - a.x) / l), y: Math.round((b.y - a.y) / l) };
-      };
-      const first = path[0];
-      const last = path[path.length - 1];
-      const d0 = n(first, path[1]);
-      const d1 = n(path[path.length - 2], last);
-      add(Math.floor(first.x + d0.x), Math.floor(first.y + d0.y), edgeOf(-d0.x, -d0.y));
-      add(Math.floor(last.x - d1.x), Math.floor(last.y - d1.y), edgeOf(d1.x, d1.y));
-    }
-    return out;
-  }
-
   private buildGround(groundC: Phaser.GameObjects.Container): void {
-    const extra = this.endpointEdges();
     const cells: MapCell[] = [];
     for (let row = 0; row < this.height; row++) {
       for (let col = 0; col < this.width; col++) {
@@ -142,14 +126,7 @@ export class MapRenderer {
     cells.sort((a, b) => a.col + a.row - (b.col + b.row) || a.col - b.col);
     for (const c of cells) {
       let key: string;
-      if (c.ch === '#') {
-        const open = new Set<Edge>(extra.get(`${c.col},${c.row}`) ?? []);
-        if (this.tileAt(c.col - 1, c.row) === '#') open.add('NW');
-        if (this.tileAt(c.col + 1, c.row) === '#') open.add('SE');
-        if (this.tileAt(c.col, c.row + 1) === '#') open.add('SW');
-        if (this.tileAt(c.col, c.row - 1) === '#') open.add('NE');
-        key = `roads/road_${c.biome}_${roadNumber(open)}`;
-      } else if (c.ch === 'B') {
+      if (c.ch === 'B') {
         key = `tiles/buildspot_${c.biome}`;
       } else {
         key = `tiles/ground_${c.biome}`;
@@ -178,6 +155,7 @@ export class MapRenderer {
     for (let row = 0; row < this.height; row++) {
       for (let col = 0; col < this.width; col++) {
         const ch = this.tileAt(col, row);
+        if (ch === '#' || this.roadCells.has(`${col},${row}`)) continue;
         const biome = this.biomeAt(col, row);
         const set = DECO[biome];
         const h1 = hash2(col, row, seed + 1);

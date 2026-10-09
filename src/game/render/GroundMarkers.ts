@@ -52,15 +52,17 @@ export class GroundMarkers {
   }
 
   /** Register the last in-map point of every path as an exit marker. */
-  setExits(paths: readonly { pts: readonly { x: number; y: number }[] }[]): void {
+  setExits(paths: readonly { pts: readonly { x: number; y: number }[] }[], mapW = Infinity, mapH = Infinity): void {
     this.exits.length = 0;
     for (const p of paths) {
       const a = p.pts[p.pts.length - 2];
-      const b = p.pts[p.pts.length - 1];
-      const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-      const dx = (b.x - a.x) / l;
-      const dy = (b.y - a.y) / l;
-      this.exits.push({ gx: b.x - dx * 0.75, gy: b.y - dy * 0.75, dx, dy });
+      const b0 = p.pts[p.pts.length - 1];
+      const l = Math.hypot(b0.x - a.x, b0.y - a.y) || 1;
+      const dx = (b0.x - a.x) / l;
+      const dy = (b0.y - a.y) / l;
+      // the road ribbon is clamped to the map border: sit the chevrons on the visible part of the road
+      const b = { x: Math.min(Math.max(b0.x, 0), mapW), y: Math.min(Math.max(b0.y, 0), mapH) };
+      this.exits.push({ gx: b.x - dx * 0.6, gy: b.y - dy * 0.6, dx, dy });
     }
   }
 
@@ -119,7 +121,7 @@ export class GroundMarkers {
     for (const ex of this.exits) {
       // pulsing chevrons on the road pointing out of the map
       for (let i = 0; i < 2; i++) {
-        const off = ((time * 0.0012 + i * 0.5) % 1) * 0.9 - 0.45;
+        const off = ((time * 0.0012 + i * 0.5) % 1) * 0.7 - 0.35;
         const cx = ex.gx + ex.dx * off;
         const cy = ex.gy + ex.dy * off;
         const px = -ex.dy;
@@ -127,7 +129,7 @@ export class GroundMarkers {
         const tip = { x: isoX(cx + ex.dx * 0.22, cy + ex.dy * 0.22), y: isoY(cx + ex.dx * 0.22, cy + ex.dy * 0.22) };
         const l = { x: isoX(cx - ex.dx * 0.12 + px * 0.28, cy - ex.dy * 0.12 + py * 0.28), y: isoY(cx - ex.dx * 0.12 + px * 0.28, cy - ex.dy * 0.12 + py * 0.28) };
         const r = { x: isoX(cx - ex.dx * 0.12 - px * 0.28, cy - ex.dy * 0.12 - py * 0.28), y: isoY(cx - ex.dx * 0.12 - px * 0.28, cy - ex.dy * 0.12 - py * 0.28) };
-        const a = 0.75 * Math.sin(Math.PI * ((off + 0.45) / 0.9));
+        const a = 0.75 * Math.sin(Math.PI * ((off + 0.35) / 0.7));
         g.fillStyle(0xe5484d, a).fillTriangle(tip.x, tip.y, l.x, l.y, r.x, r.y);
         g.lineStyle(3, 0x2e222f, a * 0.8).strokeTriangle(tip.x, tip.y, l.x, l.y, r.x, r.y);
       }

@@ -80,7 +80,7 @@ export class GameScene extends Phaser.Scene {
     this.bg = new Background(this, this.mapView.mainBiome, level.biome === 'mixed');
     this.fx = new Fx(this, this.view, this.layers);
     this.markers = new GroundMarkers(this, this.view, this.layers, this.sim.spots);
-    this.markers.setExits(this.sim.paths);
+    this.markers.setExits(this.sim.paths, this.mapView.width, this.mapView.height);
     this.simView = new SimRenderer(this, this.view, this.layers, this.sim, this.fx);
 
     this.overlays = new Overlays(this);
