@@ -480,7 +480,7 @@ export class Tooltip extends Phaser.GameObjects.Container {
     super(scene, 0, 0);
     this.gfx = scene.add.graphics();
     this.titleText = scene.add.text(0, 0, '', textStyle(22, COLORS.textGold)).setOrigin(0, 0);
-    this.bodyText = scene.add.text(0, 0, '', textStyle(18, COLORS.text, { strokeThickness: 0, wordWrap: { width: 260 }, lineSpacing: 2 })).setOrigin(0, 0);
+    this.bodyText = scene.add.text(0, 0, '', textStyle(20, COLORS.text, { strokeThickness: 0, wordWrap: { width: 280 }, lineSpacing: 2 })).setOrigin(0, 0);
     this.add([this.gfx, this.titleText, this.bodyText]);
     this.setDepth(depth).setVisible(false).setAlpha(0);
     scene.add.existing(this);
@@ -570,6 +570,12 @@ export class Slider extends Phaser.GameObjects.Container {
     this.setSize(w + 50, 56);
     this.setInteractive(new Phaser.Geom.Rectangle(0, 0, w + 50, 56), Phaser.Geom.Rectangle.Contains);
     this.input!.cursor = 'pointer';
+    this.on('pointerover', () => {
+      if (!this.dragging) this.scene.tweens.add({ targets: this.knob, scale: 1.1, duration: 100, ease: 'Back.easeOut' });
+    });
+    this.on('pointerout', () => {
+      if (!this.dragging) this.scene.tweens.add({ targets: this.knob, scale: 1, duration: 120, ease: 'Sine.easeOut' });
+    });
     this.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragging = true;
       this.setFromPointer(p);
@@ -887,4 +893,62 @@ export function starChip(scene: Phaser.Scene, x: number, y: number, text: string
   const label = scene.add.text(14, 1, text, textStyle(30, COLORS.textGold)).setOrigin(0.5);
   root.add([g, star, label]);
   return { root, label };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Speech bubble (one-off hints)
+// ---------------------------------------------------------------------------------------------------------------
+
+export interface SpeechBubble {
+  root: Phaser.GameObjects.Container;
+  hide(): void;
+}
+
+/**
+ * Small cream speech bubble with a tail. `tail` is the side the tail sits on ('up' = bubble below its target).
+ * (x, y) is the tip of the tail; the bubble hangs off it. Bobs gently until `hide()` (or `autoHideMs`).
+ */
+export function speechBubble(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  text: string,
+  o: { tail?: 'up' | 'down'; depth?: number; fontSize?: number; autoHideMs?: number; tailX?: number; maxX?: number } = {},
+): SpeechBubble {
+  const { tail = 'up', depth = 70, fontSize = 24, autoHideMs = 0, tailX = 0 } = o;
+  const t = scene.add.text(0, 0, text, textStyle(fontSize, COLORS.textDark, { strokeThickness: 0, align: 'center' })).setOrigin(0.5);
+  const padX = 22, padY = 14;
+  const w = t.width + padX * 2, h = t.height + padY * 2;
+  const tailH = 16;
+  // keep the bubble on screen; the tail keeps pointing at (x, y)
+  const left = Phaser.Math.Clamp(x - w / 2 + tailX, 10, (o.maxX ?? GAME_W - 10) - w);
+  const bx = left + w / 2 - x; // bubble centre relative to the tip
+  const by = tail === 'up' ? tailH + h / 2 : -(tailH + h / 2);
+  const g = scene.add.graphics();
+  const cream = 0xfff4d6;
+  g.fillStyle(COLORS.ink, 0.3);
+  g.fillRoundedRect(bx - w / 2 + 3, by - h / 2 + 7, w, h, 18);
+  g.fillStyle(COLORS.ink, 1);
+  g.fillRoundedRect(bx - w / 2, by - h / 2, w, h, 18);
+  g.fillStyle(cream, 1);
+  g.fillRoundedRect(bx - w / 2 + 4, by - h / 2 + 4, w - 8, h - 8, 15);
+  const dir = tail === 'up' ? 1 : -1;
+  const ty0 = by - dir * (h / 2 - 1); // bubble edge the tail grows from
+  g.fillStyle(COLORS.ink, 1);
+  g.fillTriangle(-14, ty0 + dir * 2, 14, ty0 + dir * 2, 0, ty0 - dir * (tailH + 1));
+  g.fillStyle(cream, 1);
+  g.fillTriangle(-9, ty0 + dir * 4, 9, ty0 + dir * 4, 0, ty0 - dir * (tailH - 5));
+  t.setPosition(bx, by + 1);
+  const root = scene.add.container(x, y, [g, t]).setDepth(depth).setAlpha(0).setScale(0.6);
+  scene.tweens.add({ targets: root, alpha: 1, scale: 1, duration: 260, ease: 'Back.easeOut' });
+  const bob = scene.tweens.add({ targets: root, y: y + dir * 6, duration: 620, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 260 });
+  let gone = false;
+  const hide = (): void => {
+    if (gone) return;
+    gone = true;
+    bob.stop();
+    scene.tweens.add({ targets: root, alpha: 0, scale: 0.8, duration: 180, onComplete: () => root.destroy() });
+  };
+  if (autoHideMs > 0) scene.time.delayedCall(autoHideMs, hide);
+  return { root, hide };
 }

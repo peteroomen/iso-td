@@ -1,4 +1,4 @@
-import { LEVELS, type Biome, type LevelDef, type SaveData } from '../../core';
+import { LEVELS, hasFlag, type Biome, type LevelDef, type SaveData } from '../../core';
 import { getSave } from '../services/save';
 
 /** Data helpers shared by the meta scenes (level map, upgrades). */
@@ -102,4 +102,70 @@ export function towerSprite(kind: TowerIconKind, level: number): string {
 export function fitImage<T extends { width: number; height: number; setScale(s: number): unknown }>(img: T, w: number, h: number): T {
   img.setScale(Math.min(w / img.width, h / img.height));
   return img;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// tower-cap unlocks
+// ---------------------------------------------------------------------------------------------------------------
+
+export interface TowerUnlock {
+  /** 'all' when every tower kind got the same new cap (e.g. level 2: "All Lv2 towers"). */
+  kind: TowerIconKind | 'all';
+  level: number;
+  /** Short headline, e.g. "Archer Lv3". */
+  title: string;
+  /** One-line description of the new tier. */
+  text: string;
+}
+
+const KIND_NAMES: Record<TowerIconKind, string> = { archer: 'Archer', wizard: 'Wizard', barracks: 'Barracks' };
+
+const TIER_TEXT: Record<TowerIconKind, Record<number, string>> = {
+  archer: { 2: 'Faster, harder-hitting arrows', 3: 'Double Shot: hits 2 targets' },
+  wizard: { 2: 'Heavier magic bolts', 3: 'Arc Bolt: chains to 2 more enemies' },
+  barracks: { 2: 'Tougher knights', 3: '3 knights with heavy armor' },
+};
+
+const KINDS: TowerIconKind[] = ['archer', 'wizard', 'barracks'];
+
+/**
+ * Tower tiers that level `index` (0-based) makes available for the first time: its `towerCap` compared with the
+ * highest cap of every earlier level. Level 1 (the baseline) never announces anything.
+ */
+export function levelUnlocks(index: number): TowerUnlock[] {
+  const nodes = levelNodes();
+  const def = nodes[index]?.def;
+  if (!def || index === 0) return [];
+  const prev: Record<TowerIconKind, number> = { archer: 1, wizard: 1, barracks: 1 };
+  for (let i = 0; i < index; i++) {
+    const d = nodes[i].def;
+    if (!d) continue;
+    for (const k of KINDS) prev[k] = Math.max(prev[k], d.towerCap[k]);
+  }
+  const gains = KINDS.filter((k) => def.towerCap[k] > prev[k]);
+  if (gains.length === 0) return [];
+  const lv = def.towerCap[gains[0]];
+  if (gains.length === KINDS.length && gains.every((k) => def.towerCap[k] === lv)) {
+    return [{ kind: 'all', level: lv, title: `All Lv${lv} towers`, text: 'Archers, Wizards and Barracks can reach Lv' + lv }];
+  }
+  return gains.map((k) => {
+    const level = def.towerCap[k];
+    return { kind: k, level, title: `${KIND_NAMES[k]} Lv${level}`, text: TIER_TEXT[k][level] ?? `Upgrade to level ${level}` };
+  });
+}
+
+/** Unlocks to announce for level `id`: only on a level the player has not beaten yet and has not been told about. */
+export function pendingUnlocks(save: SaveData, id: string): TowerUnlock[] {
+  if (save.levels[id]?.completed || hasFlag(save, unlockFlag(id))) return [];
+  const node = levelNodes().find((n) => n.id === id);
+  return node ? levelUnlocks(node.index) : [];
+}
+
+export function unlockFlag(levelId: string): string {
+  return 'unlockSeen:' + levelId;
+}
+
+/** Display name of a tower kind. */
+export function towerName(kind: TowerIconKind): string {
+  return KIND_NAMES[kind];
 }

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { getLevel, isLevelUnlocked, starsAvailable, starsEarned, type Biome, type SaveData } from '../../core';
+import { getLevel, hasFlag, isLevelUnlocked, starsAvailable, starsEarned, withFlag, type Biome, type SaveData } from '../../core';
 import { Audio } from '../services/audio';
-import { COLORS, textStyle } from '../ui/theme';
+import { getSave, updateSave } from '../services/save';
+import { COLORS, GAME_W, textStyle } from '../ui/theme';
 import { addSky } from '../ui/background';
 import { buildIsland, type Island, type IslandSpec } from '../ui/isoScenery';
 import {
@@ -18,8 +19,24 @@ import {
   openModal,
   ringPulse,
   sparkBurst,
+  speechBubble,
+  type SpeechBubble,
 } from '../ui/widgets';
-import { BIOME_COLORS, BIOME_NAMES, fitImage, levelNodes, levelOrder, metaSave, towerSprite, type LevelNode } from './metaData';
+import { unlockBanner, unlockToast } from '../ui/unlockUi';
+import {
+  BIOME_COLORS,
+  BIOME_NAMES,
+  fitImage,
+  levelNodes,
+  levelOrder,
+  metaSave,
+  pendingUnlocks,
+  towerName,
+  towerSprite,
+  unlockFlag,
+  type LevelNode,
+  type TowerUnlock,
+} from './metaData';
 
 export interface LevelSelectData {
   /** Level id that was just won (triggers the star / unlock animations). */
@@ -98,6 +115,7 @@ export class LevelSelectScene extends Phaser.Scene {
   private modalOpen = false;
   private intro: LevelSelectData = {};
   private routeDone: boolean[] = [];
+  private upgradesTip?: SpeechBubble;
 
   constructor() {
     super('LevelSelect');
@@ -109,6 +127,15 @@ export class LevelSelectScene extends Phaser.Scene {
 
   create(): void {
     ensureUi(this);
+    // beating the last level for the first time plays the ending before the map comes back
+    const order = levelOrder();
+    const real = getSave();
+    if (this.intro.completed === order[order.length - 1] && real.levels[this.intro.completed]?.completed && !hasFlag(real, 'endingSeen')) {
+      updateSave((sv) => withFlag(sv, 'endingSeen'));
+      this.scene.start('Ending', { returnTo: 'LevelSelect' });
+      return;
+    }
+    this.upgradesTip = undefined;
     this.views = [];
     this.wraps = [];
     this.islands = [];
@@ -311,6 +338,7 @@ export class LevelSelectScene extends Phaser.Scene {
     });
     v.face.on('pointerdown', () => {
       if (this.modalOpen) return;
+      this.tweens.add({ targets: v.face, scale: 0.94, duration: 70, yoyo: true });
       if (v.state === 'locked') {
         Audio.sfx('ui_error', { volume: 0.6 });
         this.tweens.add({ targets: v.face, x: { from: -6, to: 0 }, duration: 260, ease: 'Elastic.easeOut' });
@@ -415,6 +443,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
   private openUpgrades(): void {
     if (this.modalOpen) return;
+    this.hideUpgradesTip();
     fadeTo(this, () => this.scene.start('Upgrades', { returnTo: 'LevelSelect' }));
   }
 
@@ -429,14 +458,20 @@ export class LevelSelectScene extends Phaser.Scene {
 
   private openInfo(n: LevelNode): void {
     this.modalOpen = true;
+    this.hideUpgradesTip();
     const def = n.def ? getLevel(n.def.id) : undefined;
     const stars = this.save.levels[n.id]?.stars ?? 0;
     const biome = def?.biome ?? n.biome;
     const color = BIOME_COLORS[biome];
+    // a tower tier that no earlier level offered: highlighted once, until Play is pressed
+    const unlocks: TowerUnlock[] = def ? pendingUnlocks(getSave(), n.id) : [];
+    const hasNew = unlocks.length > 0;
+    const shift = hasNew ? 100 : 0;
+    const isNew = (kind: string): boolean => unlocks.some((u) => u.kind === 'all' || u.kind === kind);
     openModal(this, {
       title: `${n.number}. ${n.name}`,
-      width: 660,
-      height: 560,
+      width: 680,
+      height: 548 + shift,
       closeOnBackdrop: true,
       onClose: () => (this.modalOpen = false),
       build: (m) => {
@@ -450,30 +485,43 @@ export class LevelSelectScene extends Phaser.Scene {
         root.add([chip, chipT]);
 
         // best stars
-        const lbl = this.add.text(0, top + 68, 'BEST RESULT', textStyle(18, '#b9a9d6', { strokeThickness: 0 })).setOrigin(0.5);
-        const row = new StarRow(this, 0, top + 112, 56, stars, 3, 10);
+        const lbl = this.add.text(0, top + 64, 'BEST RESULT', textStyle(20, '#b9a9d6', { strokeThickness: 0 })).setOrigin(0.5);
+        const row = new StarRow(this, 0, top + 104, 52, stars, 3, 10);
         root.add([lbl, row]);
 
         const waves = def?.waves.length;
         const info = this.add
-          .text(0, top + 168, def ? `${waves} waves   |   ${def.lives} lives` : 'Coming soon', textStyle(26, COLORS.text, { strokeThickness: 4 }))
+          .text(0, top + 152, def ? `${waves} waves   |   ${def.lives} lives` : 'Coming soon', textStyle(26, COLORS.text, { strokeThickness: 4 }))
           .setOrigin(0.5);
         root.add(info);
 
+        if (hasNew) {
+          const banner = unlockBanner(this, 0, top + 226, 600, unlocks);
+          banner.setScale(0.6).setAlpha(0);
+          root.add(banner);
+          this.tweens.add({ targets: banner, scale: 1, alpha: 1, duration: 420, delay: 260, ease: 'Back.easeOut' });
+          this.time.delayedCall(260, () => Audio.sfx('upgrade_tower', { volume: 0.55 }));
+        }
+
         if (def) {
-          const label = this.add.text(0, top + 212, 'TOWERS AVAILABLE', textStyle(18, '#b9a9d6', { strokeThickness: 0 })).setOrigin(0.5);
+          const label = this.add.text(0, top + 196 + shift, 'TOWERS AVAILABLE', textStyle(20, '#b9a9d6', { strokeThickness: 0 })).setOrigin(0.5);
           root.add(label);
           const cap = def.towerCap;
           const cards: ['archer' | 'wizard' | 'barracks', number, string][] = [
-            ['archer', cap.archer, 'Archer'],
-            ['wizard', cap.wizard, 'Wizard'],
-            ['barracks', cap.barracks, 'Barracks'],
+            ['archer', cap.archer, towerName('archer')],
+            ['wizard', cap.wizard, towerName('wizard')],
+            ['barracks', cap.barracks, towerName('barracks')],
           ];
           cards.forEach(([kind, lv, name], i) => {
             const x = (i - 1) * 190;
-            const y = top + 322;
+            const y = top + 306 + shift;
+            const fresh = isNew(kind);
             const g = this.add.graphics();
-            drawOutlinedRect(g, x - 82, y - 78, 164, 156, 18, 0x2a2038, 4);
+            drawOutlinedRect(g, x - 82, y - 78, 164, 156, 18, fresh ? 0x4b3a2a : 0x2a2038, 4);
+            if (fresh) {
+              g.lineStyle(3, COLORS.gold, 1);
+              g.strokeRoundedRect(x - 78, y - 74, 156, 148, 15);
+            }
             const img = fitImage(this.add.image(x, y - 16, towerSprite(kind, lv)), 92, 92);
             const nameT = this.add.text(x, y + 44, `${name}  Lv ${lv}`, textStyle(20, COLORS.textGold, { strokeThickness: 4 })).setOrigin(0.5);
             // little pips for the level
@@ -485,6 +533,15 @@ export class LevelSelectScene extends Phaser.Scene {
               pips.fillCircle(x - 18 + k * 18, y + 66, 4);
             }
             root.add([g, img, nameT, pips]);
+            if (fresh) {
+              const tag = this.add.container(x + 62, y - 70);
+              const tg = this.add.graphics();
+              drawOutlinedRect(tg, -27, -13, 54, 26, 13, 0xe5484d, 3);
+              tag.add([tg, this.add.text(0, 0, 'NEW', textStyle(16, COLORS.text, { strokeThickness: 3 })).setOrigin(0.5)]);
+              tag.setAngle(8);
+              root.add(tag);
+              this.tweens.add({ targets: tag, scale: 1.12, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+            }
             img.setScale(0);
             this.tweens.add({ targets: img, scale: Math.min(92 / img.width, 92 / img.height), duration: 350, delay: 200 + i * 90, ease: 'Back.easeOut' });
           });
@@ -500,6 +557,7 @@ export class LevelSelectScene extends Phaser.Scene {
           keepOpen: true,
           onClick: () => {
             if (!def) return;
+            if (hasNew) updateSave((sv) => withFlag(sv, unlockFlag(def.id)));
             fadeTo(this, () => this.scene.start('Game', { levelId: def.id }));
           },
         },
@@ -516,12 +574,14 @@ export class LevelSelectScene extends Phaser.Scene {
     // after any visit, make the Upgrades button hint at unspent stars
     if (!id) {
       this.refreshAvailable(true);
+      this.maybeShowUpgradesTip(1400);
       return;
     }
     this.refreshAvailable(false);
     const v = this.views.find((x) => x.node.id === id);
     if (!v) {
       this.refreshAvailable(true);
+      this.maybeShowUpgradesTip(1400);
       return;
     }
     const gained = this.intro.starsGained ?? 0;
@@ -548,13 +608,40 @@ export class LevelSelectScene extends Phaser.Scene {
 
     // unlock the next node
     const next = this.views[v.node.index + 1];
+    let tipDelay = 600;
     if (next && next.state === 'locked') {
       this.time.delayedCall(t, () => {
         if (next.root.scene) this.unlockNode(next);
       });
       t += 900;
+      // the next level brings a new tower tier: say so while the map is still celebrating
+      const news = pendingUnlocks(getSave(), next.node.id);
+      if (news.length) {
+        this.time.delayedCall(t - 250, () => {
+          if (!this.modalOpen) unlockToast(this, GAME_W / 2, 134, news, 4200);
+        });
+        t += 1200;
+        tipDelay = 4400;
+      }
     }
     this.time.delayedCall(t, () => this.refreshAvailable(true));
+    this.maybeShowUpgradesTip(t + tipDelay);
+  }
+
+  /** One-time speech bubble that points at the Upgrades button while there are unspent stars. */
+  private maybeShowUpgradesTip(delay: number): void {
+    this.time.delayedCall(delay, () => {
+      const real = getSave();
+      if (this.modalOpen || hasFlag(real, 'tip:upgrades') || starsAvailable(real) <= 0) return;
+      updateSave((sv) => withFlag(sv, 'tip:upgrades'));
+      const b = this.upgradesBtn;
+      this.upgradesTip = speechBubble(this, b.x, b.y + b.btnHeight / 2 + 6, 'Spend stars on upgrades!', { tail: 'up', depth: 70, autoHideMs: 7000, tailX: -40 });
+    });
+  }
+
+  private hideUpgradesTip(): void {
+    this.upgradesTip?.hide();
+    this.upgradesTip = undefined;
   }
 
   private unlockNode(v: NodeView): void {
