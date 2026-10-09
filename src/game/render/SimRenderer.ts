@@ -10,6 +10,9 @@ import { ProjectileView } from './ProjectileView';
 import { HOVER_BOSS, HOVER_FLIER, HOVER_GROUND, bodyHeightOf } from './style';
 import { TOWER_SCALE, TowerView } from './TowerView';
 
+const killNow = (v: { destroy(): void }): void => v.destroy();
+const killAnimated = (v: { destroyAnimated(): void }): void => v.destroyAnimated();
+
 const TOWER_SHOOT_H: Record<string, number> = { archer: 105, wizard: 100, barracks: 60 };
 
 /**
@@ -102,10 +105,10 @@ export class SimRenderer {
     for (const e of events) this.handle(e);
 
     // 3. purge views whose entity is gone
-    this.purge(this.towers, (v) => v.destroyAnimated());
-    this.purge(this.knights, (v) => v.destroy());
-    this.purge(this.enemies, (v) => v.destroy());
-    this.purge(this.projectiles, (v) => v.destroy());
+    this.purge(this.towers, killAnimated);
+    this.purge(this.knights, killNow);
+    this.purge(this.enemies, killNow);
+    this.purge(this.projectiles, killNow);
 
     this.drawBars();
     this.drawStrikes(time, dt);

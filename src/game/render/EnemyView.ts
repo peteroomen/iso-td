@@ -134,11 +134,12 @@ export class EnemyView {
     if (this.engine) this.engine.setAlpha(0.45 + 0.25 * Math.sin(t * 6));
     if (this.glints.length) {
       const cycle = (t * 0.6) % 2.4;
-      this.glints.forEach((g, i) => {
+      for (let i = 0; i < this.glints.length; i++) {
+        const g = this.glints[i];
         const k = Phaser.Math.Clamp(1 - Math.abs(cycle - (0.5 + i * 0.35)) / 0.25, 0, 1);
         g.setScale(k * 0.9);
         g.setRotation(k * 1.2);
-      });
+      }
     }
   }
 

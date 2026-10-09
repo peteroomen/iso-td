@@ -83,19 +83,38 @@ export class GroundMarkers {
     });
   }
 
+  /** Scratch point list reused by every diamond() call (the points are consumed immediately by the Graphics). */
+  private readonly diamondPts = [
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+  ];
+  private readonly ell = { x: 0, y: 0, w: 0, h: 0 };
+
   private diamond(cx: number, cy: number, inset = 0): { x: number; y: number }[] {
     const hw = TW / 2 - inset * 1.7;
     const hh = TH / 2 - inset;
-    return [
-      { x: cx, y: cy - hh },
-      { x: cx + hw, y: cy },
-      { x: cx, y: cy + hh },
-      { x: cx - hw, y: cy },
-    ];
+    const p = this.diamondPts;
+    p[0].x = cx;
+    p[0].y = cy - hh;
+    p[1].x = cx + hw;
+    p[1].y = cy;
+    p[2].x = cx;
+    p[2].y = cy + hh;
+    p[3].x = cx - hw;
+    p[3].y = cy;
+    return p;
   }
 
+  /** Iso ellipse of a grid radius. Returns a shared scratch object: read it before the next call. */
   private ellipse(gx: number, gy: number, r: number): { x: number; y: number; w: number; h: number } {
-    return { x: isoX(gx, gy), y: isoY(gx, gy), w: 2 * r * TW * 0.7071, h: 2 * r * TH * 0.7071 };
+    const e = this.ell;
+    e.x = isoX(gx, gy);
+    e.y = isoY(gx, gy);
+    e.w = 2 * r * TW * 0.7071;
+    e.h = 2 * r * TH * 0.7071;
+    return e;
   }
 
   update(time: number): void {
