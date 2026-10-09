@@ -12,6 +12,7 @@
     "balance": "tsx tools/balance.ts"
   },
   "dependencies": {
+    "@fontsource/lilita-one": "^5.3.0",
     "phaser": "^3.90.0"
   },
   "devDependencies": {

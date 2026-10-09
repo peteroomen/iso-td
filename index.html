@@ -2,15 +2,70 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <title>UFO Defense</title>
+    <meta name="description" content="UFO Defense - an isometric tower defense game. Stop the alien invasion!" />
+    <meta name="theme-color" content="#1a1438" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="icon" type="image/png" sizes="64x64" href="favicon.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <style>
-      html, body { margin: 0; padding: 0; height: 100%; background: #0b0f1a; overflow: hidden; }
-      #game { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #120c1c;
+        overflow: hidden;
+        overscroll-behavior: none;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      #game {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      canvas {
+        display: block;
+        touch-action: none;
+        outline: none;
+      }
+      /* shown until the bundle boots; the canvas replaces it */
+      #boot-msg {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff4d6;
+        font: 24px/1 "Trebuchet MS", sans-serif;
+        letter-spacing: 0.1em;
+        pointer-events: none;
+      }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="boot-msg">LOADING...</div>
+    <script>
+      // no browser context menu / pinch-zoom / double-tap zoom / drag-select on the game
+      document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+      document.addEventListener('dblclick', function (e) { e.preventDefault(); });
+      document.addEventListener('touchmove', function (e) { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+      window.addEventListener('wheel', function (e) { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+    </script>
     <script type="module" src="/src/game/main.ts"></script>
   </body>
 </html>

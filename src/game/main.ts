@@ -1,22 +1,39 @@
+import '@fontsource/lilita-one/latin-400.css';
 import Phaser from 'phaser';
+import { BootScene } from './scenes/BootScene';
+import { PreloadScene } from './scenes/PreloadScene';
+import { TitleScene } from './scenes/TitleScene';
+import { LevelSelectScene } from './scenes/LevelSelectScene';
+import { UpgradesScene } from './scenes/UpgradesScene';
+import { SettingsScene } from './scenes/SettingsScene';
+// Scene key: 'Game'. Receives `{ levelId: string }` from the level map.
+import { GameScene } from './scenes/GameScene';
+import { GAME_H, GAME_W } from './ui/theme';
 
-class PlaceholderScene extends Phaser.Scene {
-  constructor() {
-    super('Placeholder');
-  }
-  create(): void {
-    this.add
-      .text(640, 360, 'UFO Defense', { fontFamily: 'sans-serif', fontSize: '64px', color: '#ffffff' })
-      .setOrigin(0.5);
-  }
-}
-
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  width: 1280,
-  height: 720,
-  backgroundColor: '#0b0f1a',
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [PlaceholderScene],
+  width: GAME_W,
+  height: GAME_H,
+  backgroundColor: '#120c1c',
+  pixelArt: false,
+  antialias: true,
+  roundPixels: true,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: GAME_W,
+    height: GAME_H,
+  },
+  input: {
+    // phones: allow a second finger without losing the first, no right-click menu
+    activePointers: 3,
+  },
+  render: { powerPreference: 'high-performance' },
+  scene: [BootScene, PreloadScene, TitleScene, LevelSelectScene, UpgradesScene, SettingsScene, GameScene],
 });
+
+if (import.meta.env.DEV) {
+  // handy for debugging / automated screenshots
+  (window as unknown as { __game: Phaser.Game }).__game = game;
+}
