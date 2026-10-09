@@ -7,7 +7,7 @@ export const level03: LevelDef = {
   name: 'Twin Creeks',
   biome: 'spring',
   tiles: [
-    ' dr..T.T.... ',
+    '.dr..T.T.....',
     '......r.....T',
     '.TB..B.....T.',
     '...#######...',
@@ -17,7 +17,7 @@ export const level03: LevelDef = {
     '...#######.c.',
     '..Bdd..B.....',
     '.......d.rrd.',
-    ' T..Td....Td ',
+    '.T..Td....Td.',
   ],
   paths: [
     [

@@ -7,7 +7,7 @@ export const level06: LevelDef = {
   name: 'Scorpion Loop',
   biome: 'desert',
   tiles: [
-    ' rdT#..c.T... ',
+    '.rdT#..c.T....',
     '.c.c#B......dT',
     'c...#.....c.d.',
     '.d.d#ddcB.d.d.',
@@ -20,7 +20,7 @@ export const level06: LevelDef = {
     'T.T.#..c...#.d',
     '...B#..B..B#..',
     'd...########cT',
-    ' .r.....B.... ',
+    '..r.....B.....',
   ],
   paths: [
     [

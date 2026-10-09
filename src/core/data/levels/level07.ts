@@ -7,7 +7,7 @@ export const level07: LevelDef = {
   name: 'Frostbite Pass',
   biome: 'winter',
   tiles: [
-    'T#.....d.T. #',
+    'T#.....d.T..#',
     'd#....cBTT..#',
     'c#.B......TB#',
     '.#.T.#####..#',
@@ -18,7 +18,7 @@ export const level07: LevelDef = {
     '.#.B.#.B.#..#',
     'T#c..#r..#.c#',
     '.#####.B.####',
-    ' c.B.dc...B. ',
+    '.c.B.dc...B..',
   ],
   paths: [
     [

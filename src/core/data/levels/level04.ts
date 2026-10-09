@@ -7,7 +7,7 @@ export const level04: LevelDef = {
   name: 'Dune Crossing',
   biome: 'desert',
   tiles: [
-    '..Tdc.#..... ',
+    '..Tdc.#......',
     '......#...r..',
     '.Bd.B.#c...rd',
     'c.#####..r.r.',
@@ -19,7 +19,7 @@ export const level04: LevelDef = {
     '.r.T.######..',
     '.r..B#.rc....',
     '.....#rBc...c',
-    ' ....#...... ',
+    '.....#.......',
   ],
   paths: [
     [

@@ -7,7 +7,7 @@ export const level09: LevelDef = {
   name: 'Icebound Bastion',
   biome: 'winter',
   tiles: [
-    'cc..cr....... ',
+    'cc..cr........',
     '#############.',
     '...B.r.cdB.c#.',
     'T.......d...#B',
@@ -18,7 +18,7 @@ export const level09: LevelDef = {
     '.#.T.B.T..dTTT',
     '.############c',
     '........c.d.#.',
-    ' .....T.....# ',
+    '......T.....#.',
   ],
   paths: [
     [

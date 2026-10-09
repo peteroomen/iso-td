@@ -7,7 +7,7 @@ export const level05: LevelDef = {
   name: 'Oasis Crossroads',
   biome: 'desert',
   tiles: [
-    ' .rd...r.#.d.',
+    '..rd...r.#.d.',
     '....T.Td.#T..',
     '..dcB...B#..r',
     '#######..#..c',
@@ -19,7 +19,7 @@ export const level05: LevelDef = {
     'd.B#d.#######',
     '..c#Bd.dBd.rT',
     '...#.r.T.....',
-    '...#TT..r... ',
+    '...#TT..r....',
   ],
   paths: [
     [

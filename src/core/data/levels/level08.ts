@@ -7,7 +7,7 @@ export const level08: LevelDef = {
   name: 'Glacier Junction',
   biome: 'winter',
   tiles: [
-    ' .....dddT.. ',
+    '......dddT...',
     'd...d....c...',
     '.B....T....d.',
     '####.cd.dT..T',
@@ -19,7 +19,7 @@ export const level08: LevelDef = {
     '..T.TB#B.####',
     'dT.d..#..TB..',
     '.d...B#B.T...',
-    ' .cTdT#.T... ',
+    '..cTdT#.T....',
   ],
   paths: [
     [

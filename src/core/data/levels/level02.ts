@@ -7,7 +7,7 @@ export const level02: LevelDef = {
   name: 'Blossom Bend',
   biome: 'spring',
   tiles: [
-    ' ........rd ',
+    '.........rd.',
     '.d..rTT....d',
     '#########.dT',
     '..Bcc.dB#Br.',
@@ -18,7 +18,7 @@ export const level02: LevelDef = {
     '...########.',
     '.T.d.....T#.',
     '..d.dB..B.#.',
-    ' r.d....r.#.',
+    '.r.d....r.#.',
   ],
   paths: [
     [
