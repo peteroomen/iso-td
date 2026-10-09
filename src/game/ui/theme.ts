@@ -27,6 +27,8 @@ export function textStyle(size: number, color: string = COLORS.text, extra: Reco
     color,
     stroke: '#2e222f',
     strokeThickness: Math.max(2, Math.round(size / 6)),
+    // render text at 2x so it stays crisp when the canvas is FIT-scaled up
+    resolution: 2,
     ...extra,
   };
 }
