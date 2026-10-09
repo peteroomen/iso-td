@@ -54,6 +54,8 @@ export interface InteractionDeps {
   hud: Hud;
   abilities: AbilityBar;
   isBlocked: () => boolean;
+  /** Map pan / zoom state: a press that turned into a drag or pinch is not a tap. */
+  camera?: { readonly gestureHappened: boolean };
 }
 
 /** Pointer + keyboard interaction: build/upgrade menus, ability targeting, rally placement. */
@@ -75,9 +77,11 @@ export class InteractionController {
     input.mouse?.disableContextMenu();
     input.on('pointerdown', this.onDown, this);
     input.on('pointermove', this.onMove, this);
+    input.on('pointerup', this.onUp, this);
     deps.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       input.off('pointerdown', this.onDown, this);
       input.off('pointermove', this.onMove, this);
+      input.off('pointerup', this.onUp, this);
     });
   }
 
@@ -418,6 +422,26 @@ export class InteractionController {
       if (!(hudHit as { __keep?: boolean }).__keep && this.mode.kind === 'idle') this.closeMenu();
       return;
     }
+    // world taps act on release, so a drag / pinch (pan & zoom) never selects or builds anything
+    this.tapPointer = p.id;
+  }
+
+  private tapPointer = -1;
+
+  /** The view is being panned / zoomed: screen-anchored ring menus would detach from their spot. */
+  viewMoved(): void {
+    this.tapPointer = -1;
+    if (this.mode.kind === 'idle' && this.menu.isOpen) this.closeMenu();
+  }
+
+  private onUp(p: Phaser.Input.Pointer): void {
+    if (this.tapPointer !== p.id) return;
+    this.tapPointer = -1;
+    if (this.d.isBlocked() || this.d.camera?.gestureHappened) return;
+    this.tap(p);
+  }
+
+  private tap(p: Phaser.Input.Pointer): void {
     const { sim, view, simView } = this.d;
     const g = view.toGrid(p.x, p.y);
 

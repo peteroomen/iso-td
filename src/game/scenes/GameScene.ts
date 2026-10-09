@@ -4,6 +4,7 @@ import { AbilityBar } from '../hud/AbilityBar';
 import { EnemyIntro } from '../hud/EnemyIntro';
 import { Hud, barBottom } from '../hud/Hud';
 import { InteractionController } from '../hud/InteractionController';
+import { MapCamera } from '../hud/MapCamera';
 import { Overlays } from '../hud/Overlays';
 import { WaveCall } from '../hud/WaveCall';
 import { Background } from '../render/Background';
@@ -55,6 +56,7 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
   waveCall!: WaveCall;
   intro!: EnemyIntro;
   interaction!: InteractionController;
+  mapCamera!: MapCamera;
   overlays!: Overlays;
 
   private acc = 0;
@@ -123,8 +125,18 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
     this.abilityBar = new AbilityBar(this, this.sim, this.hud, (id) => this.interaction.armAbility(id));
     this.waveCall = new WaveCall(this, this.sim, this.view, this.hud, () => this.callWave());
     this.hud.hintAvoid = () => this.waveCall.avoidRects();
-    this.intro = new EnemyIntro(this, this.sim, () => this.waveCall.avoidRects());
+    this.intro = new EnemyIntro(this, this.sim, () => [...this.waveCall.avoidRects(), this.mapCamera.buttonRect()]);
+    this.mapCamera = new MapCamera({
+      scene: this,
+      view: this.view,
+      world,
+      hud: this.hud,
+      isBlocked: () => this.overlays.active || this.ended,
+      onMove: () => this.interaction?.viewMoved(),
+    });
+    this.hud.hintAvoid = () => [...this.waveCall.avoidRects(), this.mapCamera.buttonRect()];
     this.interaction = new InteractionController({
+      camera: this.mapCamera,
       scene: this,
       sim: this.sim,
       view: this.view,
@@ -423,6 +435,7 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
     const animDt = stepping ? dt * this.speed : 0;
     this.animTime += animDt;
     this.simView.update(this.animTime * 1000, animDt, events);
+    this.mapCamera.update(dt);
     this.interaction.update(time);
     this.markers.update(time);
     this.fx.update(dt);

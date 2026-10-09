@@ -47,10 +47,18 @@ export class IsoView {
   scale = 1;
   offX = 0;
   offY = 0;
+  /** Scale / offset that fit the whole map into the play area (the default view). */
+  fitScale = 1;
+  fitOffX = 0;
+  fitOffY = 0;
+  /** Zoom relative to the fit view (1 = whole map visible); `scale = fitScale * zoom`. */
+  zoom = 1;
+  /** Iso-space bounds of the map art (before scale / offset). */
+  readonly bounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
 
   constructor(
     readonly level: LevelDef,
-    area: PlayArea,
+    readonly area: PlayArea,
   ) {
     const h = level.tiles.length;
     const w = level.tiles.reduce((m, r) => Math.max(m, r.length), 0);
@@ -74,9 +82,72 @@ export class IsoView {
     minY -= 40;
     const bw = maxX - minX;
     const bh = maxY - minY;
+    this.bounds.minX = minX;
+    this.bounds.maxX = maxX;
+    this.bounds.minY = minY;
+    this.bounds.maxY = maxY;
     this.scale = Math.min(area.w / bw, area.h / bh, 0.9);
     this.offX = area.x + area.w / 2 - ((minX + maxX) / 2) * this.scale;
     this.offY = area.y + area.h / 2 - ((minY + maxY) / 2) * this.scale;
+    this.fitScale = this.scale;
+    this.fitOffX = this.offX;
+    this.fitOffY = this.offY;
+  }
+
+  /** Smallest / largest allowed zoom (relative to fit). Never shows the art much above native size. */
+  get minZoom(): number {
+    return 0.92;
+  }
+  get maxZoom(): number {
+    return Math.max(1.25, Math.min(2.5, 1.6 / this.fitScale));
+  }
+
+  /** Zooms to `z` keeping the screen point (fx, fy) fixed, then clamps the pan. */
+  setZoomAt(z: number, fx: number, fy: number): void {
+    z = Math.min(this.maxZoom, Math.max(this.minZoom, z));
+    const lx = (fx - this.offX) / this.scale;
+    const ly = (fy - this.offY) / this.scale;
+    this.zoom = z;
+    this.scale = this.fitScale * z;
+    this.offX = fx - lx * this.scale;
+    this.offY = fy - ly * this.scale;
+    this.clampPan();
+  }
+
+  /** Moves the map by a screen-space delta (clamped). */
+  panBy(dx: number, dy: number): void {
+    this.offX += dx;
+    this.offY += dy;
+    this.clampPan();
+  }
+
+  resetView(): void {
+    this.zoom = 1;
+    this.scale = this.fitScale;
+    this.offX = this.fitOffX;
+    this.offY = this.fitOffY;
+  }
+
+  get isFit(): boolean {
+    return Math.abs(this.zoom - 1) < 0.01 && Math.abs(this.offX - this.fitOffX) < 1 && Math.abs(this.offY - this.fitOffY) < 1;
+  }
+
+  /** Keeps the map on screen: centred while it is smaller than the play area, otherwise its edges may not pass a small slack inside the area. */
+  clampPan(): void {
+    const a = this.area;
+    const b = this.bounds;
+    const s = this.scale;
+    const slack = 0.12;
+    const axis = (off: number, lo: number, hi: number, aMin: number, aLen: number): number => {
+      const len = (hi - lo) * s;
+      if (len <= aLen) return aMin + aLen / 2 - ((lo + hi) / 2) * s;
+      const pad = aLen * slack;
+      const max = aMin + pad - lo * s; // map's low edge may not move right of area start + pad
+      const min = aMin + aLen - pad - hi * s;
+      return Math.min(max, Math.max(min, off));
+    };
+    this.offX = axis(this.offX, b.minX, b.maxX, a.x, a.w);
+    this.offY = axis(this.offY, b.minY, b.maxY, a.y, a.h);
   }
 
   /** Grid -> screen (canvas) coordinates. */

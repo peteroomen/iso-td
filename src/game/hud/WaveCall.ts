@@ -37,6 +37,8 @@ export class WaveCall {
   private freshKey = '';
   private fresh = false;
   private readonly wu = Math.min(UI_SCALE, 1.4);
+  private readonly outs: Vec2[] = [];
+  private readonly view: IsoView;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -45,11 +47,13 @@ export class WaveCall {
     private readonly hud: Hud,
     private readonly onCall: () => void,
   ) {
+    this.view = view;
     sim.paths.forEach((p, i) => {
       const a = p.pts[0];
       const b = p.pts[1];
       const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       const out = { x: a.x + ((a.x - b.x) / l) * 0.55, y: a.y + ((a.y - b.y) / l) * 0.55 };
+      this.outs[i] = out;
       const sp = view.toScreen(out.x, out.y);
       const wu = this.wu;
       const pos = { x: Phaser.Math.Clamp(sp.x, 56 * wu + SAFE.l, GAME_W - 56 * wu - SAFE.r), y: Phaser.Math.Clamp(sp.y - 34 * wu, barBottom() + 64 * wu, GAME_H - 110 * wu - SAFE.b) };
@@ -137,6 +141,16 @@ export class WaveCall {
     const first = st.wave.index === 0;
     const frac = st.wave.countdown !== null ? Phaser.Math.Clamp(st.wave.countdown / st.wave.countdownMax, 0, 1) : 1;
     const secs = st.wave.countdown !== null ? Math.ceil(st.wave.countdown) : -1;
+    // the spawn buttons are anchored to the map: follow it while it is panned / zoomed
+    for (const b of this.btns) {
+      const o = this.outs[b.path];
+      if (!o) continue;
+      const wu = this.wu;
+      const sp = this.view.toScreen(o.x, o.y);
+      b.pos.x = Phaser.Math.Clamp(sp.x, 56 * wu + SAFE.l, GAME_W - 56 * wu - SAFE.r);
+      b.pos.y = Phaser.Math.Clamp(sp.y - 34 * wu * 1, barBottom() + 64 * wu, GAME_H - 110 * wu - SAFE.b);
+      b.c.setPosition(b.pos.x, b.pos.y);
+    }
     for (const b of this.btns) {
       const used = !!next && next.paths.includes(b.path);
       const show = can && used;

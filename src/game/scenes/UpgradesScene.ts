@@ -15,7 +15,7 @@ import {
 } from '../../core';
 import { Audio } from '../services/audio';
 import { getSave, updateSave } from '../services/save';
-import { COLORS, GAME_W, SAFE, designOffsetY, textStyle, viewH, viewW } from '../ui/theme';
+import { COLORS, GAME_W, SAFE, UI_SCALE, designOffsetY, textStyle, viewH, viewW } from '../ui/theme';
 import { addSky } from '../ui/background';
 import {
   Button,
@@ -121,13 +121,16 @@ export class UpgradesScene extends Phaser.Scene {
   // -------------------------------------------------------------------------------------------------------------
 
   private buildHeader(): void {
-    addHeaderBar(this);
-    const back = new Button(this, 104 + SAFE.l, 44, { width: 170, height: 60, label: 'Back', icon: 'ui_back', style: 'secondary', fontSize: 30, onClick: () => this.back() });
-    const title = this.add.text(214 + SAFE.l, 46, 'STAR UPGRADES', textStyle(42, COLORS.textGold, { strokeThickness: 8 })).setOrigin(0, 0.5);
-    const { root, label } = starChip(this, Math.max(560, viewW(this) - 400 - SAFE.r), 44, '0 to spend', 264);
+    const hs = Math.min(1.3, UI_SCALE);
+    const hy = Math.round(44 * hs);
+    addHeaderBar(this, Math.round(92 * hs));
+    const back = new Button(this, 104 * hs + SAFE.l, hy, { width: 170, height: 60, label: 'Back', icon: 'ui_back', style: 'secondary', fontSize: 30, onClick: () => this.back() }).setScale(hs);
+    const title = this.add.text(214 * hs + SAFE.l - 14 * (hs - 1), Math.round(46 * hs), 'STAR UPGRADES', textStyle(42, COLORS.textGold, { strokeThickness: 8 })).setOrigin(0, 0.5).setScale(hs);
+    const { root, label } = starChip(this, Math.max(560, viewW(this) - 400 * hs - SAFE.r), hy, '0 to spend', 264);
+    root.setScale(hs);
     this.chipRoot = root;
     this.chipText = label;
-    this.resetBtn = new Button(this, viewW(this) - 130 - SAFE.r, 44, { width: 190, height: 60, label: 'Reset', icon: 'ui_reset', style: 'danger', fontSize: 30, onClick: () => this.askReset() });
+    this.resetBtn = new Button(this, viewW(this) - 100 * hs - SAFE.r, hy, { width: 190, height: 60, label: 'Reset', icon: 'ui_reset', style: 'danger', fontSize: 30, onClick: () => this.askReset() }).setScale(hs);
     [back, title, root, this.resetBtn].forEach((o, i) => {
       o.setDepth(60).setAlpha(0);
       this.tweens.add({ targets: o, alpha: 1, duration: 400, delay: 200 + i * 70 });
