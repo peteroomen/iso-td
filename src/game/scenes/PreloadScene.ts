@@ -6,7 +6,16 @@ import { addSky } from '../ui/background';
 import { drawOutlinedRect } from '../ui/widgets';
 import { urlParam } from './metaData';
 
-const DEV_SCENES = ['Title', 'LevelSelect', 'Upgrades', 'Game'];
+const TIPS = [
+  'Knights from the Barracks block UFOs so your archers can keep shooting.',
+  'Call the next wave early for bonus gold and faster ability cooldowns.',
+  'Plated UFOs shrug off arrows. Wizards cut right through.',
+  'Prism UFOs resist magic. Send in the archers.',
+  'Spend your stars on upgrades between levels.',
+  'Orbital Strike hits fliers too. Time it on a crowd.',
+];
+
+const DEV_SCENES = ['Title', 'LevelSelect', 'Upgrades', 'Ending', 'Game'];
 
 /** Loads sprites + audio behind a progress bar, then routes to the Title (or a `?scene=` dev shortcut). */
 export class PreloadScene extends Phaser.Scene {
@@ -35,6 +44,8 @@ export class PreloadScene extends Phaser.Scene {
     this.bar = this.add.graphics();
     this.pct = this.add.text(cx, cy + 62, 'Loading... 0%', textStyle(30)).setOrigin(0.5);
     this.drawBar();
+    const tip = TIPS[Math.floor(Math.random() * TIPS.length)];
+    this.add.text(cx, GAME_H - 64, tip, textStyle(24, '#ffe9bf', { strokeThickness: 4, align: 'center', wordWrap: { width: GAME_W - 200 } })).setOrigin(0.5);
 
     this.load.on('progress', (v: number) => (this.target = v));
     this.load.on('complete', () => (this.loaded = true));

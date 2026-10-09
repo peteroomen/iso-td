@@ -13,14 +13,15 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     ensureUiTextures(this);
-    document.getElementById('boot-msg')?.remove();
+    // the HTML "LOADING..." stays up until the web font is ready, so the first canvas frame never shows fallback text
     const go = (): void => {
+      document.getElementById('boot-msg')?.remove();
       if (this.scene.isActive()) this.scene.start('Preload');
     };
     // The bundled font is local, so this is nearly instant; the timeout only guards against odd browsers.
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
     if (!fonts) return go();
     const timeout = new Promise<void>((r) => window.setTimeout(r, 3000));
-    Promise.race([fonts.load('32px "Lilita One"').then(() => undefined), timeout]).then(go, go);
+    Promise.race([fonts.load('32px "Lilita One"', 'UFO DEFENSE 0123456789 abcxyz').then(() => undefined), timeout]).then(go, go);
   }
 }

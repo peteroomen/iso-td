@@ -102,7 +102,7 @@ export class UpgradesScene extends Phaser.Scene {
 
     this.buildColumns();
     this.buildHeader();
-    this.footer = this.add.text(GAME_W / 2, 697, '', textStyle(19, '#b9a9d6', { strokeThickness: 3 })).setOrigin(0.5).setDepth(10);
+    this.footer = this.add.text(GAME_W / 2, 697, '', textStyle(20, '#b9a9d6', { strokeThickness: 3 })).setOrigin(0.5).setDepth(10);
     this.refresh(false);
     this.shown = starsAvailable(this.save());
 
@@ -211,7 +211,7 @@ export class UpgradesScene extends Phaser.Scene {
     const glow = this.add.graphics();
     const face = this.add.container(0, 0);
     const gfx = this.add.graphics();
-    const label = this.add.text(-NODE_W / 2 + 16, -NODE_H / 2 + 12, `TIER ${tier + 1}`, textStyle(15, '#d8cbe8', { strokeThickness: 0 })).setOrigin(0, 0);
+    const label = this.add.text(-NODE_W / 2 + 16, -NODE_H / 2 + 12, `TIER ${tier + 1}`, textStyle(17, '#d8cbe8', { strokeThickness: 0 })).setOrigin(0, 0);
     const costStar = this.add.image(NODE_W / 2 - 54, -NODE_H / 2 + 22, 'ui_star').setDisplaySize(26, 26);
     const costText = this.add.text(NODE_W / 2 - 38, -NODE_H / 2 + 22, String(TIER_COSTS[tier]), textStyle(24, COLORS.textGold, { strokeThickness: 4 })).setOrigin(0, 0.5);
     const icon = this.add.image(NODE_W / 2 - 32, -NODE_H / 2 + 22, 'ui_check').setDisplaySize(32, 32).setVisible(false);
@@ -233,7 +233,10 @@ export class UpgradesScene extends Phaser.Scene {
       this.tweens.add({ targets: face, scale: 1, duration: 110 });
       this.tooltip.hide();
     });
-    face.on('pointerdown', () => this.onTierClick(view));
+    face.on('pointerdown', () => {
+      if (!this.modalOpen && view.state === 'buyable') this.tweens.add({ targets: face, scale: 0.96, duration: 70, yoyo: true });
+      this.onTierClick(view);
+    });
     return view;
   }
 

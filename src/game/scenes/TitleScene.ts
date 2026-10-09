@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { starsEarned } from '../../core';
+import { hasFlag, starsEarned } from '../../core';
 import { Audio } from '../services/audio';
 import { getSave } from '../services/save';
 import { COLORS, GAME_H, GAME_W, textStyle } from '../ui/theme';
@@ -58,6 +58,7 @@ export class TitleScene extends Phaser.Scene {
   private pathLen: number[] = [];
   private totalLen = 0;
   private modalOpen = false;
+  private clickToStart = false;
 
   constructor() {
     super('Title');
@@ -68,6 +69,7 @@ export class TitleScene extends Phaser.Scene {
     this.fliers = [];
     this.turrets = [];
     this.modalOpen = false;
+    this.clickToStart = false;
     addSky(this, 'dusk', { clouds: 5 });
     fadeIn(this);
     Audio.music('music_menu');
@@ -77,7 +79,7 @@ export class TitleScene extends Phaser.Scene {
     this.buildButtons();
     this.buildStarChip();
 
-    this.add.text(14, GAME_H - 10, 'v0.1  |  CC0 art by Artyom Zagorskiy', textStyle(14, '#b9a9d6', { strokeThickness: 3 })).setOrigin(0, 1).setAlpha(0.8);
+    this.add.text(14, GAME_H - 6, 'v0.1  |  CC0 art: Artyom Zagorskiy', textStyle(15, '#c9bbe4', { strokeThickness: 3 })).setOrigin(0, 1).setAlpha(0.85);
 
     this.input.keyboard?.on('keydown-ENTER', () => this.play());
     this.input.keyboard?.on('keydown-SPACE', () => this.play());
@@ -101,6 +103,7 @@ export class TitleScene extends Phaser.Scene {
     const tag = this.add
       .text(GAME_W / 2, 204, 'Stop the alien invasion. Hold the line!', textStyle(26, '#ffe9bf', { strokeThickness: 5 }))
       .setOrigin(0.5)
+      .setDepth(20)
       .setAlpha(0);
     this.tweens.add({ targets: tag, alpha: 1, duration: 600, delay: 900 });
 
@@ -157,7 +160,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   private play(): void {
-    if (this.modalOpen) return;
+    if (this.modalOpen || this.scene.isActive('Settings') || this.clickToStart) return;
     fadeTo(this, () => this.scene.start('LevelSelect'));
   }
 
@@ -170,7 +173,7 @@ export class TitleScene extends Phaser.Scene {
     if (this.modalOpen) return;
     this.modalOpen = true;
     const lines: [string, string][] = [
-      ['Art', 'Isometric Tower Defense Pack by Artyom Zagorskiy (CC0). Mothership sprite generated to match the pack.'],
+      ['Art', 'Isometric Tower Defense Pack by Artyom Zagorskiy (CC0). The Mothership sprite was generated to match the pack.'],
       ['Sound effects', 'Kenney.nl (CC0): Interface Sounds, UI Audio, Impact Sounds, Digital Audio, RPG Audio, Sci-fi Sounds, Music Jingles.'],
       ['Music', 'The Old Tower Inn by RandomMind  |  Grasslands by Juhani Junkala (SubspaceAudio)  |  Adventure Time by Scribe  |  Boss Battle #2 by nene  (OpenGameArt, CC0).'],
       ['Font', 'Lilita One by Juan Montoreano (SIL Open Font License).'],
@@ -179,21 +182,26 @@ export class TitleScene extends Phaser.Scene {
     openModal(this, {
       title: 'Credits',
       width: 980,
-      height: 620,
+      height: 648,
       closeOnBackdrop: true,
       onClose: () => (this.modalOpen = false),
       build: (m) => {
         let y = m.top + 14;
         for (const [head, body] of lines) {
-          const h = this.add.text(-m.width / 2 + 54, y, head, textStyle(28, COLORS.textGold)).setOrigin(0, 0);
+          const h = this.add.text(-m.width / 2 + 54, y, head, textStyle(26, COLORS.textGold)).setOrigin(0, 0);
           const b = this.add
-            .text(-m.width / 2 + 54, y + 34, body, textStyle(21, COLORS.text, { strokeThickness: 0, wordWrap: { width: m.width - 108 }, lineSpacing: 3 }))
+            .text(-m.width / 2 + 54, y + 32, body, textStyle(23, COLORS.text, { strokeThickness: 0, wordWrap: { width: m.width - 108 }, lineSpacing: 2 }))
             .setOrigin(0, 0);
           m.root.add([h, b]);
-          y += 34 + b.height + 12;
+          y += 32 + b.height + 10;
         }
       },
-      buttons: [{ label: 'Close', style: 'primary', width: 220 }],
+      buttons: [
+        ...(hasFlag(getSave(), 'endingSeen')
+          ? [{ label: 'Watch ending', icon: 'ui_play', style: 'success' as const, width: 280, onClick: () => fadeTo(this, () => this.scene.start('Ending', { returnTo: 'Title' })) }]
+          : []),
+        { label: 'Close', style: 'primary' as const, width: 220 },
+      ],
     });
   }
 
@@ -202,6 +210,7 @@ export class TitleScene extends Phaser.Scene {
   // -------------------------------------------------------------------------------------------------------------
 
   private showClickToStart(): void {
+    this.clickToStart = true;
     const root = this.add.container(0, 0).setDepth(2000);
     const dim = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x120c1c, 0.74).setInteractive();
     const t = this.add.text(GAME_W / 2, GAME_H / 2 - 6, 'CLICK TO START', textStyle(84, COLORS.textGold, { strokeThickness: 14 })).setOrigin(0.5);
@@ -214,6 +223,8 @@ export class TitleScene extends Phaser.Scene {
     const dismiss = (): void => {
       if (gone) return;
       gone = true;
+      // the same key press must not also count as "Play"
+      this.time.delayedCall(80, () => (this.clickToStart = false));
       this.tweens.add({ targets: root, alpha: 0, duration: 260, onComplete: () => root.destroy() });
     };
     dim.once('pointerdown', dismiss);
@@ -258,9 +269,10 @@ export class TitleScene extends Phaser.Scene {
     const pts = ROAD_CELLS.map(([c, r]) => island.cellPos(c, r));
     const first = pts[0], second = pts[1], last = pts[pts.length - 1], beforeLast = pts[pts.length - 2];
     this.pathPts = [
-      { x: first.x - (second.x - first.x), y: first.y - (second.y - first.y) },
+      // half a cell past each end (not a full one): UFOs fade in/out there and must not climb into the tagline above
+      { x: first.x - (second.x - first.x) * 0.5, y: first.y - (second.y - first.y) * 0.5 },
       ...pts,
-      { x: last.x + (last.x - beforeLast.x), y: last.y + (last.y - beforeLast.y) },
+      { x: last.x + (last.x - beforeLast.x) * 0.5, y: last.y + (last.y - beforeLast.y) * 0.5 },
     ];
     this.pathLen = [0];
     for (let i = 1; i < this.pathPts.length; i++) {
@@ -272,8 +284,9 @@ export class TitleScene extends Phaser.Scene {
     const walkerKinds = ['ufo/ufo_1', 'ufo/ufo_2', 'ufo/ufo_4', 'ufo/ufo_1', 'ufo/ufo_5'];
     walkerKinds.forEach((key, i) => this.addFlier(key, 'walker', { dist: -i * 95 - 30, speed: 34 + (key === 'ufo/ufo_2' ? 20 : 0), hover: 16 }));
     // high fliers circling above the island
-    this.addFlier('ufo/ufo_3', 'circler', { phase: 0, cx: -20, cy: -128, rx: 230, ry: 30, rate: 0.5, hover: 0 });
-    this.addFlier('ufo/ufo_6', 'circler', { phase: 2.4, cx: 70, cy: -118, rx: 280, ry: 26, rate: -0.32, hover: 0, scale: 0.95 });
+    // (kept below the tagline: the highest point of an orbit must stay clear of the text above the island)
+    this.addFlier('ufo/ufo_3', 'circler', { phase: 0, cx: -20, cy: -84, rx: 230, ry: 24, rate: 0.5, hover: 0 });
+    this.addFlier('ufo/ufo_6', 'circler', { phase: 2.4, cx: 70, cy: -78, rx: 280, ry: 20, rate: -0.32, hover: 0, scale: 0.9 });
   }
 
   private addFlier(
@@ -282,7 +295,7 @@ export class TitleScene extends Phaser.Scene {
     o: Partial<Flier> & { scale?: number },
   ): void {
     const baseScale = (o.scale ?? 0.58) * (kind === 'circler' ? 1 : 1);
-    const img = this.add.image(0, 0, key).setScale(baseScale).setOrigin(0.5, 0.86);
+    const img = this.add.image(0, 0, key).setScale(baseScale).setOrigin(0.5, kind === 'circler' ? 0.5 : 0.86);
     this.island.root.add(img);
     img.setDepth(9000);
     this.fliers.push({
@@ -317,6 +330,7 @@ export class TitleScene extends Phaser.Scene {
         if (f.dist > this.totalLen) f.dist -= this.totalLen + 120; // loop with a pause
         const visible = f.dist >= 0;
         f.img.setVisible(visible);
+        f.img.setAlpha(Phaser.Math.Clamp(f.dist / 60, 0, 1) * Phaser.Math.Clamp((this.totalLen - f.dist) / 60, 0, 1));
       } else {
         const a = f.phase + (time / 1000) * f.rate;
         gx = f.cx + Math.cos(a) * f.rx;
