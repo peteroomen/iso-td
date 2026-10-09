@@ -4,8 +4,59 @@ import { depthOf, isoX, isoY } from './iso';
 import { Layers } from './Fx';
 import { TEX } from './textures';
 
-const BASE_OY: Record<string, number> = { archer: 0.86, wizard: 0.8, barracks: 0.82 };
-export const TOWER_SCALE = 1.2;
+/**
+ * Towers are drawn at NATIVE scale (1.0): the pack's towers are authored for these tiles (base diamond ~ the
+ * orange disc of tiles/buildspot_*.png, ~122 x 57 px) and any magnification would thicken their outline.
+ *
+ * FOOT = pixel inside the tower PNG that must sit on the cell centre (= tile top-face centre = disc centre):
+ * the centre of the tower's own base diamond. Measured with PIL on the alpha>128 silhouette:
+ *   - stone towers (archer / barracks): the silhouette's bottom tip is the front vertex of the base diamond and the
+ *     walls reach their full width W one diamond half-height above it, so centreY = bottomY - 0.288 * W
+ *     (diamond ratio 144/250 of the tiles: half-height = 0.288 W). archer W=129 (bottom 164/174/179 -> 37 px up),
+ *     barracks W=120 (bottom 153 -> 35 px up). centreX = bbox centre (symmetric).
+ *   - wizard rock slab: the sprites carry transparent padding (bbox x 15..120 / y 9..111 at L1), the slab's own
+ *     base is the grey block (x ~42..110, front edge y ~94): centre (76, 76) at L1/L2, (70, 74) at L3 (slab visual centre ~72 + a few px so the rock sits on the disc).
+ * All levels of a tower share the same footprint so upgrading grows the tower upwards without jumping.
+ * `unitY` = y (sprite px) of the archer unit's feet, `gem` = staff gem position for the wizard flash.
+ */
+interface FootSpec {
+  x: number;
+  y: number;
+  /** archer: y of the runtime archer's feet / wizard: staff gem (x, y) in sprite px. */
+  unitY?: number;
+  gem?: [number, number];
+  /** y (px above the footprint centre) of arrow / bolt launch. */
+  shootH: number;
+}
+const FOOT: Record<TowerState['kind'], FootSpec[]> = {
+  archer: [
+    { x: 64.5, y: 127, unitY: 60, shootH: 67 },
+    { x: 65, y: 137, unitY: 60, shootH: 77 },
+    { x: 65, y: 142, unitY: 59, shootH: 83 },
+  ],
+  wizard: [
+    { x: 76, y: 76, gem: [58, 18], shootH: 64 },
+    { x: 76, y: 76, gem: [57, 18], shootH: 64 },
+    { x: 70, y: 74, gem: [50, 12], shootH: 68 },
+  ],
+  barracks: [
+    { x: 70.5, y: 118, shootH: 60 },
+    { x: 70.5, y: 118, shootH: 60 },
+    { x: 70.5, y: 118, shootH: 60 },
+  ],
+};
+/** Half-height of the base diamond + margin: where the level pips sit below the footprint centre. */
+const PIPS_Y = 46;
+
+function footOf(kind: TowerState['kind'], level: number): FootSpec {
+  const t = FOOT[kind];
+  return t[Math.max(0, Math.min(t.length - 1, level - 1))];
+}
+
+/** Height (px above the footprint centre) projectiles / sparks leave a tower at. */
+export function towerShootHeight(kind: TowerState['kind'], level: number): number {
+  return footOf(kind, level).shootH;
+}
 
 function bodyKey(t: TowerState, door: number): string {
   if (t.kind === 'archer') return `towers/archer_level_${t.level}`;
@@ -47,11 +98,11 @@ export class TowerView {
     this.container.setDepth(depthOf(st.x, st.y));
     L.entityC.add(this.container);
     this.pips = scene.add.graphics();
-    this.body = scene.add.image(0, 0, bodyKey(st, 1)).setScale(TOWER_SCALE);
+    this.body = scene.add.image(0, 0, bodyKey(st, 1)).setScale(1);
     this.container.add([this.body, this.pips]);
     if (st.kind === 'archer') {
-      this.unit = scene.add.image(0, 0, 'towers/archer').setScale(TOWER_SCALE * 0.95);
-      this.bow = scene.add.image(0, 0, 'towers/bow_animation_1').setScale(TOWER_SCALE * 0.9).setVisible(false);
+      this.unit = scene.add.image(0, 0, 'towers/archer').setScale(1);
+      this.bow = scene.add.image(0, 0, 'towers/bow_animation_1').setScale(1).setVisible(false);
       this.container.add([this.unit, this.bow]);
     } else if (st.kind === 'wizard') {
       this.glow = scene.add.image(0, 0, TEX.glow).setBlendMode(Phaser.BlendModes.ADD).setTint(0x7fd0ff).setAlpha(0).setScale(0.8);
@@ -63,20 +114,19 @@ export class TowerView {
   private applyLevel(st: TowerState): void {
     this.level = st.level;
     this.body.setTexture(bodyKey(st, this.door));
-    this.body.setOrigin(0.5, BASE_OY[st.kind]);
-    const h = this.body.height * TOWER_SCALE;
-    const top = -h * BASE_OY[st.kind];
-    if (this.unit) {
+    const f = footOf(st.kind, st.level);
+    this.body.setOrigin(f.x / this.body.width, f.y / this.body.height);
+    if (this.unit && f.unitY !== undefined) {
       this.unit.setOrigin(0.5, 0.8);
-      this.unit.y = top + h * (st.level === 1 ? 0.36 : st.level === 2 ? 0.34 : 0.33);
+      this.unit.y = f.unitY - f.y;
       this.unit.x = 0;
     }
-    if (this.glow) this.glow.setPosition(-14 * TOWER_SCALE, top + h * 0.3);
+    if (this.glow && f.gem) this.glow.setPosition(f.gem[0] - f.x, f.gem[1] - f.y);
     this.pips.clear();
     for (let i = 0; i < st.level; i++) {
-      const x = (i - (st.level - 1) / 2) * 15;
-      this.pips.fillStyle(0xffd34e, 1).fillCircle(x, 30, 6.5);
-      this.pips.lineStyle(2.5, 0x2e222f, 1).strokeCircle(x, 30, 6.5);
+      const x = (i - (st.level - 1) / 2) * 13;
+      this.pips.fillStyle(0xffd34e, 1).fillCircle(x, PIPS_Y, 5.5);
+      this.pips.lineStyle(2, 0x2e222f, 1).strokeCircle(x, PIPS_Y, 5.5);
     }
   }
 
@@ -136,8 +186,8 @@ export class TowerView {
   /** Is the world-local point on this tower's sprite? */
   hitTest(lx: number, ly: number): boolean {
     const w = this.body.displayWidth * 0.5;
-    const top = this.container.y - this.body.displayHeight * BASE_OY[this.kind];
-    const bottom = this.container.y + 30;
+    const top = this.container.y - this.body.displayHeight * this.body.originY;
+    const bottom = this.container.y + 40;
     return Math.abs(lx - this.container.x) <= w * 0.85 && ly >= top && ly <= bottom;
   }
 

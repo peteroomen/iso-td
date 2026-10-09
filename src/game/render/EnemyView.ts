@@ -3,7 +3,7 @@ import { ENEMIES, type EnemyState } from '../../core';
 import { Layers } from './Fx';
 import { BarInfo } from './KnightView';
 import { depthOf, isoX, isoY } from './iso';
-import { BOSS_SCALE, SLOW_TINT, UFO_SCALE, hoverOf } from './style';
+import { BOSS_SCALE, SLOW_TINT, enemyScale, hoverOf } from './style';
 import { TEX } from './textures';
 
 const ADD = Phaser.BlendModes.ADD;
@@ -40,7 +40,7 @@ export class EnemyView {
     const def = ENEMIES[st.type];
     this.type = st.type;
     this.hover = hoverOf(st);
-    this.baseScale = st.boss ? BOSS_SCALE : UFO_SCALE * def.scale;
+    this.baseScale = st.boss ? BOSS_SCALE : enemyScale(def.scale);
     this.sprite = scene.add.image(0, 0, `ufo/${def.sprite}`).setOrigin(0.5, st.boss ? 0.62 : 0.88).setScale(this.baseScale);
     this.spriteH = this.sprite.displayHeight * (st.boss ? 0.62 : 0.88);
     this.container = scene.add.container(isoX(st.x, st.y), isoY(st.x, st.y));
@@ -88,7 +88,7 @@ export class EnemyView {
     const t = time / 1000 + this.phase;
     const px = isoX(st.x, st.y);
     const py = isoY(st.x, st.y);
-    const bobAmp = st.boss ? 5 : st.flier ? 6 : 4;
+    const bobAmp = st.boss ? 3 : st.flier ? 4 : 2.5;
     const bob = Math.sin(t * (st.boss ? 1.4 : 3.2)) * bobAmp;
     const alt = this.hover + bob;
     this.container.setPosition(px, py - alt);
@@ -103,7 +103,7 @@ export class EnemyView {
     this.container.setAlpha(fade);
 
     const sh = this.hover / 80;
-    const wBase = (st.boss ? 5.0 : 0.85 * this.baseScale) * (1 - Math.min(0.4, sh * 0.45));
+    const wBase = (st.boss ? 3.4 : 1.0 * this.baseScale) * (1 - Math.min(0.4, sh * 0.45));
     this.shadow.setPosition(px, py + 3);
     this.shadow.setScale(wBase * (st.boss ? 1 : 1) * 0.9, wBase * 0.9);
     this.shadow.setAlpha(fade * (st.flier ? 0.55 : 0.9) * (st.boss ? 0.8 : 1));
@@ -146,9 +146,9 @@ export class EnemyView {
   /** Fills `out` (reused by the caller, no allocation) with this unit's hp bar. */
   bar(st: EnemyState, out: BarInfo): BarInfo {
     out.x = this.container.x;
-    out.y = this.container.y - this.spriteH - 5;
+    out.y = this.container.y - this.spriteH - 3;
     out.frac = st.hp / st.maxHp;
-    out.width = st.type === 'dread' || st.type === 'carrier' ? 44 : 36;
+    out.width = st.type === 'dread' || st.type === 'carrier' ? 34 : 28;
     out.show = !st.boss && st.hp < st.maxHp - 0.01;
     return out;
   }

@@ -83,29 +83,7 @@ export class GroundMarkers {
     });
   }
 
-  /** Scratch point list reused by every diamond() call (the points are consumed immediately by the Graphics). */
-  private readonly diamondPts = [
-    { x: 0, y: 0 },
-    { x: 0, y: 0 },
-    { x: 0, y: 0 },
-    { x: 0, y: 0 },
-  ];
   private readonly ell = { x: 0, y: 0, w: 0, h: 0 };
-
-  private diamond(cx: number, cy: number, inset = 0): { x: number; y: number }[] {
-    const hw = TW / 2 - inset * 1.7;
-    const hh = TH / 2 - inset;
-    const p = this.diamondPts;
-    p[0].x = cx;
-    p[0].y = cy - hh;
-    p[1].x = cx + hw;
-    p[1].y = cy;
-    p[2].x = cx;
-    p[2].y = cy + hh;
-    p[3].x = cx - hw;
-    p[3].y = cy;
-    return p;
-  }
 
   /** Iso ellipse of a grid radius. Returns a shared scratch object: read it before the next call. */
   private ellipse(gx: number, gy: number, r: number): { x: number; y: number; w: number; h: number } {
@@ -129,11 +107,13 @@ export class GroundMarkers {
         const cx = isoX(s.x, s.y);
         const cy = isoY(s.x, s.y);
         const hov = this.hoverSpot === id;
-        const pts = this.diamond(cx, cy, hov ? 8 : 12);
+        // sized to the orange disc of the buildspot tile (~122 x 57 px), centred on the cell centre like the towers
+        const gw = hov ? 142 : 132;
+        const gh = gw * 0.47;
         g.fillStyle(0xffffff, hov ? 0.4 : 0.1 + 0.12 * pulse);
-        g.fillPoints(pts, true);
+        g.fillEllipse(cx, cy, gw, gh);
         g.lineStyle((hov ? 5 : 3.5) * this.k * 0.6 + 2, 0xfff4d6, hov ? 0.95 : 0.35 + 0.35 * pulse);
-        g.strokePoints(pts, true);
+        g.strokeEllipse(cx, cy, gw, gh);
       }
     }
 
@@ -155,7 +135,7 @@ export class GroundMarkers {
     }
 
     if (this.selected) {
-      const e = this.ellipse(this.selected.gx, this.selected.gy, 0.62);
+      const e = this.ellipse(this.selected.gx, this.selected.gy, 0.46);
       g.lineStyle(3.5, 0xffe27a, 0.95);
       g.strokeEllipse(e.x, e.y, e.w, e.h);
       g.fillStyle(0xffe27a, 0.14 + 0.08 * pulse);

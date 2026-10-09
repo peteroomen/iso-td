@@ -43,7 +43,7 @@ export class KnightView {
     this.container = scene.add.container(isoX(st.x, st.y), isoY(st.x, st.y), [this.sprite]);
     this.container.setDepth(depthOf(st.x, st.y));
     L.entityC.add(this.container);
-    this.shadow = scene.add.image(0, 0, TEX.shadow).setScale(1.05, 1.05).setAlpha(0.85);
+    this.shadow = scene.add.image(0, 0, TEX.shadow).setScale(0.72, 0.72).setAlpha(0.85);
     L.groundFxC.add(this.shadow);
   }
 
@@ -60,7 +60,7 @@ export class KnightView {
     this.sprite.setAlpha(0);
     this.scene.tweens.add({
       targets: this.sprite,
-      y: { from: -260, to: 0 },
+      y: { from: -150, to: 0 },
       alpha: { from: 0, to: 1 },
       duration: 420,
       ease: 'Bounce.easeOut',
@@ -89,7 +89,7 @@ export class KnightView {
     }
     const walking = st.mode === 'walking';
     this.bob += dt * (walking ? 16 : 3);
-    const bobY = walking ? -Math.abs(Math.sin(this.bob)) * 6.5 : Math.sin(this.bob) * 1;
+    const bobY = walking ? -Math.abs(Math.sin(this.bob)) * 4 : Math.sin(this.bob) * 1;
     this.container.setPosition(px + this.lunge.x, py + this.lunge.y + (this.appear === 1 ? bobY : 0));
     this.container.setDepth(depthOf(st.x, st.y));
     this.shadow.setPosition(px, py + 2);
@@ -107,7 +107,7 @@ export class KnightView {
       this.lunge.x = 0;
       this.lunge.y = 0;
       this.lungeTween?.stop();
-      const to = { x: (dx / l) * 19, y: (dy / l) * 11 };
+      const to = { x: (dx / l) * 12, y: (dy / l) * 7 };
       this.lungeTween = this.scene.tweens.add({ targets: this.lunge, x: to.x, y: to.y, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
     }
     this.lastAttacking = st.attacking;
@@ -121,9 +121,9 @@ export class KnightView {
   /** Fills `out` (reused by the caller, no allocation) with this unit's hp bar. */
   bar(st: KnightState, out: BarInfo): BarInfo {
     out.x = this.container.x;
-    out.y = this.container.y - this.sprite.displayHeight * 0.94 - 6;
+    out.y = this.container.y - this.sprite.displayHeight * 0.94 - 3;
     out.frac = st.hp / st.maxHp;
-    out.width = 30;
+    out.width = 24;
     out.show = st.mode !== 'dead' && st.hp < st.maxHp - 0.01;
     return out;
   }

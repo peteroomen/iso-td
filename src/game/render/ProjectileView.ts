@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { ProjectileState } from '../../core';
 import { Layers } from './Fx';
 import { depthOf, isoX, isoY } from './iso';
+import { ARROW_SCALE, BOLT_SCALE } from './style';
 import { TEX } from './textures';
 
 const ADD = Phaser.BlendModes.ADD;
@@ -29,9 +30,9 @@ export class ProjectileView {
     private toH: number,
   ) {
     this.isBolt = st.kind === 'bolt';
-    this.img = scene.add.image(0, 0, this.isBolt ? 'towers/wizard_bullet' : 'towers/arrow').setScale(this.isBolt ? 3.4 : 2.7);
+    this.img = scene.add.image(0, 0, this.isBolt ? 'towers/wizard_bullet' : 'towers/arrow').setScale(this.isBolt ? BOLT_SCALE : ARROW_SCALE);
     if (this.isBolt) {
-      this.glow = scene.add.image(0, 0, TEX.glow).setBlendMode(ADD).setTint(0x7fc8ff).setScale(1.0);
+      this.glow = scene.add.image(0, 0, TEX.glow).setBlendMode(ADD).setTint(0x7fc8ff).setScale(0.85);
       L.fxC.add(this.glow);
     }
     L.fxC.add(this.img);
@@ -47,7 +48,7 @@ export class ProjectileView {
     const done = Math.hypot(st.x - st.fromX, st.y - st.fromY);
     const t = Math.min(1, done / total);
     const toH = targetH || this.toH;
-    const arc = this.isBolt ? 10 : 38;
+    const arc = this.isBolt ? 6 : 24;
     this.h = this.fromH + (toH - this.fromH) * t + Math.sin(Math.PI * t) * arc;
     this.gx = st.x;
     this.gy = st.y;

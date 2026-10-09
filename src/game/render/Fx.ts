@@ -77,7 +77,7 @@ export class Fx {
     this.fire = mk(TEX.glow, {
       lifespan: { min: 320, max: 640 },
       speed: { min: 40, max: 230 },
-      scale: { start: 1.1, end: 0.1 },
+      scale: { start: 0.85, end: 0.1 },
       alpha: { start: 0.95, end: 0 },
       color: [0xfff3b0, 0xffa23a, 0xd8442a],
       colorEase: 'quad.out',
@@ -132,7 +132,7 @@ export class Fx {
       gravityY: 520,
       angle: { min: 200, max: 340 },
       rotate: { min: 0, max: 360 },
-      scale: { start: 1.3, end: 0.5 },
+      scale: { start: 1.0, end: 0.4 },
       alpha: { start: 1, end: 0 },
       color: [0xc9d1dc, 0x8e98a8, 0xe5484d],
     });
@@ -202,7 +202,7 @@ export class Fx {
 
   explosion(gx: number, gy: number, size: 'small' | 'big' | 'huge', h = 40): void {
     const p = this.pt(gx, gy, h);
-    const n = size === 'small' ? 10 : size === 'big' ? 20 : 46;
+    const n = size === 'small' ? 8 : size === 'big' ? 16 : 40;
     this.fire.explode(n, p.x, p.y);
     this.sparkWhite.explode(size === 'small' ? 6 : 14, p.x, p.y);
     this.debris.explode(size === 'small' ? 5 : size === 'big' ? 10 : 24, p.x, p.y);
@@ -213,7 +213,7 @@ export class Fx {
       this.L.fxC.add(img);
     }
     img.setPosition(p.x, p.y).setScale(0.3).setAlpha(0.9).setVisible(true);
-    this.rings.push({ img, age: 0, scale: size === 'small' ? 1.6 : size === 'big' ? 2.6 : 5 });
+    this.rings.push({ img, age: 0, scale: size === 'small' ? 1.2 : size === 'big' ? 2.0 : 4.2 });
   }
 
   private updateRings(dt: number): void {
@@ -300,7 +300,7 @@ export class Fx {
 
   coinPop(gx: number, gy: number, amount: number, h = 50): void {
     if (amount <= 0) return;
-    this.floatText(gx, gy, `+${amount}`, COLORS.textGold, h, 22);
+    this.floatText(gx, gy, `+${amount}`, COLORS.textGold, h, 17);
     this.hitSpark(gx, gy, h, 'gold', 5);
   }
 

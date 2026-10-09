@@ -8,12 +8,11 @@ import { IsoView, TH, TW, isoX, isoY } from './iso';
 import { BarInfo, KnightView } from './KnightView';
 import { ProjectileView } from './ProjectileView';
 import { HOVER_BOSS, HOVER_FLIER, HOVER_GROUND, bodyHeightOf } from './style';
-import { TOWER_SCALE, TowerView } from './TowerView';
+import { TowerView, towerShootHeight } from './TowerView';
 
 const killNow = (v: { destroy(): void }): void => v.destroy();
 const killAnimated = (v: { destroyAnimated(): void }): void => v.destroyAnimated();
 
-const TOWER_SHOOT_H: Record<string, number> = { archer: 105, wizard: 100, barracks: 60 };
 
 /**
  * Turns the Sim snapshot + events into sprites, particles and sound.
@@ -92,7 +91,7 @@ export class SimRenderer {
       }
       const tower = this.sim.getTower(p.towerId);
       const tgt = this.sim.getEnemy(p.targetId);
-      const th = (tower ? TOWER_SHOOT_H[tower.kind] : 90) * TOWER_SCALE;
+      const th = tower ? towerShootHeight(tower.kind, tower.level) : 70;
       const targetH = tgt ? bodyHeightOf(tgt) : 30;
       // interpolate height from tower top to target body height
       v.stamp = frame;
@@ -140,10 +139,10 @@ export class SimRenderer {
         cleared = true;
       }
       const w = b.width * k;
-      const h = 7 * k;
+      const h = 6 * k;
       const x = b.x - w / 2;
       const y = b.y - h;
-      const o = 2 * k;
+      const o = 1.5 * k;
       const f = Math.max(0, Math.min(1, b.frac));
       g.fillStyle(0x2e222f, 1).fillRoundedRect(x - o, y - o, w + 2 * o, h + 2 * o, 3 * k);
       g.fillStyle(0x5a3a48, 1).fillRect(x, y, w, h);
@@ -233,9 +232,9 @@ export class SimRenderer {
   // ----------------------------------------------------------------------------------- events
 
   private enemyHeight(type: EnemyId): number {
-    if (type === 'mothership') return HOVER_BOSS + 70;
-    if (type === 'skimmer') return HOVER_FLIER + 58;
-    return HOVER_GROUND + 58;
+    if (type === 'mothership') return HOVER_BOSS + 36;
+    if (type === 'skimmer') return HOVER_FLIER + 30;
+    return HOVER_GROUND + 30;
   }
 
   private handle(e: SimEvent): void {
@@ -261,7 +260,7 @@ export class SimRenderer {
       case 'shoot':
         if (e.kind === 'wizard') {
           Audio.sfx('wizard_cast', { volume: 0.55, detune: (Math.random() - 0.5) * 200, throttleMs: 60 });
-          fx.hitSpark(e.x, e.y, 105, 'blue', 3);
+          fx.hitSpark(e.x, e.y, towerShootHeight('wizard', 2), 'blue', 3);
         } else {
           Audio.sfx('arrow_shoot', { volume: 0.5, detune: (Math.random() - 0.5) * 240, throttleMs: 50 });
         }
@@ -269,7 +268,7 @@ export class SimRenderer {
       case 'hit': {
         const v = this.enemies.get(e.enemyId);
         v?.flash();
-        const h = this.enemyHeight(e.enemy) - 8;
+        const h = this.enemyHeight(e.enemy) - 4;
         if (e.source === 'orbital') break;
         if (e.source === 'knight' || e.source === 'militia') break;
         fx.hitSpark(e.x, e.y, h, e.damageType === 'magic' ? 'blue' : 'white', e.source === 'bolt' || e.source === 'chain' ? 6 : 3);
@@ -282,7 +281,7 @@ export class SimRenderer {
         const tgt = this.sim.getEnemy(e.targetId);
         const h2 = tgt ? bodyHeightOf(tgt) : 50;
         fx.lightning([
-          { gx: e.fromX, gy: e.fromY, h: 50 },
+          { gx: e.fromX, gy: e.fromY, h: towerShootHeight('wizard', 2) },
           { gx: e.toX, gy: e.toY, h: h2 },
         ]);
         break;
@@ -304,7 +303,7 @@ export class SimRenderer {
         } else if (big) {
           fx.shake(3, 0.2);
         }
-        fx.coinPop(e.x, e.y, e.gold, h + 18);
+        fx.coinPop(e.x, e.y, e.gold, h + 14);
         Audio.sfx(big || e.boss ? 'ufo_explode_big' : 'ufo_explode_small', { volume: big ? 0.9 : 0.6, throttleMs: 45, detune: (Math.random() - 0.5) * 300 });
         if (e.gold > 0) Audio.sfx('coin', { volume: 0.5, throttleMs: 80 });
         break;
@@ -314,13 +313,13 @@ export class SimRenderer {
         break;
       case 'escortLaunch':
         if (this.enemies.has(e.fromId)) {
-          fx.glowFlash(e.x, e.y, HOVER_BOSS - 10, 0xffa040, 260, 0.5);
-          fx.glowFlash(e.x, e.y, 20, 0xffe27a, 160, 0.35);
+          fx.glowFlash(e.x, e.y, HOVER_BOSS - 6, 0xffa040, 260, 0.5);
+          fx.glowFlash(e.x, e.y, 10, 0xffe27a, 160, 0.35);
         }
         break;
       case 'meleeHit': {
         Audio.sfx('sword_clash', { volume: 0.3, throttleMs: 150, detune: (Math.random() - 0.5) * 300 });
-        fx.hitSpark(e.x, e.y, 48, 'white', 3);
+        fx.hitSpark(e.x, e.y, 30, 'white', 3);
         if (e.attacker === 'enemy') this.knights.get(e.targetId)?.flash();
         else this.enemies.get(e.targetId)?.flash();
         break;
