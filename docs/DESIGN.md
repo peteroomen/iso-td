@@ -106,7 +106,7 @@ for Plated, red pulse for Dreadnought).
 | prism | ufo_5 | Prism | 60 | 1.0 | 0 | 0.5 | 10 | 1 | 4 / 1.0 | magic shield |
 | carrier | ufo_6 | Carrier | 150 | 0.7 | 0 | 0 | 20 | 2 | 8 / 1.5 | on death releases 3 Darts; scale 1.3 |
 | dread | ufo_7 | Dreadnought | 400 | 0.6 | 0.3 | 0.3 | 40 | 3 | 25 / 1.5 | scale 1.5 |
-| mothership | boss (ufo_7 ×3 placeholder) | Mothership | 6000 | 0.35 | 0.4 | 0.4 | 0 | 20 | – | not blockable; launches 2 scouts + 1 dart every 8 s; top-of-screen HP bar |
+| mothership | mothership.png | Mothership | 6000 | 0.35 | 0.4 | 0.4 | 0 | 20 | – | not blockable; launches 2 scouts + 1 dart every 8 s; top-of-screen HP bar |
 
 Enemies walk their path with a small random lateral offset (±0.2 t) so groups don't stack perfectly.
 
@@ -192,4 +192,4 @@ Entities have stable numeric ids so the renderer can map them to sprites. Render
 `roads/road_<biome>_<1..11>.png`, `deco/*` (trees, stones, cacti, crystals, small decorations), `towers/*`
 (archer/wizard/barrack levels; barrack has two door orientations `_1`/`_2`; arrow, wizard_bullet, bow_animation_1..4,
 archer.png = archer unit, stick = wizard staff, sword, shield), `units/knight_level_1..3.png`, `ufo/ufo_1..7.png`.
-Boss sprite placeholder until a generated mothership is supplied (`ufo/mothership.png`).
+Boss sprite: `ufo/mothership.png` (320×271, generated to match the pack style; hangar opening at bottom-center is where escorts launch).
