@@ -52,6 +52,6 @@ export const level03: LevelDef = {
     { groups: [g('scout', 8, 0.75, 0), g('scout', 8, 0.75, 2, 1), g('plated', 2, 2.4, 4), g('plated', 2, 2.4, 5, 1), g('skimmer', 5, 0.95, 8), g('dart', 8, 0.55, 14, 1)] },
   ],
   hints: [
-    { waveIndex: 2, text: 'Plated UFOs shrug off half of all arrows and knight blows - wizard magic cuts right through.' },
+    { waveIndex: 2, text: 'Plated UFOs shrug off most arrows and knight blows - wizard magic cuts right through.' },
   ],
 };

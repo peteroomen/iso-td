@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ENEMIES } from '../src/core/data/enemies';
 import { calcDamage } from '../src/core/sim/stats';
 import { Recorder, makeSim, straightLevel, wave } from './helpers';
 
@@ -32,25 +33,27 @@ describe('damage in the sim', () => {
     return rec.of('hit')[0].e;
   }
 
-  it('arrows are halved by plated armor, bolts are not', () => {
+  it('arrows are cut by plated armor, bolts are not', () => {
     const arrow = firstHit('archer', 'plated');
     expect(arrow.damageType).toBe('physical');
-    expect(arrow.amount).toBeCloseTo(arrow.raw * 0.5);
+    expect(arrow.amount).toBeCloseTo(arrow.raw * (1 - ENEMIES.plated.armor));
+    expect(ENEMIES.plated.armor).toBeGreaterThanOrEqual(0.5); // plated is the answer to archer spam
     const bolt = firstHit('wizard', 'plated');
     expect(bolt.damageType).toBe('magic');
     expect(bolt.amount).toBeCloseTo(bolt.raw);
   });
 
-  it('prism halves magic damage, not physical', () => {
+  it('prism resists magic damage, not physical', () => {
     const bolt = firstHit('wizard', 'prism');
-    expect(bolt.amount).toBeCloseTo(bolt.raw * 0.5);
+    expect(bolt.amount).toBeCloseTo(bolt.raw * (1 - ENEMIES.prism.magicResist));
+    expect(ENEMIES.prism.magicResist).toBeGreaterThanOrEqual(0.5); // ... and wizard spam
     const arrow = firstHit('archer', 'prism');
     expect(arrow.amount).toBeCloseTo(arrow.raw);
   });
 
   it('archer star tier 3 pierces 0.30 armor', () => {
     const arrow = firstHit('archer', 'plated', { upgrades: { archers: 3, wizards: 0, barracks: 0, orbital: 0, reinforcements: 0 } });
-    // +15% damage (tier 2) is part of raw; effective armor 0.5 - 0.3 = 0.2
-    expect(arrow.amount).toBeCloseTo(arrow.raw * 0.8);
+    // +15% damage (tier 2) is part of raw; effective armor = plated armor - 0.3
+    expect(arrow.amount).toBeCloseTo(arrow.raw * (1 - (ENEMIES.plated.armor - 0.3)));
   });
 });

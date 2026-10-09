@@ -53,7 +53,7 @@ describe('carrier', () => {
         return rec.of('kill').length > 0;
       }, 30),
     ).toBe(true);
-    expect(rec.of('kill')[0].e.gold).toBe(20);
+    expect(rec.of('kill')[0].e.gold).toBe(ENEMIES.carrier.gold);
     const spawns = rec.of('spawn').filter((s) => s.e.source === 'carrier');
     expect(spawns.length).toBe(3);
     expect(spawns.every((s) => s.e.enemy === 'dart')).toBe(true);
@@ -90,6 +90,9 @@ describe('mothership', () => {
     rec.seconds(8);
     expect(rec.of('escortLaunch').length).toBe(2);
     expect(boss.lateral).toBe(0);
-    expect(boss.maxHp).toBe(6000);
+    expect(boss.maxHp).toBe(ENEMIES.mothership.hp);
+    // the boss is a damage sponge, not an armored wall: towers must be able to hurt it
+    expect(ENEMIES.mothership.armor).toBeLessThanOrEqual(0.4);
+    expect(ENEMIES.mothership.magicResist).toBeLessThanOrEqual(0.4);
   });
 });

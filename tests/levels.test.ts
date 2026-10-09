@@ -168,4 +168,29 @@ describe('balance sanity', () => {
       expect(r.status, l.id).toBe('lost');
     }
   });
+  it('mono builds are punished from level 4 on: archer-only and wizard-only both do worse than the mixed plan, and one of them collapses', () => {
+    for (const l of LEVELS.slice(3)) {
+      const comp = runBot(l, BOTS.competent, PLANS[l.id], 1).lives;
+      const a = runBot(l, BOTS['archer-only'], PLANS[l.id], 1).lives;
+      const w = runBot(l, BOTS['wizard-only'], PLANS[l.id], 1).lives;
+      expect(a, `${l.id} archer-only ${a} vs competent ${comp}`).toBeLessThan(comp);
+      expect(w, `${l.id} wizard-only ${w} vs competent ${comp}`).toBeLessThan(comp);
+      expect(Math.min(a, w), `${l.id} best mono build`).toBeLessThanOrEqual(5);
+    }
+  }, 120_000);
+
+  it('the competent bot does not sit on a pile of gold at the end and is still buying late in the level', () => {
+    for (const l of LEVELS) {
+      const r = runBot(l, BOTS.competent, PLANS[l.id], 1);
+      expect(r.gold, `${l.id} gold left`).toBeLessThanOrEqual(700);
+      if (r.maxedAt !== null && l.id !== 'level01') expect(r.maxedAt / r.time, `${l.id} maxed too early`).toBeGreaterThanOrEqual(0.6);
+    }
+  }, 120_000);
+
+  it('the Mothership is a long fight: it survives deep into the road against the competent plan', () => {
+    const l = LEVELS.at(-1)!;
+    const r = runBot(l, BOTS.competent, PLANS[l.id], 1);
+    expect(r.status).toBe('won');
+    expect(r.bossFrac!).toBeGreaterThan(0.5);
+  });
 });

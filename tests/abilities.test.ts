@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ENEMIES } from '../src/core/data/enemies';
 import { Recorder, makeSim, straightLevel, wave } from './helpers';
 
 const noUp = { archers: 0, wizards: 0, barracks: 0, orbital: 0, reinforcements: 0 };
@@ -67,7 +68,7 @@ describe('orbital strike', () => {
     sim.castOrbital({ x: boss.x, y: boss.y });
     sim.runFor(1.1);
     expect(boss.hp).toBe(hp - 60);
-    expect(sim.state.boss).toMatchObject({ id: boss.id, hp: boss.hp, maxHp: 6000 });
+    expect(sim.state.boss).toMatchObject({ id: boss.id, hp: boss.hp, maxHp: ENEMIES.mothership.hp });
   });
 
   it('star tiers: -10 s cooldown, +40% damage/radius, burning ground', () => {
