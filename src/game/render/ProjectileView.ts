@@ -18,6 +18,8 @@ export class ProjectileView {
   gy = 0;
   h = 0;
   readonly isBolt: boolean;
+  /** Frame stamp used by SimRenderer to purge views of removed entities without allocating. */
+  stamp = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -27,9 +29,9 @@ export class ProjectileView {
     private toH: number,
   ) {
     this.isBolt = st.kind === 'bolt';
-    this.img = scene.add.image(0, 0, this.isBolt ? 'towers/wizard_bullet' : 'towers/arrow').setScale(this.isBolt ? 2.6 : 2.0);
+    this.img = scene.add.image(0, 0, this.isBolt ? 'towers/wizard_bullet' : 'towers/arrow').setScale(this.isBolt ? 3.4 : 2.7);
     if (this.isBolt) {
-      this.glow = scene.add.image(0, 0, TEX.glow).setBlendMode(ADD).setTint(0x7fc8ff).setScale(0.75);
+      this.glow = scene.add.image(0, 0, TEX.glow).setBlendMode(ADD).setTint(0x7fc8ff).setScale(1.0);
       L.fxC.add(this.glow);
     }
     L.fxC.add(this.img);

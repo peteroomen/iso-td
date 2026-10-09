@@ -13,6 +13,7 @@ export const TEX = {
   vignette: 'g_vignette',
   cloud: 'g_cloud',
   flake: 'g_flake',
+  bubble: 'g_bubble',
   heart: 'i_heart',
   coin: 'i_coin',
   ufo: 'i_ufo',
@@ -166,6 +167,28 @@ export function generateTextures(scene: Phaser.Scene): void {
       c.fill();
     }
     c.fillRect(60, 62, 140, 40);
+  });
+  // Prism shield bubble: a soft ellipse with a rim and a highlight; tinted/faded per frame by an Image (no Graphics redraw).
+  make(scene, TEX.bubble, 128, 112, (c, w, h) => {
+    c.save();
+    c.translate(w / 2, h / 2);
+    c.scale(1, h / w);
+    const g = c.createRadialGradient(0, 0, 0, 0, 0, w / 2 - 4);
+    g.addColorStop(0, 'rgba(158,230,255,0.35)');
+    g.addColorStop(0.8, 'rgba(158,230,255,0.5)');
+    g.addColorStop(1, 'rgba(158,230,255,0.7)');
+    c.fillStyle = g;
+    c.beginPath();
+    c.arc(0, 0, w / 2 - 4, 0, Math.PI * 2);
+    c.fill();
+    c.lineWidth = 4;
+    c.strokeStyle = 'rgba(255,255,255,0.9)';
+    c.stroke();
+    c.restore();
+    c.fillStyle = 'rgba(255,255,255,0.85)';
+    c.beginPath();
+    c.ellipse(w * 0.3, h * 0.22, w * 0.09, h * 0.055, -0.5, 0, Math.PI * 2);
+    c.fill();
   });
   make(scene, TEX.flake, 12, 12, (c, w, h) => radial(c, w, h, [[0, '#fff'], [0.7, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']]));
 

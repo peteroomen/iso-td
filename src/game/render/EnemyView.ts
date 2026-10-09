@@ -14,12 +14,16 @@ export class EnemyView {
   private readonly sprite: Phaser.GameObjects.Image;
   private readonly shadow: Phaser.GameObjects.Image;
   private readonly extra: Phaser.GameObjects.Image[] = [];
-  private shield?: Phaser.GameObjects.Graphics;
+  private shield?: Phaser.GameObjects.Image;
   private pulse?: Phaser.GameObjects.Image;
   private glints: Phaser.GameObjects.Image[] = [];
   private engine?: Phaser.GameObjects.Image;
   private flashUntil = 0;
   private lastAttacking = false;
+  /** 0 none, 1 slowed, 2 hit flash: avoids re-setting the tint every frame. */
+  private tintMode = 0;
+  /** Frame stamp used by SimRenderer to purge views of removed entities without allocating. */
+  stamp = 0;
   private readonly phase = Math.random() * Math.PI * 2;
   private readonly baseScale: number;
   readonly hover: number;
@@ -58,7 +62,8 @@ export class EnemyView {
     }
     this.container.add(this.sprite);
     if (st.type === 'prism') {
-      this.shield = scene.add.graphics();
+      this.shield = scene.add.image(0, -this.sprite.displayHeight * 0.45, TEX.bubble);
+      this.shield.setDisplaySize(w * 1.18, this.sprite.displayHeight * 1.05);
       this.container.add(this.shield);
     }
     if (st.type === 'plated') {
@@ -113,19 +118,15 @@ export class EnemyView {
     this.sprite.setScale(this.baseScale * (1 + sq * 0.08), this.baseScale * (1 - sq * 0.1));
 
     // tint
-    if (this.flashUntil > this.scene.time.now) this.sprite.setTintFill(0xffffff);
-    else if (st.slowed) this.sprite.setTint(SLOW_TINT);
-    else this.sprite.clearTint();
-
-    if (this.shield) {
-      const w = this.sprite.displayWidth;
-      const h = this.sprite.displayHeight;
-      const a = 0.16 + 0.07 * Math.sin(t * 4);
-      this.shield.clear();
-      this.shield.fillStyle(0x9ee6ff, a).fillEllipse(0, -h * 0.45, w * 1.18, h * 1.05);
-      this.shield.lineStyle(3, 0xffffff, 0.35 + 0.2 * Math.sin(t * 4)).strokeEllipse(0, -h * 0.45, w * 1.18, h * 1.05);
-      this.shield.fillStyle(0xffffff, 0.35).fillEllipse(-w * 0.28, -h * 0.75, w * 0.16, h * 0.1);
+    const tintMode = this.flashUntil > this.scene.time.now ? 2 : st.slowed ? 1 : 0;
+    if (tintMode !== this.tintMode) {
+      this.tintMode = tintMode;
+      if (tintMode === 2) this.sprite.setTintFill(0xffffff);
+      else if (tintMode === 1) this.sprite.setTint(SLOW_TINT);
+      else this.sprite.clearTint();
     }
+
+    if (this.shield) this.shield.setAlpha(0.5 + 0.2 * Math.sin(t * 4));
     if (this.pulse) {
       const p = 0.5 + 0.5 * Math.sin(t * (st.boss ? 2.2 : 4));
       this.pulse.setAlpha(0.18 + 0.32 * p);
@@ -141,15 +142,14 @@ export class EnemyView {
     }
   }
 
-  bar(st: EnemyState): BarInfo {
-    return {
-      x: this.container.x,
-      y: this.container.y - this.spriteH - 5,
-      frac: st.hp / st.maxHp,
-      width: st.boss ? 0 : st.type === 'dread' || st.type === 'carrier' ? 34 : 28,
-      color: 0xe5484d,
-      show: !st.boss && st.hp < st.maxHp - 0.01,
-    };
+  /** Fills `out` (reused by the caller, no allocation) with this unit's hp bar. */
+  bar(st: EnemyState, out: BarInfo): BarInfo {
+    out.x = this.container.x;
+    out.y = this.container.y - this.spriteH - 5;
+    out.frac = st.hp / st.maxHp;
+    out.width = st.type === 'dread' || st.type === 'carrier' ? 44 : 36;
+    out.show = !st.boss && st.hp < st.maxHp - 0.01;
+    return out;
   }
 
   destroy(): void {

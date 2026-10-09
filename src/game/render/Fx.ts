@@ -12,6 +12,32 @@ export interface Layers {
 }
 
 const ADD = Phaser.BlendModes.ADD;
+const MAX_FLOATS = 20;
+
+interface FloatText {
+  text: Phaser.GameObjects.Text;
+  key: string;
+  age: number;
+  x: number;
+  y: number;
+}
+
+interface Ring {
+  img: Phaser.GameObjects.Image;
+  age: number;
+  scale: number;
+}
+
+const FLOAT_IN = 0.18;
+const FLOAT_DELAY = 0.38;
+const FLOAT_OUT = 0.52;
+const RING_TIME = 0.33;
+
+function backOut(t: number): number {
+  const c1 = 1.70158;
+  const u = t - 1;
+  return 1 + (c1 + 1) * u * u * u + c1 * u * u;
+}
 
 /** Particles, floating text, rings, beams, shake: every transient visual effect lives here. */
 export class Fx {
@@ -31,6 +57,11 @@ export class Fx {
   private shakeMag = 0;
   /** screen px -> world px */
   private readonly k: number;
+  /** Pooled floating "+gold" texts and explosion rings: animated by hand in update() (no tween / Text churn per kill). */
+  private readonly floats: FloatText[] = [];
+  private readonly floatPool = new Map<string, Phaser.GameObjects.Text[]>();
+  private readonly rings: Ring[] = [];
+  private readonly ringPool: Phaser.GameObjects.Image[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -134,6 +165,8 @@ export class Fx {
   }
 
   update(dt: number): void {
+    this.updateFloats(dt);
+    this.updateRings(dt);
     const world = this.L.world;
     if (this.shakeLeft > 0) {
       this.shakeLeft -= dt;
@@ -174,11 +207,29 @@ export class Fx {
     this.sparkWhite.explode(size === 'small' ? 6 : 14, p.x, p.y);
     this.debris.explode(size === 'small' ? 5 : size === 'big' ? 10 : 24, p.x, p.y);
     this.smoke.explode(size === 'small' ? 3 : 7, p.x, p.y);
-    const ring = this.scene.add.image(p.x, p.y, TEX.glow).setBlendMode(ADD).setTint(0xffd27a).setAlpha(0.9);
-    this.L.fxC.add(ring);
-    const s = size === 'small' ? 1.6 : size === 'big' ? 2.6 : 5;
-    ring.setScale(0.3);
-    this.scene.tweens.add({ targets: ring, scale: s, alpha: 0, duration: 330, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
+    let img = this.ringPool.pop();
+    if (!img) {
+      img = this.scene.add.image(0, 0, TEX.glow).setBlendMode(ADD).setTint(0xffd27a);
+      this.L.fxC.add(img);
+    }
+    img.setPosition(p.x, p.y).setScale(0.3).setAlpha(0.9).setVisible(true);
+    this.rings.push({ img, age: 0, scale: size === 'small' ? 1.6 : size === 'big' ? 2.6 : 5 });
+  }
+
+  private updateRings(dt: number): void {
+    for (let i = this.rings.length - 1; i >= 0; i--) {
+      const r = this.rings[i];
+      r.age += dt;
+      const t = Math.min(1, r.age / RING_TIME);
+      const e = 1 - (1 - t) * (1 - t);
+      r.img.setScale(0.3 + (r.scale - 0.3) * e).setAlpha(0.9 * (1 - e));
+      if (t >= 1) {
+        r.img.setVisible(false);
+        this.ringPool.push(r.img);
+        this.rings[i] = this.rings[this.rings.length - 1];
+        this.rings.pop();
+      }
+    }
   }
 
   hitSpark(gx: number, gy: number, h: number, kind: 'white' | 'blue' | 'gold' = 'white', n = 4): void {
@@ -210,19 +261,41 @@ export class Fx {
   // ------------------------------------------------------------------ text
 
   floatText(gx: number, gy: number, text: string, color: string, h = 60, size = 22): void {
+    if (this.floats.length >= MAX_FLOATS) return;
     const p = this.pt(gx, gy, h);
-    const t = this.scene.add.text(p.x, p.y, text, textStyle(size, color)).setOrigin(0.5).setScale(this.k * 0.4);
-    this.L.fxC.add(t);
-    this.scene.tweens.add({ targets: t, scale: this.k, duration: 180, ease: 'Back.easeOut' });
-    this.scene.tweens.add({
-      targets: t,
-      y: p.y - 70 * this.k * 1.3,
-      alpha: { from: 1, to: 0 },
-      delay: 380,
-      duration: 520,
-      ease: 'Quad.easeIn',
-      onComplete: () => t.destroy(),
-    });
+    // pool by content: identical "+9" labels reuse the same rendered canvas
+    const key = `${text}|${color}|${size}`;
+    let t = this.floatPool.get(key)?.pop();
+    if (!t) {
+      t = this.scene.add.text(0, 0, text, textStyle(size, color)).setOrigin(0.5);
+      this.L.fxC.add(t);
+    }
+    t.setPosition(p.x, p.y).setScale(this.k * 0.4).setAlpha(1).setVisible(true);
+    this.floats.push({ text: t, key, age: 0, x: p.x, y: p.y });
+  }
+
+  private updateFloats(dt: number): void {
+    const rise = 70 * this.k * 1.3;
+    for (let i = this.floats.length - 1; i >= 0; i--) {
+      const f = this.floats[i];
+      f.age += dt;
+      const t = f.text;
+      if (f.age < FLOAT_IN) t.setScale(this.k * (0.4 + 0.6 * backOut(f.age / FLOAT_IN)));
+      else if (f.age < FLOAT_IN + 0.05) t.setScale(this.k);
+      if (f.age > FLOAT_DELAY) {
+        const u = Math.min(1, (f.age - FLOAT_DELAY) / FLOAT_OUT);
+        t.y = f.y - rise * u * u;
+        t.setAlpha(1 - u * u);
+        if (u >= 1) {
+          t.setVisible(false);
+          let pool = this.floatPool.get(f.key);
+          if (!pool) this.floatPool.set(f.key, (pool = []));
+          pool.push(t);
+          this.floats[i] = this.floats[this.floats.length - 1];
+          this.floats.pop();
+        }
+      }
+    }
   }
 
   coinPop(gx: number, gy: number, amount: number, h = 50): void {

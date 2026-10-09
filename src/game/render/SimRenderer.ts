@@ -24,6 +24,11 @@ export class SimRenderer {
   private readonly barsGfx: Phaser.GameObjects.Graphics;
   private readonly strikeGfx: Phaser.GameObjects.Graphics;
   private readonly k: number;
+  /** Frame counter: views touched this frame get stamped, the rest are purged (no per-frame Set allocations). */
+  private frame = 0;
+  private readonly bar = { x: 0, y: 0, frac: 1, width: 0, show: false } satisfies BarInfo;
+  private barsDirty = false;
+  private strikesDirty = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -43,6 +48,7 @@ export class SimRenderer {
   /** Called once per rendered frame. `events` = everything the sim emitted since the previous frame. */
   update(time: number, dt: number, events: SimEvent[]): void {
     const s = this.sim.state;
+    const frame = ++this.frame;
 
     // 1. create / update views of everything alive
     for (const t of s.towers) {
@@ -54,6 +60,7 @@ export class SimRenderer {
       if (t.kind === 'barracks' && t.rallyX !== null && t.rallyY !== null) {
         v.setDoorFacing(t.rallyX - t.rallyY - (t.x - t.y), t);
       }
+      v.stamp = frame;
       v.update(t, dt);
     }
     for (const k of s.knights) {
@@ -62,6 +69,7 @@ export class SimRenderer {
         v = new KnightView(this.scene, this.L, k);
         this.knights.set(k.id, v);
       }
+      v.stamp = frame;
       v.update(k, time, dt);
     }
     for (const e of s.enemies) {
@@ -70,6 +78,7 @@ export class SimRenderer {
         v = new EnemyView(this.scene, this.L, e);
         this.enemies.set(e.id, v);
       }
+      v.stamp = frame;
       v.update(e, time);
     }
     for (const p of s.projectiles) {
@@ -83,6 +92,7 @@ export class SimRenderer {
       const th = (tower ? TOWER_SHOOT_H[tower.kind] : 90) * TOWER_SCALE;
       const targetH = tgt ? bodyHeightOf(tgt) : 30;
       // interpolate height from tower top to target body height
+      v.stamp = frame;
       v.setHeights(th, targetH);
       v.update(p, targetH);
       if (v.isBolt) this.fx.trail(v.gx, v.gy, v.h);
@@ -92,19 +102,19 @@ export class SimRenderer {
     for (const e of events) this.handle(e);
 
     // 3. purge views whose entity is gone
-    this.purge(this.towers, new Set(s.towers.map((t) => t.id)), (v) => v.destroyAnimated());
-    this.purge(this.knights, new Set(s.knights.map((k) => k.id)), (v) => v.destroy());
-    this.purge(this.enemies, new Set(s.enemies.map((e) => e.id)), (v) => v.destroy());
-    this.purge(this.projectiles, new Set(s.projectiles.map((p) => p.id)), (v) => v.destroy());
+    this.purge(this.towers, (v) => v.destroyAnimated());
+    this.purge(this.knights, (v) => v.destroy());
+    this.purge(this.enemies, (v) => v.destroy());
+    this.purge(this.projectiles, (v) => v.destroy());
 
     this.drawBars();
     this.drawStrikes(time, dt);
     this.L.entityC.sort('depth');
   }
 
-  private purge<V>(map: Map<number, V>, alive: Set<number>, kill: (v: V) => void): void {
+  private purge<V extends { stamp: number }>(map: Map<number, V>, kill: (v: V) => void): void {
     for (const [id, v] of map) {
-      if (!alive.has(id)) {
+      if (v.stamp !== this.frame) {
         kill(v);
         map.delete(id);
       }
@@ -115,29 +125,44 @@ export class SimRenderer {
 
   private drawBars(): void {
     const g = this.barsGfx;
-    g.clear();
     const s = this.sim.state;
-    const draw = (b: BarInfo) => {
+    const k = this.k;
+    const b = this.bar;
+    let cleared = false;
+    const draw = () => {
       if (!b.show) return;
-      const w = b.width * this.k;
-      const h = 5 * this.k;
+      // only touch the Graphics when there is something to draw (or something stale to wipe)
+      if (!cleared) {
+        g.clear();
+        cleared = true;
+      }
+      const w = b.width * k;
+      const h = 7 * k;
       const x = b.x - w / 2;
       const y = b.y - h;
-      g.fillStyle(0x2e222f, 1).fillRoundedRect(x - 1.5 * this.k, y - 1.5 * this.k, w + 3 * this.k, h + 3 * this.k, 2.5 * this.k);
-      g.fillStyle(0x5a3a48, 1).fillRect(x, y, w, h);
+      const o = 2 * k;
       const f = Math.max(0, Math.min(1, b.frac));
-      const col = b.color === 0x6cc24a ? (f > 0.5 ? 0x6cc24a : f > 0.25 ? 0xf2c230 : 0xe5484d) : f > 0.5 ? 0x6cc24a : f > 0.25 ? 0xf2c230 : 0xe5484d;
-      g.fillStyle(col, 1).fillRect(x, y, w * f, h);
-      g.fillStyle(0xffffff, 0.35).fillRect(x, y, w * f, h * 0.4);
+      g.fillStyle(0x2e222f, 1).fillRoundedRect(x - o, y - o, w + 2 * o, h + 2 * o, 3 * k);
+      g.fillStyle(0x5a3a48, 1).fillRect(x, y, w, h);
+      g.fillStyle(f > 0.5 ? 0x6cc24a : f > 0.25 ? 0xf2c230 : 0xe5484d, 1).fillRect(x, y, w * f, h);
+      g.fillStyle(0xffffff, 0.35).fillRect(x, y, w * f, h * 0.38);
     };
     for (const e of s.enemies) {
       const v = this.enemies.get(e.id);
-      if (v) draw(v.bar(e));
+      if (v) {
+        v.bar(e, b);
+        draw();
+      }
     }
     for (const kn of s.knights) {
       const v = this.knights.get(kn.id);
-      if (v) draw(v.bar(kn));
+      if (v) {
+        v.bar(kn, b);
+        draw();
+      }
     }
+    if (!cleared && this.barsDirty) g.clear();
+    this.barsDirty = cleared;
   }
 
   // ----------------------------------------------------------------------------------- strikes / burns
@@ -153,8 +178,17 @@ export class SimRenderer {
 
   private drawStrikes(time: number, dt: number): void {
     const g = this.strikeGfx;
-    g.clear();
     const s = this.sim.state;
+    const any = s.strikes.length > 0 || s.burns.length > 0;
+    if (!any) {
+      if (this.strikesDirty) {
+        g.clear();
+        this.strikesDirty = false;
+      }
+      return;
+    }
+    this.strikesDirty = true;
+    g.clear();
     for (const st of s.strikes) {
       const p = 1 - st.timer / st.delay;
       const pulse = 0.5 + 0.5 * Math.sin(time * 0.025);
@@ -196,9 +230,9 @@ export class SimRenderer {
   // ----------------------------------------------------------------------------------- events
 
   private enemyHeight(type: EnemyId): number {
-    if (type === 'mothership') return HOVER_BOSS + 60;
-    if (type === 'skimmer') return HOVER_FLIER + 45;
-    return HOVER_GROUND + 45;
+    if (type === 'mothership') return HOVER_BOSS + 70;
+    if (type === 'skimmer') return HOVER_FLIER + 58;
+    return HOVER_GROUND + 58;
   }
 
   private handle(e: SimEvent): void {
@@ -283,7 +317,7 @@ export class SimRenderer {
         break;
       case 'meleeHit': {
         Audio.sfx('sword_clash', { volume: 0.3, throttleMs: 150, detune: (Math.random() - 0.5) * 300 });
-        fx.hitSpark(e.x, e.y, 38, 'white', 3);
+        fx.hitSpark(e.x, e.y, 48, 'white', 3);
         if (e.attacker === 'enemy') this.knights.get(e.targetId)?.flash();
         else this.enemies.get(e.targetId)?.flash();
         break;

@@ -22,6 +22,8 @@ export class TowerView {
   private readonly glow?: Phaser.GameObjects.Image;
   private readonly pips: Phaser.GameObjects.Graphics;
   private level = 0;
+  /** Frame stamp used by SimRenderer to purge views of removed entities without allocating. */
+  stamp = 0;
   private lastShots: number;
   private bowT = 99;
   private flashT = 99;

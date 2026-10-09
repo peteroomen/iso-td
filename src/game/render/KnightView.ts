@@ -10,7 +10,6 @@ export interface BarInfo {
   y: number;
   frac: number;
   width: number;
-  color: number;
   show: boolean;
 }
 
@@ -27,6 +26,8 @@ export class KnightView {
   private lungeTween?: Phaser.Tweens.Tween;
   private bob = Math.random() * 6;
   private level: number;
+  /** Frame stamp used by SimRenderer to purge views of removed entities without allocating. */
+  stamp = 0;
   private appear = 1;
   private readonly militia: boolean;
 
@@ -42,7 +43,7 @@ export class KnightView {
     this.container = scene.add.container(isoX(st.x, st.y), isoY(st.x, st.y), [this.sprite]);
     this.container.setDepth(depthOf(st.x, st.y));
     L.entityC.add(this.container);
-    this.shadow = scene.add.image(0, 0, TEX.shadow).setScale(0.8, 0.8).setAlpha(0.85);
+    this.shadow = scene.add.image(0, 0, TEX.shadow).setScale(1.05, 1.05).setAlpha(0.85);
     L.groundFxC.add(this.shadow);
   }
 
@@ -88,7 +89,7 @@ export class KnightView {
     }
     const walking = st.mode === 'walking';
     this.bob += dt * (walking ? 16 : 3);
-    const bobY = walking ? -Math.abs(Math.sin(this.bob)) * 5 : Math.sin(this.bob) * 0.8;
+    const bobY = walking ? -Math.abs(Math.sin(this.bob)) * 6.5 : Math.sin(this.bob) * 1;
     this.container.setPosition(px + this.lunge.x, py + this.lunge.y + (this.appear === 1 ? bobY : 0));
     this.container.setDepth(depthOf(st.x, st.y));
     this.shadow.setPosition(px, py + 2);
@@ -106,7 +107,7 @@ export class KnightView {
       this.lunge.x = 0;
       this.lunge.y = 0;
       this.lungeTween?.stop();
-      const to = { x: (dx / l) * 14, y: (dy / l) * 8 };
+      const to = { x: (dx / l) * 19, y: (dy / l) * 11 };
       this.lungeTween = this.scene.tweens.add({ targets: this.lunge, x: to.x, y: to.y, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
     }
     this.lastAttacking = st.attacking;
@@ -117,15 +118,14 @@ export class KnightView {
     if (this.militia && st.lifeLeft >= 0 && st.lifeLeft < 1.2 && !dead) this.sprite.setAlpha(0.35 + 0.65 * Math.abs(Math.sin(this.scene.time.now * 0.02)));
   }
 
-  bar(st: KnightState): BarInfo {
-    return {
-      x: this.container.x,
-      y: this.container.y - this.sprite.displayHeight * 0.94 - 6,
-      frac: st.hp / st.maxHp,
-      width: 24,
-      color: 0x6cc24a,
-      show: st.mode !== 'dead' && st.hp < st.maxHp - 0.01,
-    };
+  /** Fills `out` (reused by the caller, no allocation) with this unit's hp bar. */
+  bar(st: KnightState, out: BarInfo): BarInfo {
+    out.x = this.container.x;
+    out.y = this.container.y - this.sprite.displayHeight * 0.94 - 6;
+    out.frac = st.hp / st.maxHp;
+    out.width = 30;
+    out.show = st.mode !== 'dead' && st.hp < st.maxHp - 0.01;
+    return out;
   }
 
   destroy(): void {
