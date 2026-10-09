@@ -1,0 +1,122 @@
+{
+  "sfx": {
+    "ui_click": [
+      "ui_click.ogg",
+      "ui_click.mp3"
+    ],
+    "ui_hover": [
+      "ui_hover.ogg",
+      "ui_hover.mp3"
+    ],
+    "ui_error": [
+      "ui_error.ogg",
+      "ui_error.mp3"
+    ],
+    "build_tower": [
+      "build_tower.ogg",
+      "build_tower.mp3"
+    ],
+    "upgrade_tower": [
+      "upgrade_tower.ogg",
+      "upgrade_tower.mp3"
+    ],
+    "sell_tower": [
+      "sell_tower.ogg",
+      "sell_tower.mp3"
+    ],
+    "coin": [
+      "coin.ogg",
+      "coin.mp3"
+    ],
+    "arrow_shoot": [
+      "arrow_shoot.ogg",
+      "arrow_shoot.mp3"
+    ],
+    "arrow_hit": [
+      "arrow_hit.ogg",
+      "arrow_hit.mp3"
+    ],
+    "wizard_cast": [
+      "wizard_cast.ogg",
+      "wizard_cast.mp3"
+    ],
+    "wizard_hit": [
+      "wizard_hit.ogg",
+      "wizard_hit.mp3"
+    ],
+    "sword_clash": [
+      "sword_clash.ogg",
+      "sword_clash.mp3"
+    ],
+    "knight_death": [
+      "knight_death.ogg",
+      "knight_death.mp3"
+    ],
+    "ufo_explode_small": [
+      "ufo_explode_small.ogg",
+      "ufo_explode_small.mp3"
+    ],
+    "ufo_explode_big": [
+      "ufo_explode_big.ogg",
+      "ufo_explode_big.mp3"
+    ],
+    "ufo_hit": [
+      "ufo_hit.ogg",
+      "ufo_hit.mp3"
+    ],
+    "leak": [
+      "leak.ogg",
+      "leak.mp3"
+    ],
+    "wave_start": [
+      "wave_start.ogg",
+      "wave_start.mp3"
+    ],
+    "boss_warning": [
+      "boss_warning.ogg",
+      "boss_warning.mp3"
+    ],
+    "orbital_charge": [
+      "orbital_charge.ogg",
+      "orbital_charge.mp3"
+    ],
+    "orbital_blast": [
+      "orbital_blast.ogg",
+      "orbital_blast.mp3"
+    ],
+    "reinforcements": [
+      "reinforcements.ogg",
+      "reinforcements.mp3"
+    ],
+    "star_earned": [
+      "star_earned.ogg",
+      "star_earned.mp3"
+    ],
+    "level_victory": [
+      "level_victory.ogg",
+      "level_victory.mp3"
+    ],
+    "level_defeat": [
+      "level_defeat.ogg",
+      "level_defeat.mp3"
+    ]
+  },
+  "music": {
+    "music_menu": [
+      "music_menu.ogg",
+      "music_menu.mp3"
+    ],
+    "music_battle_1": [
+      "music_battle_1.ogg",
+      "music_battle_1.mp3"
+    ],
+    "music_battle_2": [
+      "music_battle_2.ogg",
+      "music_battle_2.mp3"
+    ],
+    "music_boss": [
+      "music_boss.ogg",
+      "music_boss.mp3"
+    ]
+  }
+}
