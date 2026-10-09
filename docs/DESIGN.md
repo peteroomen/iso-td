@@ -102,16 +102,18 @@ for Plated, red pulse for Dreadnought).
 | scout | ufo_1 | Scout | 20 | 1.0 | 0 | 0 | 3 | 1 | 2 / 1.0 | |
 | dart | ufo_2 | Dart | 15 | 1.8 | 0 | 0 | 4 | 1 | 1 / 0.8 | fast, scale 0.85 |
 | skimmer | ufo_3 | Skimmer | 60 | 1.1 | 0 | 0 | 9 | 1 | – | **flier** |
-| plated | ufo_4 | Plated | 160 | 0.7 | 0.5 | 0 | 15 | 1 | 6 / 1.2 | armored |
-| prism | ufo_5 | Prism | 120 | 1.0 | 0 | 0.5 | 15 | 1 | 4 / 1.0 | magic shield |
+| plated | ufo_4 | Plated | 160 | 0.7 | 0.8 | 0 | 15 | 1 | 6 / 1.2 | armored |
+| prism | ufo_5 | Prism | 120 | 1.0 | 0 | 0.7 | 15 | 1 | 4 / 1.0 | magic shield |
 | carrier | ufo_6 | Carrier | 300 | 0.7 | 0 | 0 | 20 | 2 | 8 / 1.5 | on death releases 3 Darts; scale 1.3 |
-| dread | ufo_7 | Dreadnought | 800 | 0.6 | 0.3 | 0.3 | 70 | 3 | 25 / 1.5 | scale 1.5 |
-| mothership | mothership.png | Mothership | 6000 | 0.35 | 0.8 | 0.8 | 0 | 20 | – | not blockable; launches 2 scouts + 1 dart every 8 s; top-of-screen HP bar |
+| dread | ufo_7 | Dreadnought | 800 | 0.6 | 0.6 | 0.4 | 40 | 3 | 25 / 1.5 | scale 1.5 |
+| mothership | mothership.png | Mothership | 14000 | 0.35 | 0.4 | 0.4 | 0 | 20 | – | not blockable; launches 2 scouts + 1 dart every 8 s; top-of-screen HP bar |
 
 Enemies walk their path with a small random lateral offset (±0.2 t) so groups don't stack perfectly.
 
-_Balance pass:_ the HP of skimmer/plated/prism/carrier/dread (doubled) and the bounties of skimmer/plated/prism/dread, and the
-Mothership's armor/magic resistance (0.4 → 0.8), were retuned with `npm run balance` — see `docs/BALANCE.md` for the reasoning.
+_Balance pass:_ the HP of skimmer/plated/prism/carrier/dread (doubled) and the bounties of skimmer/plated/prism were retuned first. A
+second pass made armor and magic resistance the real counters (plated 0.5 -> 0.8 armor, prism 0.5 -> 0.7 resist, dread
+0.3/0.3 -> 0.6/0.4, dread bounty 70 -> 40) so single-tower builds lose from level 4 on, and turned the Mothership into a damage
+sponge instead of an armor wall (HP 6000 -> 14000, armor/resist 0.8 -> 0.4). See `docs/BALANCE.md` for the reasoning and the numbers.
 
 ## 7. Campaign
 
@@ -139,8 +141,12 @@ Start gold roughly 250–450, tuned by the balance tool. Grids up to ~14×14; ca
 - **naive**: builds only the cheapest tower type on the spots nearest the spawn, upgrades when affordable, no abilities.
 - **idle**: builds nothing (sanity check — must lose every level, ideally on wave 1–2).
 
-Targets: competent wins with 10–17 lives; expert can reach 18+ (3★); naive loses from L4 onward; idle always loses.
-Output: a markdown table per level (lives left, gold left, wave reached, per-bot), written to `docs/BALANCE.md`.
+Targets: competent wins with 10–17 lives; expert can reach 18+ (3★); naive loses from L4 onward; idle always loses; from L4 on every
+single-tower-kind build (archer-only / wizard-only / barracks-only variants of the competent bot) scores below the mixed plan and at
+least one of archer-only / wizard-only loses or nearly loses; the competent bot ends every level with <= ~600 gold left and is still
+buying in the last third of the level.
+Output: a markdown table per level (lives left, gold left, wave reached, per-bot), an economy table (gold left, gold earned, time
+when every spot was built and maxed, time of the last purchase) and the Mothership's death position, written to `docs/BALANCE.md`.
 
 ## 9. Architecture
 
