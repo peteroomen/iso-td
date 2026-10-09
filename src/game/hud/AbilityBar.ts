@@ -91,7 +91,7 @@ export class AbilityBar {
           { text: 'Cooldown', right: `${Math.round(o.cooldownMax)}s` },
           ...(o.burn ? [{ text: 'Leaves burning ground', color: '#ffb35c' }] : []),
         ],
-        note: `A beam from orbit hits every UFO in the circle, fliers and bosses too. Hotkey ${key}.`,
+        note: `A beam from orbit hits every UFO in the circle, fliers and bosses too. Hotkey ${key}.${this.sim.state.status === 'pre' ? '\nAvailable once the first wave starts.' : ''}`,
       };
     }
     const r = ab.reinforce;
@@ -103,7 +103,7 @@ export class AbilityBar {
         { text: 'Lasts', right: `${Math.round(r.duration)}s` },
         { text: 'Cooldown', right: `${Math.round(r.cooldownMax)}s` },
       ],
-      note: `Drops militia anywhere close to the road to block ground UFOs. Hotkey ${key}.`,
+      note: `Drops militia anywhere close to the road to block ground UFOs. Hotkey ${key}.${this.sim.state.status === 'pre' ? '\nAvailable once the first wave starts.' : ''}`,
     };
   }
 

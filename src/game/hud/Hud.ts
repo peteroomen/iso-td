@@ -150,8 +150,8 @@ export class Hud {
     if (this.hintText === text && this.hintBox) return;
     this.hideHint(true);
     this.hintText = text;
-    const w = 640;
-    const c = this.scene.add.container(GAME_W / 2, GAME_H + 20).setDepth(DEPTH.bar);
+    const w = 600;
+    const c = this.scene.add.container(GAME_W / 2 + 40, GAME_H + 20).setDepth(DEPTH.bar);
     const txt = this.scene.add.text(-w / 2 + 70, 0, text, { fontFamily: FONT, fontSize: '20px', color: '#fff4d6', wordWrap: { width: w - 130 }, lineSpacing: 3, stroke: '#2e222f', strokeThickness: 3 });
     const h = Math.max(70, txt.height + 28);
     txt.y = -h / 2 + 14;

@@ -80,6 +80,7 @@ export class GameScene extends Phaser.Scene {
     this.bg = new Background(this, this.mapView.mainBiome, level.biome === 'mixed');
     this.fx = new Fx(this, this.view, this.layers);
     this.markers = new GroundMarkers(this, this.view, this.layers, this.sim.spots);
+    this.markers.setExits(this.sim.paths);
     this.simView = new SimRenderer(this, this.view, this.layers, this.sim, this.fx);
 
     this.overlays = new Overlays(this);
@@ -103,15 +104,16 @@ export class GameScene extends Phaser.Scene {
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup());
     if (import.meta.env.DEV) {
-      const w = window as unknown as { __game?: unknown };
-      w.__game = this;
+      const w = window as unknown as { __gameScene?: unknown };
+      w.__gameScene = this;
     }
     this.simView.update(this.time.now, 0, []);
+    this.hud.banner(level.name, { sub: `Level ${n}`, hold: 1.4 });
   }
 
   // ----------------------------------------------------------------------------------- dev helpers
 
-  /** Dev/testing only (exposed through window.__game in DEV builds). */
+  /** Dev/testing only (exposed through window.__gameScene in DEV builds). */
   devAddGold(n: number): void {
     (this.sim.state as { gold: number }).gold += n;
   }
@@ -194,6 +196,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.scene.pause();
     this.scene.launch('Settings', { returnTo: 'Game' });
+    this.scene.bringToTop('Settings');
   }
 
   private restart(): void {
@@ -220,9 +223,11 @@ export class GameScene extends Phaser.Scene {
   // ----------------------------------------------------------------------------------- events -> HUD / flow
 
   private handleEvents(events: SimEvent[]): void {
+    const bossIncoming = events.some((e) => e.type === 'bossSpawn');
     for (const e of events) {
       switch (e.type) {
         case 'waveStart':
+          if (bossIncoming) break;
           this.hud.banner(e.number === e.total ? 'Final Wave!' : `Wave ${e.number}`, { color: e.number === e.total ? '#ff9a8a' : COLORS.text, hold: 1.1 });
           break;
         case 'waveCalledEarly':

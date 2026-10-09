@@ -111,7 +111,7 @@ export class Tooltip {
       y += 28;
       w = Math.max(w, pad * 2 + 30 + t.width);
     }
-    y += pad - 2;
+    y += pad;
     for (const r of rowLayout) {
       if (r.r) r.r.setPosition(w - pad - r.r.width, r.y + (r.h - r.r.height) / 2);
     }

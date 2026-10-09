@@ -24,7 +24,6 @@ export class SimRenderer {
   private readonly barsGfx: Phaser.GameObjects.Graphics;
   private readonly strikeGfx: Phaser.GameObjects.Graphics;
   private readonly k: number;
-  private emberAcc = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -176,20 +175,22 @@ export class SimRenderer {
       g.lineBetween(cx, cy - ry * 1.15, cx, cy - ry * 0.45);
       g.lineBetween(cx, cy + ry * 1.15, cx, cy + ry * 0.45);
     }
-    this.emberAcc += dt;
     for (const b of s.burns) {
       const f = b.timer / b.duration;
-      g.fillStyle(0xff6a1a, (0.18 + 0.1 * Math.sin(time * 0.03 + b.id)) * Math.min(1, f * 2));
+      const fade = Math.min(1, f * 2);
+      g.fillStyle(0xff6a1a, (0.26 + 0.12 * Math.sin(time * 0.03 + b.id)) * fade);
       this.ellipse(g, b.x, b.y, b.radius, 'fill');
-      g.fillStyle(0xffc04a, 0.1 * Math.min(1, f * 2));
+      g.fillStyle(0xffc04a, 0.16 * fade);
       this.ellipse(g, b.x, b.y, b.radius * 0.6, 'fill');
-      if (this.emberAcc > 0.02) {
+      g.lineStyle(3 * this.k * 0.8, 0xffa040, 0.7 * fade);
+      this.ellipse(g, b.x, b.y, b.radius, 'stroke');
+      const n = Math.max(1, Math.round(dt * 60 * 1.5));
+      for (let i = 0; i < n; i++) {
         const a = Math.random() * Math.PI * 2;
         const r = Math.sqrt(Math.random()) * b.radius;
         this.fx.emberAt(b.x + Math.cos(a) * r, b.y + Math.sin(a) * r);
       }
     }
-    if (this.emberAcc > 0.02) this.emberAcc = 0;
   }
 
   // ----------------------------------------------------------------------------------- events

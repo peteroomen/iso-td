@@ -150,8 +150,9 @@ export function generateTextures(scene: Phaser.Scene): void {
     c.fillRect(0, 0, w, h);
   });
   make(scene, TEX.vignette, 256, 144, (c, w, h) => {
-    const g = c.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, w * 0.62);
+    const g = c.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, w * 0.58);
     g.addColorStop(0, 'rgba(255,0,0,0)');
+    g.addColorStop(0.55, 'rgba(255,30,30,0.3)');
     g.addColorStop(1, 'rgba(255,30,30,1)');
     c.fillStyle = g;
     c.fillRect(0, 0, w, h);

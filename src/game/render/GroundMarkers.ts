@@ -37,6 +37,8 @@ export class GroundMarkers {
   reticle: Reticle | null = null;
   private flags: { img: Phaser.GameObjects.Image; gx: number; gy: number }[] = [];
   private readonly k: number;
+  /** Exit arrows: where UFOs leave the map (and cost lives). */
+  private readonly exits: { gx: number; gy: number; dx: number; dy: number }[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -47,6 +49,19 @@ export class GroundMarkers {
     this.k = 1 / view.scale;
     this.g = scene.add.graphics();
     L.groundFxC.add(this.g);
+  }
+
+  /** Register the last in-map point of every path as an exit marker. */
+  setExits(paths: readonly { pts: readonly { x: number; y: number }[] }[]): void {
+    this.exits.length = 0;
+    for (const p of paths) {
+      const a = p.pts[p.pts.length - 2];
+      const b = p.pts[p.pts.length - 1];
+      const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const dx = (b.x - a.x) / l;
+      const dy = (b.y - a.y) / l;
+      this.exits.push({ gx: b.x - dx * 0.75, gy: b.y - dy * 0.75, dx, dy });
+    }
   }
 
   setRallyFlags(list: { gx: number; gy: number; preview?: boolean }[]): void {
@@ -98,6 +113,23 @@ export class GroundMarkers {
         g.fillPoints(pts, true);
         g.lineStyle((hov ? 5 : 3.5) * this.k * 0.6 + 2, 0xfff4d6, hov ? 0.95 : 0.35 + 0.35 * pulse);
         g.strokePoints(pts, true);
+      }
+    }
+
+    for (const ex of this.exits) {
+      // pulsing chevrons on the road pointing out of the map
+      for (let i = 0; i < 2; i++) {
+        const off = ((time * 0.0012 + i * 0.5) % 1) * 0.9 - 0.45;
+        const cx = ex.gx + ex.dx * off;
+        const cy = ex.gy + ex.dy * off;
+        const px = -ex.dy;
+        const py = ex.dx;
+        const tip = { x: isoX(cx + ex.dx * 0.22, cy + ex.dy * 0.22), y: isoY(cx + ex.dx * 0.22, cy + ex.dy * 0.22) };
+        const l = { x: isoX(cx - ex.dx * 0.12 + px * 0.28, cy - ex.dy * 0.12 + py * 0.28), y: isoY(cx - ex.dx * 0.12 + px * 0.28, cy - ex.dy * 0.12 + py * 0.28) };
+        const r = { x: isoX(cx - ex.dx * 0.12 - px * 0.28, cy - ex.dy * 0.12 - py * 0.28), y: isoY(cx - ex.dx * 0.12 - px * 0.28, cy - ex.dy * 0.12 - py * 0.28) };
+        const a = 0.75 * Math.sin(Math.PI * ((off + 0.45) / 0.9));
+        g.fillStyle(0xe5484d, a).fillTriangle(tip.x, tip.y, l.x, l.y, r.x, r.y);
+        g.lineStyle(3, 0x2e222f, a * 0.8).strokeTriangle(tip.x, tip.y, l.x, l.y, r.x, r.y);
       }
     }
 
