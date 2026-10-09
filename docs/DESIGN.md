@@ -101,29 +101,32 @@ for Plated, red pulse for Dreadnought).
 |---|---|---|---|---|---|---|---|---|---|---|
 | scout | ufo_1 | Scout | 20 | 1.0 | 0 | 0 | 3 | 1 | 2 / 1.0 | |
 | dart | ufo_2 | Dart | 15 | 1.8 | 0 | 0 | 4 | 1 | 1 / 0.8 | fast, scale 0.85 |
-| skimmer | ufo_3 | Skimmer | 30 | 1.1 | 0 | 0 | 6 | 1 | – | **flier** |
-| plated | ufo_4 | Plated | 80 | 0.7 | 0.5 | 0 | 10 | 1 | 6 / 1.2 | armored |
-| prism | ufo_5 | Prism | 60 | 1.0 | 0 | 0.5 | 10 | 1 | 4 / 1.0 | magic shield |
-| carrier | ufo_6 | Carrier | 150 | 0.7 | 0 | 0 | 20 | 2 | 8 / 1.5 | on death releases 3 Darts; scale 1.3 |
-| dread | ufo_7 | Dreadnought | 400 | 0.6 | 0.3 | 0.3 | 40 | 3 | 25 / 1.5 | scale 1.5 |
-| mothership | mothership.png | Mothership | 6000 | 0.35 | 0.4 | 0.4 | 0 | 20 | – | not blockable; launches 2 scouts + 1 dart every 8 s; top-of-screen HP bar |
+| skimmer | ufo_3 | Skimmer | 60 | 1.1 | 0 | 0 | 9 | 1 | – | **flier** |
+| plated | ufo_4 | Plated | 160 | 0.7 | 0.5 | 0 | 15 | 1 | 6 / 1.2 | armored |
+| prism | ufo_5 | Prism | 120 | 1.0 | 0 | 0.5 | 15 | 1 | 4 / 1.0 | magic shield |
+| carrier | ufo_6 | Carrier | 300 | 0.7 | 0 | 0 | 20 | 2 | 8 / 1.5 | on death releases 3 Darts; scale 1.3 |
+| dread | ufo_7 | Dreadnought | 800 | 0.6 | 0.3 | 0.3 | 70 | 3 | 25 / 1.5 | scale 1.5 |
+| mothership | mothership.png | Mothership | 6000 | 0.35 | 0.8 | 0.8 | 0 | 20 | – | not blockable; launches 2 scouts + 1 dart every 8 s; top-of-screen HP bar |
 
 Enemies walk their path with a small random lateral offset (±0.2 t) so groups don't stack perfectly.
 
+_Balance pass:_ the HP of skimmer/plated/prism/carrier/dread (doubled) and the bounties of skimmer/plated/prism/dread, and the
+Mothership's armor/magic resistance (0.4 → 0.8), were retuned with `npm run balance` — see `docs/BALANCE.md` for the reasoning.
+
 ## 7. Campaign
 
-| L | Biome | Waves | Introduces | Map feature |
-|---|---|---|---|---|
-| 1 | Spring | 6 | scout, dart | single winding path, includes tutorial hints |
-| 2 | Spring | 7 | skimmer | |
-| 3 | Spring | 8 | plated | path forks (two branches rejoin) |
-| 4 | Desert | 9 | prism | |
-| 5 | Desert | 10 | carrier | two entrances |
-| 6 | Desert | 10 | – (mix) | long loop |
-| 7 | Winter | 12 | dread | |
-| 8 | Winter | 12 | – | two entrances that merge |
-| 9 | Winter | 12 | – | few, tight build spots |
-| 10 | Mixed spring→desert→winter | 15 | mothership (final wave) | long path through all biomes |
+| L | Name | Biome | Waves | Introduces | Map feature |
+|---|---|---|---|---|---|
+| 1 | Meadow Landing | Spring | 6 | scout, dart | single winding path, includes tutorial hints |
+| 2 | Blossom Bend | Spring | 7 | skimmer | S-curve with two pocket spots covering two road legs each |
+| 3 | Twin Creeks | Spring | 8 | plated | path forks (two branches rejoin) |
+| 4 | Dune Crossing | Desert | 9 | prism | three long switchbacks |
+| 5 | Oasis Crossroads | Desert | 10 | carrier | two entrances; the two roads cross in the middle |
+| 6 | Scorpion Loop | Desert | 10 | – (mix) | long loop: the road crosses itself, the crossing is passed twice |
+| 7 | Frostbite Pass | Winter | 12 | dread | long serpentine pass |
+| 8 | Glacier Junction | Winter | 12 | – | two entrances that merge |
+| 9 | Icebound Bastion | Winter | 12 | – | few, tight build spots |
+| 10 | The Mothership | Mixed spring→desert→winter | 15 | mothership (final wave) | long path through all biomes |
 
 Start gold roughly 250–450, tuned by the balance tool. Grids up to ~14×14; camera fits the map into the play area.
 
