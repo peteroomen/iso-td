@@ -161,3 +161,15 @@ describe('persistence', () => {
     expect(parseSave('42')).toEqual(createDefaultSave());
   });
 });
+
+describe('save flags and seen enemies', () => {
+  it('round-trips and sanitizes', async () => {
+    const p = await import('../src/core/progress');
+    let s = p.createDefaultSave();
+    s = p.withFlag(p.withSeenEnemies(s, ['scout', 'dart', 'scout']), 'endingSeen');
+    const back = p.parseSave(p.serializeSave(s));
+    expect(back.seenEnemies).toEqual(['scout', 'dart']);
+    expect(p.hasFlag(back, 'endingSeen')).toBe(true);
+    expect(p.parseSave('{"flags":[1,"x","x"],"seenEnemies":"bad"}')).toMatchObject({ flags: ['x'], seenEnemies: [] });
+  });
+});

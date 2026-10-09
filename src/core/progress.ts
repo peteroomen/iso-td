@@ -29,6 +29,10 @@ export interface SaveData {
   /** Purchased star-tree tiers per track. */
   upgrades: UpgradeState;
   settings: Settings;
+  /** Enemy ids whose "new enemy" intro card has been shown. */
+  seenEnemies: string[];
+  /** One-off flags, e.g. 'endingSeen', 'unlockSeen:level03'. */
+  flags: string[];
 }
 
 export function createDefaultSave(): SaveData {
@@ -37,7 +41,22 @@ export function createDefaultSave(): SaveData {
     levels: {},
     upgrades: emptyUpgrades(),
     settings: { ...SETTINGS_DEFAULTS },
+    seenEnemies: [],
+    flags: [],
   };
+}
+
+export function hasFlag(save: SaveData, flag: string): boolean {
+  return save.flags.includes(flag);
+}
+
+export function withFlag(save: SaveData, flag: string): SaveData {
+  return hasFlag(save, flag) ? save : { ...save, flags: [...save.flags, flag] };
+}
+
+export function withSeenEnemies(save: SaveData, ids: readonly string[]): SaveData {
+  const add = ids.filter((id) => !save.seenEnemies.includes(id));
+  return add.length ? { ...save, seenEnemies: [...save.seenEnemies, ...add] } : save;
 }
 
 // ---- stars ----
@@ -170,6 +189,10 @@ export function parseSave(raw: string | null | undefined): SaveData {
     if (typeof s.music === 'number') out.settings.music = Math.max(0, Math.min(1, s.music));
     if (typeof s.sfx === 'number') out.settings.sfx = Math.max(0, Math.min(1, s.sfx));
   }
+  const strList = (v: unknown): string[] =>
+    Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string'))] : [];
+  out.seenEnemies = strList(d.seenEnemies);
+  out.flags = strList(d.flags);
   // never allow spending more stars than were earned (tamper / old data): reset upgrades
   if (starsSpent(out) > starsEarned(out)) out.upgrades = emptyUpgrades();
   return out;
