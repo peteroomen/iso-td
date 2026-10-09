@@ -130,10 +130,13 @@ export class Hud {
 
   toast(msg: string, x?: number, y?: number, color: string = COLORS.textRed): void {
     const p = this.scene.input.activePointer;
-    const tx = Phaser.Math.Clamp(x ?? p.x, 100, GAME_W - 100);
-    const ty = Phaser.Math.Clamp(y ?? p.y - 36, 80, GAME_H - 40);
-    const c = this.scene.add.container(tx, ty).setDepth(DEPTH.toast);
+    const c = this.scene.add.container(0, 0).setDepth(DEPTH.toast);
     const t = this.scene.add.text(0, 0, msg, textStyle(20, color)).setOrigin(0.5);
+    // keep the whole pill on screen, however long the message is
+    const half = t.width / 2 + 20;
+    const tx = Phaser.Math.Clamp(x ?? p.x, half, GAME_W - half);
+    const ty = Phaser.Math.Clamp(y ?? p.y - 36, 80, GAME_H - 40);
+    c.setPosition(tx, ty);
     const g = this.scene.add.graphics();
     drawPanel(g, -t.width / 2 - 12, -t.height / 2 - 4, t.width + 24, t.height + 8, { r: 10, fill: 0x2c2240, bw: 3, alpha: 0.95 });
     c.add([g, t]);

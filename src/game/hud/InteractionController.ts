@@ -63,6 +63,9 @@ export class InteractionController {
   private selectedTower: number | null = null;
   private menuSpot: number | null = null;
   private hoverTower: number | null = null;
+  private readonly occupied = new Set<number>();
+  private occupancySig = NaN;
+  private occupancyCount = -1;
   private readonly d: InteractionDeps;
 
   constructor(deps: InteractionDeps) {
@@ -483,11 +486,18 @@ export class InteractionController {
 
   update(time: number): void {
     const { sim, markers } = this.d;
-    const occupied = new Set<number>();
-    for (const t of sim.state.towers) occupied.add(t.spotId);
-    markers.emptySpots.clear();
-    for (const s of sim.spots) if (!occupied.has(s.id)) markers.emptySpots.add(s.id);
-    if (this.menuSpot !== null && occupied.has(this.menuSpot)) this.closeMenu();
+    // which spots are free only changes on build/sell: recompute when the occupancy signature changes (no per-frame Set)
+    let sig = 0;
+    for (const t of sim.state.towers) sig += (t.spotId + 1) * 2654435761 + 1;
+    if (sig !== this.occupancySig || sim.state.towers.length !== this.occupancyCount) {
+      this.occupancySig = sig;
+      this.occupancyCount = sim.state.towers.length;
+      this.occupied.clear();
+      for (const t of sim.state.towers) this.occupied.add(t.spotId);
+      markers.emptySpots.clear();
+      for (const s of sim.spots) if (!this.occupied.has(s.id)) markers.emptySpots.add(s.id);
+    }
+    if (this.menuSpot !== null && this.occupied.has(this.menuSpot)) this.closeMenu();
     if (this.selectedTower !== null) {
       const t: TowerState | undefined = sim.getTower(this.selectedTower);
       if (!t) {

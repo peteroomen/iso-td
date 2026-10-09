@@ -153,7 +153,7 @@ export class EnemyIntro {
     // text
     const tx = px + PORTRAIT_W + 14;
     const name = s.add.text(tx, py - 4, def.name, textStyle(30, COLORS.textGold)).setOrigin(0, 0);
-    const blurb = s.add.text(tx, py + 36, ENEMY_BLURB[id], { fontFamily: FONT, fontSize: '16px', color: '#e9dfff', wordWrap: { width: W - tx - PAD }, lineSpacing: 2 });
+    const blurb = s.add.text(tx, py + 36, ENEMY_BLURB[id], { fontFamily: FONT, fontSize: '17px', color: '#e9dfff', wordWrap: { width: W - tx - PAD }, lineSpacing: 2 });
 
     // trait chips (flow layout)
     const chips = s.add.container(0, 0);
@@ -161,10 +161,10 @@ export class EnemyIntro {
     chips.add(cg);
     let cx = PAD;
     let cy = py + PORTRAIT_H + 12;
-    const rowH = 30;
+    const rowH = 32;
     const maxX = W - PAD;
     for (const t of traitsOf(id).slice(0, MAX_CHIPS)) {
-      const label = s.add.text(0, 0, t.label, textStyle(15, COLORS.text, { strokeThickness: 2 })).setOrigin(0, 0.5);
+      const label = s.add.text(0, 0, t.label, textStyle(16, COLORS.text, { strokeThickness: 2 })).setOrigin(0, 0.5);
       const icon = s.add.image(0, 0, t.icon);
       icon.setScale(20 / icon.height);
       const cw = 8 + 20 + 5 + label.width + 10;
@@ -172,15 +172,15 @@ export class EnemyIntro {
         cx = PAD;
         cy += rowH;
       }
-      drawPanel(cg, cx, cy, cw, 24, { r: 9, fill: t.color, bw: 2.5, gloss: false });
-      icon.setPosition(cx + 8 + 10, cy + 12);
-      label.setPosition(cx + 8 + 20 + 5, cy + 12);
+      drawPanel(cg, cx, cy, cw, 26, { r: 9, fill: t.color, bw: 2.5, gloss: false });
+      icon.setPosition(cx + 8 + 10, cy + 13);
+      label.setPosition(cx + 8 + 20 + 5, cy + 13);
       chips.add([icon, label]);
       cx += cw + 8;
     }
     const hasChips = traitsOf(id).length > 0;
     const footerY = cy + (hasChips ? rowH : 0) + 8;
-    const stats = s.add.text(PAD, footerY + 19, statLine(id), textStyle(14, '#b9aee0', { strokeThickness: 0 })).setOrigin(0, 0.5);
+    const stats = s.add.text(PAD, footerY + 19, statLine(id), textStyle(15, '#b9aee0', { strokeThickness: 0 })).setOrigin(0, 0.5);
     const btn = new UiButton(s, W - PAD - 52, footerY + 19, {
       w: 104,
       h: 40,
