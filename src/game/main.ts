@@ -6,6 +6,7 @@ import { TitleScene } from './scenes/TitleScene';
 import { LevelSelectScene } from './scenes/LevelSelectScene';
 import { UpgradesScene } from './scenes/UpgradesScene';
 import { SettingsScene } from './scenes/SettingsScene';
+import { EndingScene } from './scenes/EndingScene';
 // Scene key: 'Game'. Receives `{ levelId: string }` from the level map.
 import { GameScene } from './scenes/GameScene';
 import { GAME_H, GAME_W } from './ui/theme';
@@ -30,7 +31,7 @@ const game = new Phaser.Game({
     activePointers: 3,
   },
   render: { powerPreference: 'high-performance' },
-  scene: [BootScene, PreloadScene, TitleScene, LevelSelectScene, UpgradesScene, SettingsScene, GameScene],
+  scene: [BootScene, PreloadScene, TitleScene, LevelSelectScene, UpgradesScene, SettingsScene, EndingScene, GameScene],
 });
 
 if (import.meta.env.DEV) {
