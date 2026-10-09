@@ -75,6 +75,14 @@ export class UiButton extends Phaser.GameObjects.Container {
   private fill: number;
   private readonly opts: ButtonOpts;
   onHover?: (over: boolean) => void;
+  /** Resting scale (UI scale on small screens); hover / press tweens are relative to it. */
+  private bs = 1;
+
+  /** Sets the resting scale. */
+  setBaseScale(s: number): this {
+    this.bs = s;
+    return this.setScale(s);
+  }
 
   constructor(scene: Phaser.Scene, x: number, y: number, opts: ButtonOpts) {
     super(scene, x, y);
@@ -101,7 +109,7 @@ export class UiButton extends Phaser.GameObjects.Container {
       if (this.disabledFlag) return;
       this.hovered = true;
       this.redraw();
-      scene.tweens.add({ targets: this, scale: 1.07, duration: 110, ease: 'Quad.easeOut' });
+      scene.tweens.add({ targets: this, scale: 1.07 * this.bs, duration: 110, ease: 'Quad.easeOut' });
       if (opts.hoverSfx !== false) Audio.sfx('ui_hover', { volume: 0.35, throttleMs: 90 });
       this.onHover?.(true);
     });
@@ -109,21 +117,21 @@ export class UiButton extends Phaser.GameObjects.Container {
       this.hovered = false;
       this.pressed = false;
       this.redraw();
-      scene.tweens.add({ targets: this, scale: 1, duration: 110, ease: 'Quad.easeOut' });
+      scene.tweens.add({ targets: this, scale: this.bs, duration: 110, ease: 'Quad.easeOut' });
       this.onHover?.(false);
     });
     this.on('pointerdown', () => {
       if (this.disabledFlag) return;
       this.pressed = true;
       this.redraw();
-      scene.tweens.add({ targets: this, scale: 0.94, duration: 70 });
+      scene.tweens.add({ targets: this, scale: 0.94 * this.bs, duration: 70 });
     });
     this.on('pointerup', () => {
       const was = this.pressed;
       this.pressed = false;
       this.redraw();
       if (this.disabledFlag || !was) return;
-      scene.tweens.add({ targets: this, scale: 1.07, duration: 90, ease: 'Back.easeOut' });
+      scene.tweens.add({ targets: this, scale: 1.07 * this.bs, duration: 90, ease: 'Back.easeOut' });
       Audio.sfx('ui_click');
       opts.onClick();
     });

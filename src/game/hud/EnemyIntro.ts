@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { ENEMIES, withSeenEnemies, type EnemyId, type Sim } from '../../core';
 import { Audio } from '../services/audio';
 import { getSave, updateSave } from '../services/save';
-import { COLORS, FONT, GAME_H, GAME_W, textStyle } from '../ui/theme';
+import { COLORS, FONT, GAME_H, GAME_W, SAFE, UI_SCALE, textStyle } from '../ui/theme';
 import { ENEMY_BLURB, statLine, traitsOf } from './enemyInfo';
+import { barBottom } from './Hud';
 import { DEPTH, UiButton, drawPanel, markHud } from './widgets';
 
 const W = 372;
@@ -52,6 +53,7 @@ export class EnemyIntro {
   private hideAt = 0;
   private shownId: EnemyId | null = null;
   private disabled = false;
+  private readonly eu = Math.min(UI_SCALE, 1.3);
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -109,14 +111,18 @@ export class EnemyIntro {
   // ----------------------------------------------------------------------------------------- card
 
   private place(h: number): { x: number; y: number } {
+    const k = this.eu;
+    const cw = W * k;
+    const ch = h * k;
+    const top = barBottom() + 20;
     const spots = [
-      { x: GAME_W - W - 14, y: GAME_H - h - 14 },
-      { x: GAME_W - W - 14, y: 76 },
-      { x: 14, y: 76 },
+      { x: GAME_W - cw - 14 - SAFE.r, y: GAME_H - ch - 14 - SAFE.b },
+      { x: GAME_W - cw - 14 - SAFE.r, y: top },
+      { x: 14 + SAFE.l, y: top },
     ];
     const bad = this.avoid();
     for (const s of spots) {
-      const hit = bad.some((r) => s.x < r.x + r.w && s.x + W > r.x && s.y < r.y + r.h && s.y + h > r.y);
+      const hit = bad.some((r) => s.x < r.x + r.w && s.x + cw > r.x && s.y < r.y + r.h && s.y + ch > r.y);
       if (!hit) return s;
     }
     return spots[0];
@@ -207,8 +213,8 @@ export class EnemyIntro {
     card.add([body, backing, portrait, shadow, sprite, name, blurb, chips, stats, btn, tab, tabText]);
 
     const pos = this.place(h);
-    const offX = pos.x > GAME_W / 2 ? GAME_W + 20 : -W - 20;
-    card.setPosition(offX, pos.y).setAlpha(0);
+    const offX = pos.x > GAME_W / 2 ? GAME_W + 20 : -W * this.eu - 20;
+    card.setScale(this.eu).setPosition(offX, pos.y).setAlpha(0);
     s.tweens.add({ targets: card, x: pos.x, alpha: 1, duration: 420, ease: 'Back.easeOut' });
     Audio.sfx('ui_click', { volume: 0.4, throttleMs: 200 });
     (card as { __sprite?: Phaser.GameObjects.Image }).__sprite = sprite;
@@ -248,7 +254,7 @@ export class EnemyIntro {
     for (const o of card.list) if ((o as Phaser.GameObjects.GameObject).input) (o as Phaser.GameObjects.GameObject).disableInteractive();
     this.scene.tweens.add({
       targets: card,
-      x: card.x > GAME_W / 2 ? GAME_W + 20 : -W - 20,
+      x: card.x > GAME_W / 2 ? GAME_W + 20 : -W * this.eu - 20,
       alpha: 0,
       duration: 260,
       ease: 'Quad.easeIn',

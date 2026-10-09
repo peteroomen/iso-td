@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { getLevel, hasFlag, isLevelUnlocked, starsAvailable, starsEarned, withFlag, type Biome, type SaveData } from '../../core';
 import { Audio } from '../services/audio';
 import { getSave, updateSave } from '../services/save';
-import { COLORS, GAME_W, textStyle } from '../ui/theme';
+import { COLORS, SAFE, UI_SCALE, textStyle, viewH, viewW } from '../ui/theme';
 import { addSky } from '../ui/background';
 import { buildIsland, type Island, type IslandSpec } from '../ui/isoScenery';
 import {
@@ -116,6 +116,10 @@ export class LevelSelectScene extends Phaser.Scene {
   private intro: LevelSelectData = {};
   private routeDone: boolean[] = [];
   private upgradesTip?: SpeechBubble;
+  /** Island layout for the live canvas size (the ISLANDS table is the 1280x720 design). */
+  private defs: IslandDef[] = ISLANDS;
+  /** Header / node scale on small screens (keeps touch targets near 44 CSS px). */
+  private hs = 1;
 
   constructor() {
     super('LevelSelect');
@@ -136,6 +140,8 @@ export class LevelSelectScene extends Phaser.Scene {
       return;
     }
     this.upgradesTip = undefined;
+    this.hs = Math.min(1.3, UI_SCALE);
+    this.defs = this.layoutDefs();
     this.views = [];
     this.wraps = [];
     this.islands = [];
@@ -162,8 +168,21 @@ export class LevelSelectScene extends Phaser.Scene {
   // world
   // -------------------------------------------------------------------------------------------------------------
 
+  /** Spreads the design-space islands over the live canvas: wider phones push them apart, taller screens space them out. */
+  private layoutDefs(): IslandDef[] {
+    const W = viewW(this);
+    const H = viewH(this);
+    const kx = Math.min(1.5, Math.max(1, W / 1280));
+    const ky = Math.min(1.35, Math.max(1, H / 720));
+    const grow = Math.min(1.25, Math.max(1, Math.min(kx, ky)));
+    const headerExtra = 92 * (this.hs - 1);
+    const mapX = (x: number): number => W / 2 + (x - 640) * kx;
+    const mapY = (y: number): number => H / 2 + (y - 360) * ky + headerExtra + 12;
+    return ISLANDS.map((d) => ({ ...d, cx: mapX(d.cx), cy: mapY(d.cy), labelY: mapY(d.labelY), scale: d.scale * grow }));
+  }
+
   private buildIslands(): void {
-    ISLANDS.forEach((def, i) => {
+    this.defs.forEach((def, i) => {
       const wrap = this.add.container(def.cx, def.cy).setDepth(2);
       // soft shadow far below the floating island
       const sh = this.add.ellipse(def.cx + 6, def.cy + 118 * (def.scale / SCALE) + 20, 330 * (def.scale / SCALE), 54, 0x2a3a66, 0.2).setDepth(1);
@@ -195,7 +214,7 @@ export class LevelSelectScene extends Phaser.Scene {
   }
 
   private islandOfNode(index: number): number {
-    return ISLANDS.findIndex((d) => index in d.nodes);
+    return this.defs.findIndex((d) => index in d.nodes);
   }
 
   private nodeState(n: LevelNode, save: SaveData = this.save): 'locked' | 'open' | 'done' {
@@ -208,7 +227,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const before = this.beforeSave();
     for (const n of this.nodes) {
       const wi = this.islandOfNode(n.index);
-      const def = ISLANDS[wi];
+      const def = this.defs[wi];
       const [c, r] = def.nodes[n.index];
       const p = this.islands[wi].cellPos(c, r);
       const local = { x: p.x, y: p.y - 3 };
@@ -256,7 +275,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
       // pop-in
       root.setScale(0);
-      this.tweens.add({ targets: root, scale: 1, duration: 420, ease: 'Back.easeOut', delay: 500 + n.index * 70 });
+      this.tweens.add({ targets: root, scale: Math.min(1.2, this.hs), duration: 420, ease: 'Back.easeOut', delay: 500 + n.index * 70 });
     }
     this.routeDone = this.nodes.map((n) => this.nodeState(n, before) === 'done');
   }
@@ -393,22 +412,28 @@ export class LevelSelectScene extends Phaser.Scene {
   // -------------------------------------------------------------------------------------------------------------
 
   private buildHeader(): void {
-    addHeaderBar(this);
+    const hs = this.hs;
+    const W = viewW(this);
+    addHeaderBar(this, Math.round(92 * hs));
 
     const items: Phaser.GameObjects.GameObject[] = [];
-    const back = new Button(this, 104, 44, { width: 170, height: 60, label: 'Menu', icon: 'ui_home', style: 'secondary', fontSize: 30, onClick: () => this.backToTitle() });
-    const title = this.add.text(214, 46, 'WORLD MAP', textStyle(42, COLORS.textGold, { strokeThickness: 8 })).setOrigin(0, 0.5);
+    const hy = Math.round(44 * hs);
+    const back = new Button(this, 104 * hs + SAFE.l, hy, { width: 170, height: 60, label: 'Menu', icon: 'ui_home', style: 'secondary', fontSize: 30, onClick: () => this.backToTitle() }).setScale(hs);
+    const title = this.add.text(214 * hs + SAFE.l - 14 * (hs - 1), Math.round(46 * hs), 'WORLD MAP', textStyle(42, COLORS.textGold, { strokeThickness: 8 })).setOrigin(0, 0.5).setScale(hs);
 
     // star counter chip
     const earned = starsEarned(this.save) - (this.intro.completed ? this.intro.starsGained ?? 0 : 0);
-    const { root: chip, label } = starChip(this, 836, 44, `${earned} / 30`);
+    const { root: chip, label } = starChip(this, Math.max(W / 2 + 40, W - 444 * hs - SAFE.r), hy, `${earned} / 30`);
+    chip.setScale(hs);
     this.starChipText = label;
 
-    this.upgradesBtn = new Button(this, 1066, 44, { width: 220, height: 60, label: 'Upgrades', icon: 'ui_upgrade', style: 'primary', fontSize: 30, onClick: () => this.openUpgrades() });
-    const gear = new IconButton(this, 1226, 44, 'ui_gear', () => this.openSettings(), { width: 60, height: 60, iconScale: 0.4 });
+    const gearX = W - 54 * hs - SAFE.r;
+    const upX = gearX - (30 + 110 + 20) * hs;
+    this.upgradesBtn = new Button(this, upX, hy, { width: 220, height: 60, label: 'Upgrades', icon: 'ui_upgrade', style: 'primary', fontSize: 30, onClick: () => this.openUpgrades() }).setScale(hs);
+    const gear = new IconButton(this, gearX, hy, 'ui_gear', () => this.openSettings(), { width: 60, height: 60, iconScale: 0.4 }).setScale(hs);
 
     // unspent-stars badge on the Upgrades button
-    this.badge = this.add.container(1066 + 104, 44 - 28);
+    this.badge = this.add.container(upX + 104 * hs, hy - 28 * hs).setScale(hs);
     const bg = this.add.graphics();
     bg.fillStyle(COLORS.ink, 1);
     bg.fillCircle(0, 0, 18);
@@ -618,7 +643,7 @@ export class LevelSelectScene extends Phaser.Scene {
       const news = pendingUnlocks(getSave(), next.node.id);
       if (news.length) {
         this.time.delayedCall(t - 250, () => {
-          if (!this.modalOpen) unlockToast(this, GAME_W / 2, 134, news, 4200);
+          if (!this.modalOpen) unlockToast(this, viewW(this) / 2, Math.round(134 * this.hs), news, 4200);
         });
         t += 1200;
         tipDelay = 4400;

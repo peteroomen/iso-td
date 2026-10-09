@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { FIXED_DT, Sim, getLevel, recordResult, type AbilityId, type LevelDef, type SimEvent } from '../../core';
 import { AbilityBar } from '../hud/AbilityBar';
 import { EnemyIntro } from '../hud/EnemyIntro';
-import { Hud } from '../hud/Hud';
+import { Hud, barBottom } from '../hud/Hud';
 import { InteractionController } from '../hud/InteractionController';
 import { Overlays } from '../hud/Overlays';
 import { WaveCall } from '../hud/WaveCall';
@@ -15,12 +15,31 @@ import { SimRenderer } from '../render/SimRenderer';
 import { generateTextures } from '../render/textures';
 import { Audio } from '../services/audio';
 import { getSave, updateSave } from '../services/save';
-import { COLORS, GAME_H, GAME_W } from '../ui/theme';
+import { COLORS, GAME_H, GAME_W, SAFE, UI_SCALE } from '../ui/theme';
+import { fullscreenAvailable, toggleFullscreen, type ViewResizable } from '../ui/viewport';
 
 const MAX_STEPS_PER_FRAME = 8;
 
 /** The in-game scene: renders the deterministic Sim, feeds it commands and hosts the HUD. */
-export class GameScene extends Phaser.Scene {
+/** Everything needed to rebuild the display after a canvas resize without losing the run. */
+interface ResumeState {
+  sim: Sim;
+  speed: number;
+  acc: number;
+  animTime: number;
+  dismissedHints: Set<number>;
+  pauseOpen: boolean;
+  ended: boolean;
+  result?: ResultState;
+  /** the run was started by this scene before the resize (skips the level-name banner) */
+  hold: boolean;
+}
+
+type ResultState =
+  | { kind: 'won'; lives: number; info: { stars: number; gained: number } }
+  | { kind: 'lost'; wave: number };
+
+export class GameScene extends Phaser.Scene implements ViewResizable {
   levelId = 'level01';
   level!: LevelDef;
   sim!: Sim;
@@ -46,29 +65,43 @@ export class GameScene extends Phaser.Scene {
   private shownHintWave = -1;
   private dismissedHints = new Set<number>();
   private resultTimer?: Phaser.Time.TimerEvent;
+  private resumeFrom?: ResumeState;
+  private result?: ResultState;
+  /** the canvas was resized while this scene was paused behind the Settings overlay */
+  private staleLayout = false;
+  private onResumeEvt = (): void => {
+    if (this.staleLayout) this.relayout();
+  };
 
   constructor() {
     super('Game');
   }
 
-  init(data: { levelId?: string }): void {
+  init(data: { levelId?: string; resume?: ResumeState }): void {
     this.levelId = data?.levelId ?? 'level01';
+    this.resumeFrom = data?.resume;
   }
 
   create(): void {
-    this.acc = 0;
-    this.speed = 1;
+    const rs = this.resumeFrom;
+    this.resumeFrom = undefined;
+    this.acc = rs?.acc ?? 0;
+    this.speed = rs?.speed ?? 1;
     this.paused = false;
     this.ended = false;
-    this.animTime = 0;
+    this.result = undefined;
+    this.staleLayout = false;
+    this.animTime = rs?.animTime ?? 0;
     this.shownHintWave = -1;
-    this.dismissedHints = new Set();
+    this.dismissedHints = rs?.dismissedHints ?? new Set();
 
     const level = getLevel(this.levelId) ?? getLevel('level01')!;
     this.level = level;
     generateTextures(this);
-    this.sim = new Sim(level, { seed: (Date.now() & 0x7fffffff) >>> 0, upgrades: getSave().upgrades, towerCap: level.towerCap });
-    this.view = new IsoView(level, { x: 16, y: 58, w: GAME_W - 32, h: GAME_H - 58 - 8 });
+    this.sim = rs?.sim ?? new Sim(level, { seed: (Date.now() & 0x7fffffff) >>> 0, upgrades: getSave().upgrades, towerCap: level.towerCap });
+    // play area: the whole canvas minus the safe-area insets; the top bar overlaps the (empty) upper corners of the iso diamond
+    const top = Math.max(SAFE.t + 6, barBottom() - 14 * UI_SCALE);
+    this.view = new IsoView(level, { x: 12 + SAFE.l, y: top, w: GAME_W - 24 - SAFE.l - SAFE.r, h: GAME_H - top - 6 - SAFE.b });
 
     const world = this.add.container(this.view.offX, this.view.offY).setScale(this.view.scale);
     const groundC = this.add.container(0, 0);
@@ -106,13 +139,60 @@ export class GameScene extends Phaser.Scene {
     const n = parseInt(level.id.replace(/\D+/g, ''), 10) || 1;
     Audio.music(n % 2 === 1 ? 'music_battle_1' : 'music_battle_2');
 
+    this.events.on(Phaser.Scenes.Events.RESUME, this.onResumeEvt);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup());
     if (import.meta.env.DEV) {
       const w = window as unknown as { __gameScene?: unknown };
       w.__gameScene = this;
     }
     this.simView.update(this.time.now, 0, []);
-    this.hud.banner(level.name, { sub: `Level ${n}`, hold: 1.4 });
+    if (this.hud) this.hud.setSpeed(this.speed);
+    if (!rs) this.hud.banner(level.name, { sub: `Level ${n}`, hold: 1.4 });
+    if (rs) this.restoreAfterResize(rs);
+  }
+
+  // ----------------------------------------------------------------------------------- resize / orientation
+
+  /** Canvas size changed (rotation, window resize, fullscreen): rebuild the display, keep the run. */
+  onViewResize(): void {
+    if (this.sys.isPaused() || !this.sys.isActive()) {
+      // behind the Settings overlay: rebuild once it closes
+      this.staleLayout = true;
+      return;
+    }
+    this.relayout();
+  }
+
+  /** Phone turned upright: freeze the run behind the "rotate" overlay. */
+  onPortraitBlock(): void {
+    if (!this.ended && this.sys.isActive() && !this.overlays.active) this.openPause();
+  }
+
+  private relayout(): void {
+    this.staleLayout = false;
+    const resume: ResumeState = {
+      sim: this.sim,
+      speed: this.speed,
+      acc: this.acc,
+      animTime: this.animTime,
+      dismissedHints: this.dismissedHints,
+      pauseOpen: this.overlays.pauseOpen,
+      ended: this.ended,
+      result: this.result,
+      hold: true,
+    };
+    this.scene.restart({ levelId: this.levelId, resume });
+  }
+
+  private restoreAfterResize(rs: ResumeState): void {
+    if (rs.ended && rs.result) {
+      this.result = rs.result;
+      this.ended = true;
+      this.intro.disable();
+      this.showResult(rs.result, 60);
+    } else if (rs.pauseOpen) {
+      this.openPause();
+    }
   }
 
   // ----------------------------------------------------------------------------------- dev helpers
@@ -185,6 +265,8 @@ export class GameScene extends Phaser.Scene {
       onRestart: () => this.restart(),
       onSettings: () => this.openSettings(),
       onQuit: () => this.quit(),
+      onFullscreen: fullscreenAvailable(this.scale) ? () => toggleFullscreen(this.scale) : undefined,
+      fullscreenLabel: () => (this.scale.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'),
     });
   }
 
@@ -219,6 +301,7 @@ export class GameScene extends Phaser.Scene {
   private cleanup(): void {
     this.input.setDefaultCursor('default');
     this.input.keyboard?.removeAllListeners();
+    this.events.off(Phaser.Scenes.Events.RESUME, this.onResumeEvt);
     this.interaction?.destroy();
     this.overlays?.destroy();
     this.intro?.destroy();
@@ -265,18 +348,8 @@ export class GameScene extends Phaser.Scene {
     Audio.sfx('level_victory');
     const info = recordResult(getSave(), this.levelId, lives);
     updateSave(() => info.save);
-    this.resultTimer = this.time.delayedCall(1400, () => {
-      this.hud.hideHint(true);
-      this.overlays.showVictory({
-        levelName: this.level.name,
-        stars: info.stars,
-        lives,
-        maxLives: this.sim.state.maxLives,
-        gained: info.gained,
-        onContinue: () => this.gotoLevelSelect({ completed: this.levelId, starsGained: info.gained }),
-        onRetry: () => this.restart(),
-      });
-    });
+    this.result = { kind: 'won', lives, info: { stars: info.stars, gained: info.gained } };
+    this.showResult(this.result, 1400);
   }
 
   private onLost(wave: number): void {
@@ -285,15 +358,33 @@ export class GameScene extends Phaser.Scene {
     this.interaction.cancelAll();
     Audio.music(null);
     Audio.sfx('level_defeat');
-    this.resultTimer = this.time.delayedCall(1200, () => {
+    this.result = { kind: 'lost', wave };
+    this.showResult(this.result, 1200);
+  }
+
+  private showResult(r: ResultState, delay: number): void {
+    this.resultTimer = this.time.delayedCall(delay, () => {
       this.hud.hideHint(true);
-      this.overlays.showDefeat({
-        levelName: this.level.name,
-        wave,
-        total: this.sim.state.wave.total,
-        onRetry: () => this.restart(),
-        onQuit: () => this.gotoLevelSelect(),
-      });
+      if (r.kind === 'won') {
+        const info = r.info;
+        this.overlays.showVictory({
+          levelName: this.level.name,
+          stars: info.stars,
+          lives: r.lives,
+          maxLives: this.sim.state.maxLives,
+          gained: info.gained,
+          onContinue: () => this.gotoLevelSelect({ completed: this.levelId, starsGained: info.gained }),
+          onRetry: () => this.restart(),
+        });
+      } else {
+        this.overlays.showDefeat({
+          levelName: this.level.name,
+          wave: r.wave,
+          total: this.sim.state.wave.total,
+          onRetry: () => this.restart(),
+          onQuit: () => this.gotoLevelSelect(),
+        });
+      }
     });
   }
 

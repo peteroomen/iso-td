@@ -1,13 +1,17 @@
 import Phaser from 'phaser';
 import type { Sim } from '../../core';
 import { Audio } from '../services/audio';
-import { COLORS, GAME_H, GAME_W, FONT, textStyle } from '../ui/theme';
+import { COLORS, GAME_H, GAME_W, FONT, SAFE, UI_SCALE, textStyle } from '../ui/theme';
 import { TEX } from '../render/textures';
 import { Tooltip } from './Tooltip';
 import { DEPTH, UiButton, drawPanel, markHud } from './widgets';
 
 /** Height of the pills / buttons in the top bar. */
 const BAR_H = 46;
+/** Top edge of the top bar (below the notch). */
+export const barTop = (): number => SAFE.t + 10;
+/** Bottom edge of the top bar (grows with the UI scale on small screens). */
+export const barBottom = (): number => barTop() + BAR_H * UI_SCALE;
 /** Hint banner auto-dismisses after this long. */
 const HINT_TIME = 10000;
 
@@ -35,6 +39,7 @@ export class Hud {
   private readonly bossBox: Phaser.GameObjects.Container;
   private readonly bossGfx: Phaser.GameObjects.Graphics;
   private readonly bossName: Phaser.GameObjects.Text;
+  private bossY = 54;
   private bossShown = false;
   private bossFrac = 1;
   private bossDrawn = -1;
@@ -59,9 +64,10 @@ export class Hud {
     this.lastGold = s.gold;
     this.lastLives = s.lives;
 
+    const U = UI_SCALE;
     // ---- stats pills ----
     const pill = (x: number, w: number) => {
-      const c = scene.add.container(x, 14).setDepth(DEPTH.hud);
+      const c = scene.add.container(SAFE.l + x * U, barTop()).setDepth(DEPTH.hud).setScale(U);
       const g = scene.add.graphics();
       drawPanel(g, 0, 0, w, BAR_H, { r: 14, fill: COLORS.panel, bw: 3.5 });
       c.add(g);
@@ -85,22 +91,27 @@ export class Hud {
     ] as const) {
       box.setSize(w, BAR_H).setInteractive({ hitArea: new Phaser.Geom.Rectangle(0, 0, w, BAR_H), hitAreaCallback: Phaser.Geom.Rectangle.Contains });
       markHud(box);
-      box.on('pointerover', () => this.tooltip.show(tip(), box.x + w / 2, box.y + BAR_H + 4, 'below'));
+      box.on('pointerover', () => this.tooltip.show(tip(), box.x + (w / 2) * U, box.y + BAR_H * U + 4, 'below'));
       box.on('pointerout', () => this.tooltip.hide());
     }
 
     // ---- top-right ----
-    this.pauseBtn = new UiButton(scene, GAME_W - 14 - 27, 14 + BAR_H / 2, { w: 54, h: BAR_H, icon: TEX.pause, iconSize: 26, onClick: cb.onPause, radius: 12 });
-    this.pauseBtn.onHover = (o) => (o ? this.tooltip.show({ title: 'Pause', rows: [{ text: 'Esc / P' }] }, this.pauseBtn.x, this.pauseBtn.y + 30, 'below') : this.tooltip.hide());
-    this.speedBtn = new UiButton(scene, GAME_W - 14 - 54 - 10 - 42, 14 + BAR_H / 2, { w: 84, h: BAR_H, icon: TEX.ff, iconSize: 24, label: '1x', fontSize: 22, onClick: cb.onSpeed, radius: 12 });
-    this.speedBtn.onHover = (o) => (o ? this.tooltip.show({ title: 'Game speed', rows: [{ text: 'Toggle 1x / 2x', right: 'Space' }] }, this.speedBtn.x, this.speedBtn.y + 30, 'below') : this.tooltip.hide());
+    this.pauseBtn = new UiButton(scene, GAME_W - SAFE.r - (14 + 27) * U, barTop() + (BAR_H / 2) * U, { w: 54, h: BAR_H, icon: TEX.pause, iconSize: 26, onClick: cb.onPause, radius: 12 }).setBaseScale(U);
+    this.pauseBtn.onHover = (o) => (o ? this.tooltip.show({ title: 'Pause', rows: [{ text: 'Esc / P' }] }, this.pauseBtn.x, this.pauseBtn.y + 30 * U, 'below') : this.tooltip.hide());
+    this.speedBtn = new UiButton(scene, GAME_W - SAFE.r - (14 + 54 + 10 + 42) * U, barTop() + (BAR_H / 2) * U, { w: 84, h: BAR_H, icon: TEX.ff, iconSize: 24, label: '1x', fontSize: 22, onClick: cb.onSpeed, radius: 12 }).setBaseScale(U);
+    this.speedBtn.onHover = (o) => (o ? this.tooltip.show({ title: 'Game speed', rows: [{ text: 'Toggle 1x / 2x', right: 'Space' }] }, this.speedBtn.x, this.speedBtn.y + 30 * U, 'below') : this.tooltip.hide());
     this.pauseBtn.setDepth(DEPTH.hud);
     this.speedBtn.setDepth(DEPTH.hud);
     scene.add.existing(this.pauseBtn);
     scene.add.existing(this.speedBtn);
 
     // ---- boss bar ----
-    this.bossBox = scene.add.container(GAME_W / 2 + 40, -60).setDepth(DEPTH.bar).setVisible(false);
+    // boss bar: centred; drops below the top bar when the (scaled) pills would run into it
+    const bu = Math.min(U, 1.4);
+    const pillsRight = SAFE.l + 444 * U;
+    const bossLeft = GAME_W / 2 + 40 - 220 * bu;
+    this.bossY = pillsRight > bossLeft - 12 ? barBottom() + 34 * bu : 54;
+    this.bossBox = scene.add.container(GAME_W / 2 + 40, -60).setDepth(DEPTH.bar).setVisible(false).setScale(bu);
     this.bossGfx = scene.add.graphics();
     this.bossName = scene.add.text(0, -4, 'MOTHERSHIP', textStyle(24, '#ff8a80')).setOrigin(0.5, 1);
     const skull = scene.add.image(-196, 14, TEX.skull).setScale(0.5);
@@ -117,7 +128,7 @@ export class Hud {
   }
 
   shakeLives(): void {
-    this.scene.tweens.add({ targets: this.livesBox, x: { from: 14 - 8, to: 14 }, duration: 380, ease: 'Elastic.easeOut' });
+    this.scene.tweens.add({ targets: this.livesBox, x: { from: this.livesBox.x - 8, to: this.livesBox.x }, duration: 380, ease: 'Elastic.easeOut' });
     this.scene.tweens.add({ targets: this.livesText, scale: { from: 1.5, to: 1 }, duration: 320, ease: 'Back.easeOut' });
     this.livesText.setColor(COLORS.textRed);
     this.scene.time.delayedCall(450, () => this.livesText.active && this.livesText.setColor(COLORS.text));
@@ -125,7 +136,7 @@ export class Hud {
 
   /** Screen position of the gold counter (for coin fly-ins). */
   get goldPos(): { x: number; y: number } {
-    return { x: 134 + 26, y: 14 + BAR_H / 2 };
+    return { x: SAFE.l + (134 + 26) * UI_SCALE, y: barTop() + (BAR_H / 2) * UI_SCALE };
   }
 
   toast(msg: string, x?: number, y?: number, color: string = COLORS.textRed): void {
@@ -133,22 +144,25 @@ export class Hud {
     const c = this.scene.add.container(0, 0).setDepth(DEPTH.toast);
     const t = this.scene.add.text(0, 0, msg, textStyle(20, color)).setOrigin(0.5);
     // keep the whole pill on screen, however long the message is
-    const half = t.width / 2 + 20;
-    const tx = Phaser.Math.Clamp(x ?? p.x, half, GAME_W - half);
-    const ty = Phaser.Math.Clamp(y ?? p.y - 36, 80, GAME_H - 40);
+    const tk = Math.min(UI_SCALE, 1.5);
+    const half = (t.width / 2 + 20) * tk;
+    const tx = Phaser.Math.Clamp(x ?? p.x, half + SAFE.l, GAME_W - half - SAFE.r);
+    const ty = Phaser.Math.Clamp(y ?? p.y - 36, barBottom() + 20, GAME_H - 40 - SAFE.b);
     c.setPosition(tx, ty);
     const g = this.scene.add.graphics();
     drawPanel(g, -t.width / 2 - 12, -t.height / 2 - 4, t.width + 24, t.height + 8, { r: 10, fill: 0x2c2240, bw: 3, alpha: 0.95 });
     c.add([g, t]);
-    c.setScale(0.6).setAlpha(0);
-    this.scene.tweens.add({ targets: c, scale: 1, alpha: 1, duration: 140, ease: 'Back.easeOut' });
+    c.setScale(0.6 * tk).setAlpha(0);
+    this.scene.tweens.add({ targets: c, scale: tk, alpha: 1, duration: 140, ease: 'Back.easeOut' });
     this.scene.tweens.add({ targets: c, y: ty - 34, alpha: 0, delay: 900, duration: 420, ease: 'Quad.easeIn', onComplete: () => c.destroy() });
   }
 
   /** Big centre banner ("Wave 3", "MOTHERSHIP INBOUND"). */
   banner(text: string, opts: { color?: string; band?: number; sub?: string; hold?: number } = {}): void {
-    const c = this.scene.add.container(GAME_W / 2, 200).setDepth(DEPTH.banner);
-    const band = this.scene.add.rectangle(0, 0, GAME_W, opts.sub ? 120 : 96, opts.band ?? 0x2e222f, 0.62);
+    const bk = Math.min(UI_SCALE, 1.3);
+    const by = Math.max(200, barBottom() + 90 * bk);
+    const c = this.scene.add.container(GAME_W / 2, by).setDepth(DEPTH.banner).setScale(1);
+    const band = this.scene.add.rectangle(0, 0, GAME_W / 1, (opts.sub ? 120 : 96) * bk, opts.band ?? 0x2e222f, 0.62);
     const t = this.scene.add.text(0, opts.sub ? -14 : 0, text, textStyle(58, opts.color ?? COLORS.text, { strokeThickness: 9 })).setOrigin(0.5);
     c.add([band, t]);
     if (opts.sub) c.add(this.scene.add.text(0, 36, opts.sub, textStyle(24, '#ffd7d7')).setOrigin(0.5));
@@ -158,7 +172,7 @@ export class Hud {
     this.scene.tweens.add({ targets: c, alpha: 1, duration: 120 });
     this.scene.tweens.add({ targets: band, scaleY: 1, duration: 220, ease: 'Back.easeOut' });
     this.scene.tweens.add({ targets: t, scale: 1, duration: 360, ease: 'Back.easeOut' });
-    this.scene.tweens.add({ targets: c, alpha: 0, y: 170, delay: (opts.hold ?? 1.5) * 1000, duration: 380, ease: 'Quad.easeIn', onComplete: () => c.destroy() });
+    this.scene.tweens.add({ targets: c, alpha: 0, y: by - 30, delay: (opts.hold ?? 1.5) * 1000, duration: 380, ease: 'Quad.easeIn', onComplete: () => c.destroy() });
   }
 
   /** Compact tutorial hint under the top bar. Auto-dismisses after ~10 s, when the next hint arrives, or on close. */
@@ -166,7 +180,8 @@ export class Hud {
     if (this.hintText === text && this.hintBox) return;
     this.hideHint(true);
     this.hintText = text;
-    const c = this.scene.add.container(GAME_W / 2, 0).setDepth(DEPTH.bar);
+    const hk = Math.min(UI_SCALE, 1.6);
+    const c = this.scene.add.container(GAME_W / 2, 0).setDepth(DEPTH.bar).setScale(hk);
     const txt = this.scene.add.text(0, 0, text, { fontFamily: FONT, fontSize: '17px', color: '#fff4d6', wordWrap: { width: 480 }, lineSpacing: 2, stroke: '#2e222f', strokeThickness: 3 });
     const w = Math.max(280, Math.min(590, Math.ceil(txt.width) + 52 + 54));
     txt.x = -w / 2 + 52;
@@ -181,14 +196,16 @@ export class Hud {
     const close = new UiButton(this.scene, w / 2 - 25, 0, { w: 38, h: 38, icon: TEX.close, iconSize: 18, radius: 10, fill: 0x6b5a8a, onClick: () => this.hideHint(false), keepMenu: true });
     c.add([g, bubble, bang, txt, close]);
     this.hintBox = c;
-    this.hintH = h;
-    const targetY = 14 + BAR_H + 10 + h / 2;
+    this.hintH = h * hk;
+    const hw = w * hk;
+    const targetY = barBottom() + 10 + (h * hk) / 2;
     // centred under the bar unless that would cover a wave call button: then slide to the right or left corner
     const bad = this.hintAvoid();
-    const fits = (cx: number) => !bad.some((r) => cx - w / 2 < r.x + r.w && cx + w / 2 > r.x && targetY - h / 2 - 6 < r.y + r.h && targetY + h / 2 + 6 > r.y);
-    const options = [GAME_W / 2, GAME_W - 14 - w / 2, 14 + w / 2];
+    const hh = h * hk;
+    const fits = (cx: number) => !bad.some((r) => cx - hw / 2 < r.x + r.w && cx + hw / 2 > r.x && targetY - hh / 2 - 6 < r.y + r.h && targetY + hh / 2 + 6 > r.y);
+    const options = [GAME_W / 2, GAME_W - 14 - SAFE.r - hw / 2, 14 + SAFE.l + hw / 2];
     c.x = options.find(fits) ?? options[0];
-    c.y = -h;
+    c.y = -hh;
     this.scene.tweens.add({ targets: c, y: targetY, duration: 420, ease: 'Back.easeOut' });
     this.hintTimer?.remove();
     this.hintTimer = this.scene.time.delayedCall(HINT_TIME, () => this.hideHint(false));
@@ -248,7 +265,7 @@ export class Hud {
       this.bossFrac = 1;
       this.bossDrawn = -1;
       this.bossBox.setVisible(true).setY(-60);
-      this.scene.tweens.add({ targets: this.bossBox, y: 54, duration: 520, ease: 'Back.easeOut' });
+      this.scene.tweens.add({ targets: this.bossBox, y: this.bossY, duration: 520, ease: 'Back.easeOut' });
     } else if (!boss && this.bossShown) {
       this.bossShown = false;
       this.scene.tweens.add({ targets: this.bossBox, y: -80, duration: 400, ease: 'Back.easeIn', onComplete: () => this.bossBox.setVisible(false) });

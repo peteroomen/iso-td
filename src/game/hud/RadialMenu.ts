@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { Audio } from '../services/audio';
-import { COLORS, GAME_H, GAME_W, textStyle } from '../ui/theme';
+import { COLORS, GAME_H, GAME_W, SAFE, UI_SCALE, textStyle } from '../ui/theme';
 import { TEX } from '../render/textures';
 import { Hud } from './Hud';
 import type { TipSpec } from './Tooltip';
@@ -48,6 +48,7 @@ export class RadialMenu {
   private anchor = { x: 0, y: 0 };
   private selected = -1;
   open_ = false;
+  private u = 1;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -64,9 +65,11 @@ export class RadialMenu {
 
   open(ax: number, ay: number, items: RadialItem[]): void {
     this.close(true);
-    const margin = RING_R + BTN_R + 26;
-    const x = Phaser.Math.Clamp(ax, margin, GAME_W - margin);
-    const y = Phaser.Math.Clamp(ay, margin + 56, GAME_H - margin - 8);
+    const u = Math.min(UI_SCALE, 1.6);
+    this.u = u;
+    const margin = (RING_R + BTN_R + 26) * u;
+    const x = Phaser.Math.Clamp(ax, margin + SAFE.l, GAME_W - margin - SAFE.r);
+    const y = Phaser.Math.Clamp(ay, margin + 40 + 20 * u + SAFE.t, GAME_H - margin - 8 - SAFE.b);
     this.anchor = { x, y };
     const s = this.scene;
     const root = s.add.container(x, y).setDepth(DEPTH.menu);
@@ -79,8 +82,8 @@ export class RadialMenu {
     disc.lineStyle(4, COLORS.ink, 0.9).strokeCircle(0, 0, RING_R + BTN_R + 12);
     disc.lineStyle(2, 0xffffff, 0.15).strokeCircle(0, 0, RING_R + BTN_R + 8);
     root.add(disc);
-    root.setScale(0.55).setAlpha(0);
-    s.tweens.add({ targets: root, scale: 1, alpha: 1, duration: 220, ease: 'Back.easeOut' });
+    root.setScale(0.55 * u).setAlpha(0);
+    s.tweens.add({ targets: root, scale: u, alpha: 1, duration: 220, ease: 'Back.easeOut' });
 
     const n = items.length;
     const angles = n === 1 ? [-90] : n === 2 ? [-90, 90] : n === 3 ? [-90, 30, 150] : items.map((_, i) => -90 + (360 / n) * i);
@@ -151,7 +154,7 @@ export class RadialMenu {
 
   private showTip(b: Btn): void {
     const side = this.anchor.x < GAME_W / 2 ? 'right' : 'left';
-    const off = RING_R + BTN_R + 16;
+    const off = (RING_R + BTN_R + 16) * this.u;
     this.hud.tooltip.show(b.item.tip(), this.anchor.x + (side === 'right' ? off : -off), this.anchor.y, side);
   }
 
@@ -209,6 +212,6 @@ export class RadialMenu {
       root.destroy();
       return;
     }
-    this.scene.tweens.add({ targets: root, scale: 0.5, alpha: 0, duration: 130, ease: 'Quad.easeIn', onComplete: () => root.destroy() });
+    this.scene.tweens.add({ targets: root, scale: 0.5 * this.u, alpha: 0, duration: 130, ease: 'Quad.easeIn', onComplete: () => root.destroy() });
   }
 }

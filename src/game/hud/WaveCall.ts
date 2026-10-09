@@ -2,10 +2,10 @@ import Phaser from 'phaser';
 import { ENEMIES, type EnemyId, type Sim, type Vec2 } from '../../core';
 import { getSave } from '../services/save';
 import { Audio } from '../services/audio';
-import { COLORS, GAME_H, GAME_W, textStyle } from '../ui/theme';
+import { COLORS, GAME_H, GAME_W, SAFE, UI_SCALE, textStyle } from '../ui/theme';
 import { IsoView } from '../render/iso';
 import { TEX } from '../render/textures';
-import { Hud } from './Hud';
+import { Hud, barBottom } from './Hud';
 import { DEPTH, markHud } from './widgets';
 import { traitsOf } from './enemyInfo';
 import type { TipRow, TipSpec } from './Tooltip';
@@ -36,6 +36,7 @@ export class WaveCall {
   private tipKey = '';
   private freshKey = '';
   private fresh = false;
+  private readonly wu = Math.min(UI_SCALE, 1.4);
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -50,8 +51,9 @@ export class WaveCall {
       const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       const out = { x: a.x + ((a.x - b.x) / l) * 0.55, y: a.y + ((a.y - b.y) / l) * 0.55 };
       const sp = view.toScreen(out.x, out.y);
-      const pos = { x: Phaser.Math.Clamp(sp.x, 56, GAME_W - 56), y: Phaser.Math.Clamp(sp.y - 34, 120, GAME_H - 110) };
-      const c = scene.add.container(pos.x, pos.y).setDepth(DEPTH.hud + 5).setVisible(false);
+      const wu = this.wu;
+      const pos = { x: Phaser.Math.Clamp(sp.x, 56 * wu + SAFE.l, GAME_W - 56 * wu - SAFE.r), y: Phaser.Math.Clamp(sp.y - 34 * wu, barBottom() + 64 * wu, GAME_H - 110 * wu - SAFE.b) };
+      const c = scene.add.container(pos.x, pos.y).setDepth(DEPTH.hud + 5).setVisible(false).setScale(wu);
       const glow = scene.add.image(0, 0, TEX.glow).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff7a59).setDisplaySize((R + 18) * 2, (R + 18) * 2);
       const face = scene.add.graphics();
       const ring = scene.add.graphics();
@@ -76,7 +78,7 @@ export class WaveCall {
         this.tipKey = '';
         this.hud.tooltip.hide();
       });
-      c.on('pointerdown', () => scene.tweens.add({ targets: c, scale: 0.9, duration: 60 }));
+      c.on('pointerdown', () => scene.tweens.add({ targets: c, scale: 0.9 * wu, duration: 60 }));
       c.on('pointerup', () => {
         Audio.sfx('ui_click');
         this.hud.tooltip.hide();
@@ -88,13 +90,14 @@ export class WaveCall {
 
   /** Screen rectangles occupied by the call buttons (other HUD pieces avoid covering them). */
   avoidRects(): { x: number; y: number; w: number; h: number }[] {
-    return this.btns.map((b) => ({ x: b.pos.x - R - 16, y: b.pos.y - R - 16, w: (R + 16) * 2, h: (R + 16) * 2 + 34 }));
+    const k = this.wu;
+    return this.btns.map((b) => ({ x: b.pos.x - (R + 16) * k, y: b.pos.y - (R + 16) * k, w: (R + 16) * 2 * k, h: ((R + 16) * 2 + 34) * k }));
   }
 
   private showTip(b: Btn): void {
     // near the top of the screen the tip drops under the button (and its countdown label), otherwise it sits above
-    if (b.c.y < 260) this.hud.tooltip.show(this.tip(), b.c.x, b.c.y + R + 34, 'below');
-    else this.hud.tooltip.show(this.tip(), b.c.x, b.c.y - R - 8, 'above');
+    if (b.c.y < 260) this.hud.tooltip.show(this.tip(), b.c.x, b.c.y + (R + 34) * this.wu, 'below');
+    else this.hud.tooltip.show(this.tip(), b.c.x, b.c.y - (R + 8) * this.wu, 'above');
   }
 
   private tip(): TipSpec {
@@ -141,8 +144,8 @@ export class WaveCall {
         b.shown = show;
         this.scene.tweens.killTweensOf(b.c);
         if (show) {
-          b.c.setVisible(true).setScale(0.2).setAlpha(0);
-          this.scene.tweens.add({ targets: b.c, scale: 1, alpha: 1, duration: 360, ease: 'Back.easeOut' });
+          b.c.setVisible(true).setScale(0.2 * this.wu).setAlpha(0);
+          this.scene.tweens.add({ targets: b.c, scale: this.wu, alpha: 1, duration: 360, ease: 'Back.easeOut' });
         } else {
           if (b.hovered) this.hud.tooltip.hide();
           b.hovered = false;
@@ -151,7 +154,7 @@ export class WaveCall {
       }
       if (!b.c.visible) continue;
       const pulse = 0.5 + 0.5 * Math.sin(time * 0.007);
-      if (!b.hovered && b.shown) b.c.setScale(1 + 0.05 * pulse);
+      if (!b.hovered && b.shown) b.c.setScale(this.wu * (1 + 0.05 * pulse));
       b.glow.setAlpha(0.35 + 0.4 * pulse);
       b.badge.setVisible(this.fresh).setScale(1 + 0.12 * pulse);
       const hot = first || (st.wave.earlyBonus > 0 && b.hovered);

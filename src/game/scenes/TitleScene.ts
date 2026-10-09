@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { hasFlag, starsEarned } from '../../core';
 import { Audio } from '../services/audio';
 import { getSave } from '../services/save';
-import { COLORS, GAME_H, GAME_W, textStyle } from '../ui/theme';
+import { COLORS, SAFE, textStyle, viewH, viewW } from '../ui/theme';
 import { addSky } from '../ui/background';
 import { buildIsland, PITCH_Y, type Island } from '../ui/isoScenery';
 import {
@@ -79,7 +79,7 @@ export class TitleScene extends Phaser.Scene {
     this.buildButtons();
     this.buildStarChip();
 
-    this.add.text(14, GAME_H - 6, 'v0.1  |  CC0 art: Artyom Zagorskiy', textStyle(15, '#c9bbe4', { strokeThickness: 3 })).setOrigin(0, 1).setAlpha(0.85);
+    this.add.text(14 + SAFE.l, viewH(this) - 6 - SAFE.b, 'v0.1  |  CC0 art: Artyom Zagorskiy', textStyle(18, '#c9bbe4', { strokeThickness: 3 })).setOrigin(0, 1).setAlpha(0.85);
 
     this.input.keyboard?.on('keydown-ENTER', () => this.play());
     this.input.keyboard?.on('keydown-SPACE', () => this.play());
@@ -92,7 +92,7 @@ export class TitleScene extends Phaser.Scene {
   // -------------------------------------------------------------------------------------------------------------
 
   private buildLogo(): void {
-    const logo = chunkyText(this, GAME_W / 2, 106, 'UFO DEFENSE', 128);
+    const logo = chunkyText(this, viewW(this) / 2, 106, 'UFO DEFENSE', 128);
     logo.setScale(0.2).setAlpha(0).setY(-80);
     this.tweens.add({ targets: logo, y: 106, scale: 1, alpha: 1, duration: 800, ease: 'Back.easeOut', delay: 150 });
     this.time.delayedCall(1100, () => {
@@ -101,17 +101,17 @@ export class TitleScene extends Phaser.Scene {
     });
 
     const tag = this.add
-      .text(GAME_W / 2, 204, 'Stop the alien invasion. Hold the line!', textStyle(26, '#ffe9bf', { strokeThickness: 5 }))
+      .text(viewW(this) / 2, 204, 'Stop the alien invasion. Hold the line!', textStyle(26, '#ffe9bf', { strokeThickness: 5 }))
       .setOrigin(0.5)
       .setDepth(20)
       .setAlpha(0);
     this.tweens.add({ targets: tag, alpha: 1, duration: 600, delay: 900 });
 
     // a saucer hovering over the logo with a flickering beam
-    const ufo = this.add.image(GAME_W / 2 + 430, 70, 'ufo/ufo_6').setScale(0.85).setDepth(10).setAngle(8);
+    const ufo = this.add.image(viewW(this) / 2 + 430, 70, 'ufo/ufo_6').setScale(0.85).setDepth(10).setAngle(8);
     this.tweens.add({ targets: ufo, y: 82, angle: -6, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: ufo, x: ufo.x + 18, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    const ufo2 = this.add.image(GAME_W / 2 - 420, 96, 'ufo/ufo_2').setScale(0.7).setDepth(10).setAngle(-8);
+    const ufo2 = this.add.image(viewW(this) / 2 - 420, 96, 'ufo/ufo_2').setScale(0.7).setDepth(10).setAngle(-8);
     this.tweens.add({ targets: ufo2, y: 108, angle: 6, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
 
@@ -120,20 +120,21 @@ export class TitleScene extends Phaser.Scene {
   // -------------------------------------------------------------------------------------------------------------
 
   private buildButtons(): void {
-    const y = 660;
-    const upgrades = new Button(this, 346, y, {
+    const W = viewW(this);
+    const y = viewH(this) - 60 - SAFE.b;
+    const upgrades = new Button(this, W / 2 - 294, y, {
       width: 240, height: 70, label: 'Upgrades', icon: 'ui_upgrade', style: 'secondary', fontSize: 32,
       onClick: () => fadeTo(this, () => this.scene.start('Upgrades', { returnTo: 'Title' })),
     });
-    const play = new Button(this, 640, y - 4, {
+    const play = new Button(this, W / 2, y - 4, {
       width: 300, height: 92, label: 'PLAY', icon: 'ui_play', style: 'success', fontSize: 54, radius: 30,
       onClick: () => this.play(),
     });
-    const settings = new Button(this, 934, y, {
+    const settings = new Button(this, W / 2 + 294, y, {
       width: 240, height: 70, label: 'Settings', icon: 'ui_gear', style: 'secondary', fontSize: 32,
       onClick: () => this.openSettings(),
     });
-    const credits = new IconButton(this, GAME_W - 52, GAME_H - 52, 'ui_credits', () => this.openCredits(), { width: 62, height: 62, iconScale: 0.36, style: 'ghost' });
+    const credits = new IconButton(this, W - 52 - SAFE.r, viewH(this) - 52 - SAFE.b, 'ui_credits', () => this.openCredits(), { width: 62, height: 62, iconScale: 0.36, style: 'ghost' });
     [upgrades, play, settings, credits].forEach((b, i) => {
       const ty = b.y;
       b.setY(ty + 140).setAlpha(0);
@@ -145,7 +146,7 @@ export class TitleScene extends Phaser.Scene {
   private buildStarChip(): void {
     const earned = starsEarned(getSave());
     if (earned <= 0) return;
-    const c = this.add.container(118, 42);
+    const c = this.add.container(118 + SAFE.l, 42 + SAFE.t);
     const g = this.add.graphics();
     g.fillStyle(COLORS.ink, 0.35);
     g.fillRoundedRect(-92, -24 + 4, 184, 48, 24);
@@ -212,10 +213,12 @@ export class TitleScene extends Phaser.Scene {
   private showClickToStart(): void {
     this.clickToStart = true;
     const root = this.add.container(0, 0).setDepth(2000);
-    const dim = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x120c1c, 0.74).setInteractive();
-    const t = this.add.text(GAME_W / 2, GAME_H / 2 - 6, 'CLICK TO START', textStyle(84, COLORS.textGold, { strokeThickness: 14 })).setOrigin(0.5);
-    const sub = this.add.text(GAME_W / 2, GAME_H / 2 + 70, 'to enable sound', textStyle(26, '#ffe9bf')).setOrigin(0.5);
-    const ufo = this.add.image(GAME_W / 2, GAME_H / 2 - 130, 'ufo/ufo_1').setScale(1.1);
+    const cx = viewW(this) / 2;
+    const cy = viewH(this) / 2;
+    const dim = this.add.rectangle(cx, cy, viewW(this), viewH(this), 0x120c1c, 0.74).setInteractive();
+    const t = this.add.text(cx, cy - 6, 'CLICK TO START', textStyle(84, COLORS.textGold, { strokeThickness: 14 })).setOrigin(0.5);
+    const sub = this.add.text(cx, cy + 70, 'to enable sound', textStyle(26, '#ffe9bf')).setOrigin(0.5);
+    const ufo = this.add.image(cx, cy - 130, 'ufo/ufo_1').setScale(1.1);
     root.add([dim, ufo, t, sub]);
     this.tweens.add({ targets: t, scale: 1.06, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: ufo, y: ufo.y - 12, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -238,7 +241,7 @@ export class TitleScene extends Phaser.Scene {
 
   private buildDiorama(): void {
     const scale = 0.44;
-    const island = (this.island = buildIsland(this, GAME_W / 2, 408, { rows: DIORAMA_ROWS, biome: 'spring', scale, seed: 11 }));
+    const island = (this.island = buildIsland(this, viewW(this) / 2, viewH(this) / 2 + 48, { rows: DIORAMA_ROWS, biome: 'spring', scale, seed: 11 }));
     island.root.setDepth(1);
     island.root.setAlpha(0).setY(island.root.y + 40);
     this.tweens.add({ targets: island.root, alpha: 1, y: island.root.y - 40, duration: 700, ease: 'Back.easeOut', delay: 250 });

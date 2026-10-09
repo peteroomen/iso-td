@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { starsEarned } from '../../core';
 import { Audio } from '../services/audio';
 import { getSave } from '../services/save';
-import { COLORS, GAME_H, GAME_W, textStyle } from '../ui/theme';
+import { COLORS, GAME_H, GAME_W, SAFE, designOffsetY, textStyle, viewH, viewW } from '../ui/theme';
 import { addSky } from '../ui/background';
 import { buildIsland, type Island } from '../ui/isoScenery';
 import { Button, Panel, chunkyText, ensureUi, fadeIn, fadeTo, ringPulse, sparkBurst, starChip, tweenNumber } from '../ui/widgets';
@@ -19,12 +19,13 @@ const TOWERS: [number, number, 'archer' | 'wizard' | 'barracks'][] = [
 ];
 const KNIGHTS: [number, number][] = [[3, 2], [3, 3], [4, 3]];
 
-const SHIP_X = GAME_W / 2;
-const SHIP_Y = 214;
+/** Layout (recomputed in create() from the live canvas size; the 1280x720 design is centred in it). */
+let SHIP_X = 640;
+let SHIP_Y = 214;
 const SHIP_SCALE = 0.95;
-const ISLAND_Y = 478;
+let ISLAND_Y = 478;
 const ISLAND_SCALE = 0.42;
-const ISLAND_END_X = 346;
+let ISLAND_END_X = 346;
 const PANEL = { x: 962, y: 474, w: 500, h: 288 };
 
 const CREDIT_LINES: { head: string; body: string[] }[] = [
@@ -73,6 +74,15 @@ export class EndingScene extends Phaser.Scene {
 
   create(): void {
     ensureUi(this);
+    {
+      const oy = Math.round(designOffsetY(this) * 0.8);
+      SHIP_X = viewW(this) / 2;
+      SHIP_Y = 214 + oy;
+      ISLAND_Y = 478 + oy;
+      ISLAND_END_X = viewW(this) / 2 - 294;
+      PANEL.x = viewW(this) / 2 + 322;
+      PANEL.y = 474 + oy;
+    }
     fadeIn(this, 500);
     Audio.music(null);
 
@@ -435,7 +445,7 @@ export class EndingScene extends Phaser.Scene {
     this.ready = true;
     this.tweens.timeScale = 1;
     this.time.timeScale = 1;
-    const btn = (new Button(this, GAME_W / 2, 664, {
+    const btn = (new Button(this, GAME_W / 2, viewH(this) - 56 - SAFE.b, {
       width: 320, height: 76, label: 'Continue', icon: 'ui_play', style: 'success', fontSize: 40, radius: 26, onClick: () => this.leave(),
     }));
     btn.setDepth(60).setScale(0).setAlpha(0);

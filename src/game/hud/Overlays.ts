@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { Audio } from '../services/audio';
-import { COLORS, GAME_H, GAME_W, textStyle } from '../ui/theme';
+import { COLORS, GAME_H, GAME_W, UI_SCALE, textStyle } from '../ui/theme';
 import { TEX } from '../render/textures';
 import { DEPTH, UiButton, drawPanel, markHud } from './widgets';
 
@@ -8,6 +8,9 @@ export interface PauseActions {
   onResume(): void;
   onRestart(): void;
   onSettings(): void;
+  /** Present only when the browser supports fullscreen. */
+  onFullscreen?(): void;
+  fullscreenLabel?: () => string;
   onQuit(): void;
 }
 
@@ -33,6 +36,7 @@ export interface DefeatInfo {
 export class Overlays {
   private pause?: Phaser.GameObjects.Container;
   private result?: Phaser.GameObjects.Container;
+  private k = 1;
 
   constructor(private readonly scene: Phaser.Scene) {}
 
@@ -50,7 +54,10 @@ export class Overlays {
     const dim = s.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x0d0816, 0.62).setInteractive();
     markHud(dim);
     root.add(dim);
-    const panel = s.add.container(GAME_W / 2, GAME_H / 2);
+    // fit the panel (and its ribbon) into the live canvas; grow it a little on small screens
+    const k = Math.max(0.6, Math.min(UI_SCALE, 1.25, (GAME_H - 24) / (h + 60), (GAME_W - 24) / (w + 20)));
+    this.k = k;
+    const panel = s.add.container(GAME_W / 2, GAME_H / 2).setScale(k);
     const g = s.add.graphics();
     drawPanel(g, -w / 2, -h / 2, w, h, { r: 22, fill: 0x3d3150, bw: 5 });
     const ribbon = s.add.graphics();
@@ -61,24 +68,29 @@ export class Overlays {
     panel.add([g, ribbon, t]);
     root.add(panel);
     root.setAlpha(0);
-    panel.setScale(0.6);
+    panel.setScale(0.6 * k);
     s.tweens.add({ targets: root, alpha: 1, duration: 160 });
-    s.tweens.add({ targets: panel, scale: 1, duration: 360, ease: 'Back.easeOut' });
+    s.tweens.add({ targets: panel, scale: k, duration: 360, ease: 'Back.easeOut' });
     return { root, panel };
   }
 
   showPause(a: PauseActions): void {
     if (this.pause) return;
-    const { root, panel } = this.shell(DEPTH.overlay, 380, 400, 'PAUSED', COLORS.text);
+    const items: { label: string; fill: number; fn: () => void }[] = [
+      { label: 'Resume', fill: 0x4d9a3f, fn: a.onResume },
+      { label: 'Restart', fill: 0x4c6fd0, fn: a.onRestart },
+      { label: 'Settings', fill: 0x6b5a8a, fn: a.onSettings },
+    ];
+    if (a.onFullscreen) items.push({ label: a.fullscreenLabel?.() ?? 'Fullscreen', fill: 0x3f8aa8, fn: a.onFullscreen });
+    items.push({ label: 'Quit to Map', fill: 0xb0504a, fn: a.onQuit });
+    const n = items.length;
+    const { root, panel } = this.shell(DEPTH.overlay, 380, 120 + n * 70, 'PAUSED', COLORS.text);
     this.pause = root;
-    const mk = (label: string, y: number, fill: number, fn: () => void) => {
-      const b = new UiButton(this.scene, 0, y, { w: 280, h: 56, label, fontSize: 28, fill, onClick: fn, radius: 16 });
+    items.forEach((it, i) => {
+      const y = -((n - 1) * 70) / 2 + i * 70 + 24;
+      const b = new UiButton(this.scene, 0, y, { w: 280, h: 56, label: it.label, fontSize: 28, fill: it.fill, onClick: it.fn, radius: 16 });
       panel.add(b);
-    };
-    mk('Resume', -90, 0x4d9a3f, a.onResume);
-    mk('Restart', -20, 0x4c6fd0, a.onRestart);
-    mk('Settings', 50, 0x6b5a8a, a.onSettings);
-    mk('Quit to Map', 120, 0xb0504a, a.onQuit);
+    });
   }
 
   hidePause(): void {
@@ -122,7 +134,7 @@ export class Overlays {
         st.setVisible(true).setScale(0).setAngle(-40);
         Audio.sfx('star_earned');
         s.tweens.add({ targets: st, scale: i === 1 ? 1.35 : 1.1, angle: 0, duration: 520, ease: 'Back.easeOut' });
-        this.sparkle(panel.x + st.x, panel.y + st.y);
+        this.sparkle(panel.x + st.x * this.k, panel.y + st.y * this.k);
       });
     }
     s.time.delayedCall(550 + Math.max(1, v.stars) * 520 + 100, () => {

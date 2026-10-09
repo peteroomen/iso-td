@@ -3,6 +3,7 @@ import { withSettings } from '../../core';
 import { Audio } from '../services/audio';
 import { clearSave, getSave, updateSave } from '../services/save';
 import { COLORS, GAME_H, GAME_W, textStyle } from '../ui/theme';
+import { toggleFullscreen } from '../ui/viewport';
 import { Button, IconButton, Panel, Slider, confirmModal, drawOutlinedRect, ensureUi } from '../ui/widgets';
 
 export interface SettingsData {
@@ -130,7 +131,7 @@ export class SettingsScene extends Phaser.Scene {
 
   private fullscreenRow(y: number): void {
     this.rowFrame(y, 'Fullscreen', 'ui_fullscreen');
-    const available = this.sys.game.device.fullscreen.available;
+    const available = this.scale.fullscreen.available;
     const btn = new Button(this, 190, y, {
       width: 250,
       height: 54,
@@ -140,8 +141,7 @@ export class SettingsScene extends Phaser.Scene {
       fontSize: 26,
       disabled: !available,
       onClick: () => {
-        if (this.scale.isFullscreen) this.scale.stopFullscreen();
-        else this.scale.startFullscreen();
+        toggleFullscreen(this.scale);
       },
     });
     const sync = (): void => {

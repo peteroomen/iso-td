@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { AbilityId, Sim } from '../../core';
 import { Audio } from '../services/audio';
-import { COLORS, GAME_H, textStyle } from '../ui/theme';
+import { COLORS, GAME_H, SAFE, UI_SCALE, textStyle } from '../ui/theme';
 import { TEX } from '../render/textures';
 import { Hud } from './Hud';
 import { DEPTH, markHud } from './widgets';
@@ -30,6 +30,7 @@ interface Slot {
 export class AbilityBar {
   private readonly slots: Slot[] = [];
   private armed: AbilityId | null = null;
+  private u = 1;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -37,13 +38,16 @@ export class AbilityBar {
     private readonly hud: Hud,
     onPick: (id: AbilityId) => void,
   ) {
+    const u = Math.min(UI_SCALE, 1.45);
+    this.u = u;
+    const x0 = SAFE.l + 14 + (R + 4) * u;
     const defs: { id: AbilityId; icon: string; key: string; x: number }[] = [
-      { id: 'orbital', icon: TEX.orbital, key: '1', x: 14 + R + 4 },
-      { id: 'reinforce', icon: TEX.reinforce, key: '2', x: 14 + R + 4 + R * 2 + 18 },
+      { id: 'orbital', icon: TEX.orbital, key: '1', x: x0 },
+      { id: 'reinforce', icon: TEX.reinforce, key: '2', x: x0 + (R * 2 + 18) * u },
     ];
-    const y = GAME_H - 14 - R - 4;
+    const y = GAME_H - SAFE.b - 14 - (R + 4) * u;
     for (const d of defs) {
-      const c = scene.add.container(d.x, y).setDepth(DEPTH.hud);
+      const c = scene.add.container(d.x, y).setDepth(DEPTH.hud).setScale(u);
       const glow = scene.add.image(0, 0, TEX.glow).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffe27a).setDisplaySize(R * 3.4, R * 3.4).setAlpha(0);
       const base = scene.add.graphics();
       const icon = scene.add.image(0, -1, d.icon).setDisplaySize(R * 1.25, R * 1.25);
@@ -60,24 +64,24 @@ export class AbilityBar {
       const slot: Slot = { id: d.id, c, glow, base, sweep, timeText, ring, wasReady: true, hovered: false, pressed: false, baseKey: -1, sweepKey: -1, ringKey: -1, lastTime: '' };
       c.on('pointerover', () => {
         slot.hovered = true;
-        scene.tweens.add({ targets: c, scale: 1.08, duration: 110, ease: 'Quad.easeOut' });
+        scene.tweens.add({ targets: c, scale: 1.08 * u, duration: 110, ease: 'Quad.easeOut' });
         Audio.sfx('ui_hover', { volume: 0.35, throttleMs: 90 });
-        this.hud.tooltip.show(this.tip(d.id, d.key), c.x, c.y - R - 6, 'above');
+        this.hud.tooltip.show(this.tip(d.id, d.key), c.x, c.y - (R + 6) * u, 'above');
       });
       c.on('pointerout', () => {
         slot.hovered = false;
         slot.pressed = false;
-        scene.tweens.add({ targets: c, scale: 1, duration: 110 });
+        scene.tweens.add({ targets: c, scale: u, duration: 110 });
         this.hud.tooltip.hide();
       });
       c.on('pointerdown', () => {
         slot.pressed = true;
-        scene.tweens.add({ targets: c, scale: 0.94, duration: 60 });
+        scene.tweens.add({ targets: c, scale: 0.94 * u, duration: 60 });
       });
       c.on('pointerup', () => {
         if (!slot.pressed) return;
         slot.pressed = false;
-        scene.tweens.add({ targets: c, scale: 1.08, duration: 80, ease: 'Back.easeOut' });
+        scene.tweens.add({ targets: c, scale: 1.08 * u, duration: 80, ease: 'Back.easeOut' });
         onPick(d.id);
       });
       this.slots.push(slot);
@@ -172,7 +176,7 @@ export class AbilityBar {
       s.ring.setAlpha(ready && !armed ? 0.5 + 0.4 * Math.sin(time * 0.006) : 1);
       s.glow.setAlpha(armed ? 0.6 : ready ? 0.22 + 0.18 * Math.sin(time * 0.006) : 0);
       if (ready && !s.wasReady && st.status === 'running') {
-        this.scene.tweens.add({ targets: s.c, scale: { from: 1.35, to: s.hovered ? 1.08 : 1 }, duration: 380, ease: 'Back.easeOut' });
+        this.scene.tweens.add({ targets: s.c, scale: { from: 1.35 * this.u, to: (s.hovered ? 1.08 : 1) * this.u }, duration: 380, ease: 'Back.easeOut' });
       }
       s.wasReady = ready;
       s.c.setAlpha(usable ? 1 : 0.7);

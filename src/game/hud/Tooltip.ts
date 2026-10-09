@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, GAME_H, GAME_W, FONT } from '../ui/theme';
+import { COLORS, GAME_H, GAME_W, FONT, UI_SCALE } from '../ui/theme';
 import { DEPTH } from './widgets';
 
 export interface TipRow {
@@ -124,24 +124,28 @@ export class Tooltip {
     g.lineStyle(2, COLORS.gold, 0.55).strokeRoundedRect(5, 5, w - 10, y - 10, 8);
     this.box.add(items);
 
+    // small screens: grow the panel so the text stays readable
+    const k = Math.min(UI_SCALE, 1.5);
+    const W = w * k;
+    const H = y * k;
     let x = ax;
     let yy = ay;
     if (side === 'above') {
-      x = ax - w / 2;
-      yy = ay - y - 10;
+      x = ax - W / 2;
+      yy = ay - H - 10;
     } else if (side === 'below') {
-      x = ax - w / 2;
+      x = ax - W / 2;
       yy = ay + 10;
     } else if (side === 'right') {
       x = ax + 12;
-      yy = ay - y / 2;
+      yy = ay - H / 2;
     } else {
-      x = ax - w - 12;
-      yy = ay - y / 2;
+      x = ax - W - 12;
+      yy = ay - H / 2;
     }
-    x = Phaser.Math.Clamp(x, 6, GAME_W - w - 6);
-    yy = Phaser.Math.Clamp(yy, 6, GAME_H - y - 6);
-    this.box.setPosition(x, yy).setVisible(true).setAlpha(0);
+    x = Phaser.Math.Clamp(x, 6, GAME_W - W - 6);
+    yy = Phaser.Math.Clamp(yy, 6, GAME_H - H - 6);
+    this.box.setScale(k).setPosition(x, yy).setVisible(true).setAlpha(0);
     this.visible = true;
     s.tweens.add({ targets: this.box, alpha: 1, duration: 110 });
   }

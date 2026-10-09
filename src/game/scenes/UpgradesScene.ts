@@ -15,7 +15,7 @@ import {
 } from '../../core';
 import { Audio } from '../services/audio';
 import { getSave, updateSave } from '../services/save';
-import { COLORS, GAME_W, textStyle } from '../ui/theme';
+import { COLORS, GAME_W, SAFE, designOffsetY, textStyle, viewH, viewW } from '../ui/theme';
 import { addSky } from '../ui/background';
 import {
   Button,
@@ -102,7 +102,7 @@ export class UpgradesScene extends Phaser.Scene {
 
     this.buildColumns();
     this.buildHeader();
-    this.footer = this.add.text(GAME_W / 2, 697, '', textStyle(20, '#b9a9d6', { strokeThickness: 3 })).setOrigin(0.5).setDepth(10);
+    this.footer = this.add.text(GAME_W / 2, viewH(this) - 23 - SAFE.b, '', textStyle(20, '#b9a9d6', { strokeThickness: 3 })).setOrigin(0.5).setDepth(10);
     this.refresh(false);
     this.shown = starsAvailable(this.save());
 
@@ -122,12 +122,12 @@ export class UpgradesScene extends Phaser.Scene {
 
   private buildHeader(): void {
     addHeaderBar(this);
-    const back = new Button(this, 104, 44, { width: 170, height: 60, label: 'Back', icon: 'ui_back', style: 'secondary', fontSize: 30, onClick: () => this.back() });
-    const title = this.add.text(214, 46, 'STAR UPGRADES', textStyle(42, COLORS.textGold, { strokeThickness: 8 })).setOrigin(0, 0.5);
-    const { root, label } = starChip(this, 880, 44, '0 to spend', 264);
+    const back = new Button(this, 104 + SAFE.l, 44, { width: 170, height: 60, label: 'Back', icon: 'ui_back', style: 'secondary', fontSize: 30, onClick: () => this.back() });
+    const title = this.add.text(214 + SAFE.l, 46, 'STAR UPGRADES', textStyle(42, COLORS.textGold, { strokeThickness: 8 })).setOrigin(0, 0.5);
+    const { root, label } = starChip(this, Math.max(560, viewW(this) - 400 - SAFE.r), 44, '0 to spend', 264);
     this.chipRoot = root;
     this.chipText = label;
-    this.resetBtn = new Button(this, 1150, 44, { width: 190, height: 60, label: 'Reset', icon: 'ui_reset', style: 'danger', fontSize: 30, onClick: () => this.askReset() });
+    this.resetBtn = new Button(this, viewW(this) - 130 - SAFE.r, 44, { width: 190, height: 60, label: 'Reset', icon: 'ui_reset', style: 'danger', fontSize: 30, onClick: () => this.askReset() });
     [back, title, root, this.resetBtn].forEach((o, i) => {
       o.setDepth(60).setAlpha(0);
       this.tweens.add({ targets: o, alpha: 1, duration: 400, delay: 200 + i * 70 });
@@ -139,7 +139,7 @@ export class UpgradesScene extends Phaser.Scene {
     const x0 = (GAME_W - totalW) / 2 + CARD_W / 2;
     UPGRADE_TRACKS.forEach((track, i) => {
       const cx = x0 + i * (CARD_W + CARD_GAP);
-      const root = this.add.container(cx, 0).setDepth(5);
+      const root = this.add.container(cx, Math.max(0, Math.floor(designOffsetY(this)))).setDepth(5);
       const card = this.add.graphics();
       card.fillStyle(COLORS.ink, 0.35);
       card.fillRoundedRect(-CARD_W / 2 + 3, CARD_TOP + 9, CARD_W, CARD_H, 26);
