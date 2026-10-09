@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { FIXED_DT, Sim, getLevel, recordResult, type AbilityId, type LevelDef, type SimEvent } from '../../core';
 import { AbilityBar } from '../hud/AbilityBar';
+import { EnemyIntro } from '../hud/EnemyIntro';
 import { Hud } from '../hud/Hud';
 import { InteractionController } from '../hud/InteractionController';
 import { Overlays } from '../hud/Overlays';
@@ -33,6 +34,7 @@ export class GameScene extends Phaser.Scene {
   hud!: Hud;
   abilityBar!: AbilityBar;
   waveCall!: WaveCall;
+  intro!: EnemyIntro;
   interaction!: InteractionController;
   overlays!: Overlays;
 
@@ -87,6 +89,8 @@ export class GameScene extends Phaser.Scene {
     this.hud = new Hud(this, this.sim, { onPause: () => this.openPause(), onSpeed: () => this.toggleSpeed() });
     this.abilityBar = new AbilityBar(this, this.sim, this.hud, (id) => this.interaction.armAbility(id));
     this.waveCall = new WaveCall(this, this.sim, this.view, this.hud, () => this.callWave());
+    this.hud.hintAvoid = () => this.waveCall.avoidRects();
+    this.intro = new EnemyIntro(this, this.sim, () => this.waveCall.avoidRects());
     this.interaction = new InteractionController({
       scene: this,
       sim: this.sim,
@@ -217,6 +221,7 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.removeAllListeners();
     this.interaction?.destroy();
     this.overlays?.destroy();
+    this.intro?.destroy();
     this.resultTimer?.remove();
   }
 
@@ -231,7 +236,7 @@ export class GameScene extends Phaser.Scene {
           this.hud.banner(e.number === e.total ? 'Final Wave!' : `Wave ${e.number}`, { color: e.number === e.total ? '#ff9a8a' : COLORS.text, hold: 1.1 });
           break;
         case 'waveCalledEarly':
-          if (e.bonus > 0) this.hud.toast(`Early call bonus  +${e.bonus}`, GAME_W / 2, 110, COLORS.textGold);
+          if (e.bonus > 0) this.hud.toast(`Early call bonus  +${e.bonus}`, GAME_W / 2, 290, COLORS.textGold);
           break;
         case 'bossSpawn':
           Audio.sfx('boss_warning');
@@ -254,6 +259,7 @@ export class GameScene extends Phaser.Scene {
 
   private onWon(lives: number): void {
     this.ended = true;
+    this.intro.disable();
     this.interaction.cancelAll();
     Audio.music(null);
     Audio.sfx('level_victory');
@@ -275,6 +281,7 @@ export class GameScene extends Phaser.Scene {
 
   private onLost(wave: number): void {
     this.ended = true;
+    this.intro.disable();
     this.interaction.cancelAll();
     Audio.music(null);
     Audio.sfx('level_defeat');
@@ -332,6 +339,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.update(time, dt);
     this.abilityBar.update(time);
     this.waveCall.update(time);
+    this.intro.update(time);
     this.updateHints();
   }
 }

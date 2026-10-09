@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
-import { ENEMIES, type Sim, type Vec2 } from '../../core';
+import { ENEMIES, type EnemyId, type Sim, type Vec2 } from '../../core';
+import { getSave } from '../services/save';
 import { Audio } from '../services/audio';
 import { COLORS, GAME_H, GAME_W, textStyle } from '../ui/theme';
 import { IsoView } from '../render/iso';
 import { TEX } from '../render/textures';
 import { Hud } from './Hud';
 import { DEPTH, markHud } from './widgets';
+import { traitsOf } from './enemyInfo';
 import type { TipRow, TipSpec } from './Tooltip';
 
 const R = 30;
@@ -15,15 +17,25 @@ interface Btn {
   c: Phaser.GameObjects.Container;
   ring: Phaser.GameObjects.Graphics;
   face: Phaser.GameObjects.Graphics;
+  glow: Phaser.GameObjects.Image;
+  badge: Phaser.GameObjects.Container;
   label: Phaser.GameObjects.Text;
   shown: boolean;
   hovered: boolean;
   pos: Vec2;
+  /** Cached draw keys so Graphics are only redrawn when something visibly changed. */
+  faceKey: number;
+  ringKey: number;
 }
+
+const isNew = (id: EnemyId): boolean => !getSave().seenEnemies.includes(id);
 
 /** Pulsing "incoming wave" buttons at the spawn entrances with a countdown ring and a composition tooltip. */
 export class WaveCall {
   private readonly btns: Btn[] = [];
+  private tipKey = '';
+  private freshKey = '';
+  private fresh = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -40,21 +52,28 @@ export class WaveCall {
       const sp = view.toScreen(out.x, out.y);
       const pos = { x: Phaser.Math.Clamp(sp.x, 56, GAME_W - 56), y: Phaser.Math.Clamp(sp.y - 34, 120, GAME_H - 110) };
       const c = scene.add.container(pos.x, pos.y).setDepth(DEPTH.hud + 5).setVisible(false);
+      const glow = scene.add.image(0, 0, TEX.glow).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff7a59).setDisplaySize((R + 18) * 2, (R + 18) * 2);
       const face = scene.add.graphics();
       const ring = scene.add.graphics();
       const icon = scene.add.image(0, -1, TEX.ufo).setDisplaySize(R * 1.25, R * 1.25);
       const label = scene.add.text(0, R + 16, '', textStyle(20)).setOrigin(0.5);
-      c.add([face, icon, ring, label]);
+      const badge = scene.add.container(R * 0.78, -R * 0.78).setVisible(false);
+      const bg = scene.add.graphics();
+      bg.fillStyle(COLORS.ink, 1).fillCircle(0, 0, 13);
+      bg.fillStyle(COLORS.gold, 1).fillCircle(0, 0, 10);
+      badge.add([bg, scene.add.text(0, 1, '!', textStyle(17, '#2e222f', { strokeThickness: 0 })).setOrigin(0.5)]);
+      c.add([glow, face, icon, ring, label, badge]);
       c.setSize(R * 2 + 12, R * 2 + 12).setInteractive({ useHandCursor: true, hitArea: new Phaser.Geom.Circle(R + 6, R + 6, R + 6), hitAreaCallback: Phaser.Geom.Circle.Contains });
       markHud(c);
-      const btn: Btn = { path: i, c, ring, face, label, shown: false, hovered: false, pos };
+      const btn: Btn = { path: i, c, ring, face, glow, badge, label, shown: false, hovered: false, pos, faceKey: -1, ringKey: -1 };
       c.on('pointerover', () => {
         btn.hovered = true;
         Audio.sfx('ui_hover', { volume: 0.35, throttleMs: 90 });
-        this.hud.tooltip.show(this.tip(), c.x, c.y - R - 8, c.y < 260 ? 'below' : 'above');
+        this.showTip(btn);
       });
       c.on('pointerout', () => {
         btn.hovered = false;
+        this.tipKey = '';
         this.hud.tooltip.hide();
       });
       c.on('pointerdown', () => scene.tweens.add({ targets: c, scale: 0.9, duration: 60 }));
@@ -67,16 +86,33 @@ export class WaveCall {
     });
   }
 
+  /** Screen rectangles occupied by the call buttons (other HUD pieces avoid covering them). */
+  avoidRects(): { x: number; y: number; w: number; h: number }[] {
+    return this.btns.map((b) => ({ x: b.pos.x - R - 16, y: b.pos.y - R - 16, w: (R + 16) * 2, h: (R + 16) * 2 + 34 }));
+  }
+
+  private showTip(b: Btn): void {
+    // near the top of the screen the tip drops under the button (and its countdown label), otherwise it sits above
+    if (b.c.y < 260) this.hud.tooltip.show(this.tip(), b.c.x, b.c.y + R + 34, 'below');
+    else this.hud.tooltip.show(this.tip(), b.c.x, b.c.y - R - 8, 'above');
+  }
+
   private tip(): TipSpec {
     const w = this.sim.state.wave;
     const next = w.next;
     if (!next) return { title: 'No more waves' };
+    const fresh = next.entries.filter((e) => isNew(e.enemy));
     const rows: TipRow[] = next.entries.map((e) => {
       const def = ENEMIES[e.enemy];
-      return { icon: `ufo/${def.sprite}`, iconH: 30, text: def.name, right: `x${e.count}` };
+      const n = isNew(e.enemy);
+      return { icon: `ufo/${def.sprite}`, iconH: 30, text: n ? `${def.name}  NEW!` : def.name, color: n ? COLORS.textGold : undefined, right: `x${e.count}` };
     });
     if (next.hasFlier) rows.push({ text: 'Flying UFOs: knights cannot block them', color: '#9ee6ff', size: 15 });
     if (next.hasBoss) rows.push({ text: 'BOSS WAVE!', color: '#ff8a80', size: 20 });
+    for (const e of fresh) {
+      if (fresh.length > 1) rows.push({ text: ENEMIES[e.enemy].name, color: COLORS.textGold, size: 15 });
+      for (const t of traitsOf(e.enemy).slice(0, 3)) rows.push({ icon: t.icon, iconH: 18, text: t.label, color: t.text, size: 15 });
+    }
     const first = w.index === 0;
     return {
       title: first ? 'Start the invasion' : `Wave ${next.number} of ${w.total}`,
@@ -89,8 +125,17 @@ export class WaveCall {
   update(time: number): void {
     const st = this.sim.state;
     const can = this.sim.canCallNextWave().ok && !!st.wave.next;
+    const next = st.wave.next;
+    const fk = `${next?.number ?? 0}|${getSave().seenEnemies.length}`;
+    if (fk !== this.freshKey) {
+      this.freshKey = fk;
+      this.fresh = !!next && next.entries.some((e) => isNew(e.enemy));
+    }
+    const first = st.wave.index === 0;
+    const frac = st.wave.countdown !== null ? Phaser.Math.Clamp(st.wave.countdown / st.wave.countdownMax, 0, 1) : 1;
+    const secs = st.wave.countdown !== null ? Math.ceil(st.wave.countdown) : -1;
     for (const b of this.btns) {
-      const used = !!st.wave.next && st.wave.next.paths.includes(b.path);
+      const used = !!next && next.paths.includes(b.path);
       const show = can && used;
       if (show !== b.shown) {
         b.shown = show;
@@ -105,26 +150,42 @@ export class WaveCall {
         }
       }
       if (!b.c.visible) continue;
-      const first = st.wave.index === 0;
-      const frac = st.wave.countdown !== null ? Phaser.Math.Clamp(st.wave.countdown / st.wave.countdownMax, 0, 1) : 1;
       const pulse = 0.5 + 0.5 * Math.sin(time * 0.007);
       if (!b.hovered && b.shown) b.c.setScale(1 + 0.05 * pulse);
-      const g = b.face;
-      g.clear();
+      b.glow.setAlpha(0.35 + 0.4 * pulse);
+      b.badge.setVisible(this.fresh).setScale(1 + 0.12 * pulse);
       const hot = first || (st.wave.earlyBonus > 0 && b.hovered);
-      g.fillStyle(0xff7a59, 0.18 + 0.2 * pulse).fillCircle(0, 0, R + 11 + 4 * pulse);
-      g.fillStyle(COLORS.ink, 1).fillCircle(0, 0, R + 4);
-      g.fillStyle(hot ? 0xe5484d : 0xc23a4a, 1).fillCircle(0, 0, R);
-      g.fillStyle(0xffffff, 0.16).fillEllipse(0, -R * 0.45, R * 1.5, R * 0.8);
-      const ring = b.ring;
-      ring.clear();
-      if (!first) {
-        ring.lineStyle(7, COLORS.ink, 1).beginPath().arc(0, 0, R + 9, 0, Math.PI * 2).strokePath();
-        ring.lineStyle(4, 0xffd34e, 1).beginPath().arc(0, 0, R + 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac, false).strokePath();
+      const faceKey = hot ? 1 : 0;
+      if (faceKey !== b.faceKey) {
+        b.faceKey = faceKey;
+        const g = b.face;
+        g.clear();
+        g.fillStyle(COLORS.ink, 1).fillCircle(0, 0, R + 4);
+        g.fillStyle(hot ? 0xe5484d : 0xc23a4a, 1).fillCircle(0, 0, R);
+        g.fillStyle(0xffffff, 0.16).fillEllipse(0, -R * 0.45, R * 1.5, R * 0.8);
       }
-      b.label.setText(first ? 'START' : st.wave.countdown !== null ? `${Math.ceil(st.wave.countdown)}s` : '');
-      b.label.setColor(first ? COLORS.textGold : COLORS.text);
-      if (b.hovered) this.hud.tooltip.show(this.tip(), b.c.x, b.c.y - R - 8, b.c.y < 260 ? 'below' : 'above');
+      // countdown ring: redrawn only when the arc moves by about 2 degrees
+      const ringKey = first ? 0 : 1 + Math.round(frac * 180);
+      if (ringKey !== b.ringKey) {
+        b.ringKey = ringKey;
+        const ring = b.ring;
+        ring.clear();
+        if (!first) {
+          ring.lineStyle(7, COLORS.ink, 1).beginPath().arc(0, 0, R + 9, 0, Math.PI * 2).strokePath();
+          ring.lineStyle(4, 0xffd34e, 1).beginPath().arc(0, 0, R + 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac, false).strokePath();
+        }
+      }
+      b.label.setText(first ? 'START' : secs >= 0 ? `${secs}s` : '');
+      const col = first ? COLORS.textGold : COLORS.text;
+      if (b.label.style.color !== col) b.label.setColor(col); // setColor re-renders the text canvas, so only on change
+      if (b.hovered) {
+        // the tooltip text only changes when the wave or the seconds tick over
+        const key = `${next?.number ?? 0}|${secs}|${this.fresh}`;
+        if (key !== this.tipKey) {
+          this.tipKey = key;
+          this.showTip(b);
+        }
+      }
     }
   }
 }
