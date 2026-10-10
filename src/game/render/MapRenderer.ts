@@ -97,6 +97,24 @@ export class MapRenderer {
     this.buildDecor(entityC);
   }
 
+  private occupiedKey = '';
+
+  /** Built towers stand on plain ground: swap build-spot tiles for ground tiles while occupied. */
+  syncOccupied(occupied: readonly { col: number; row: number }[]): void {
+    const key = occupied.map((c) => `${c.col},${c.row}`).sort().join(';');
+    if (key === this.occupiedKey) return;
+    this.occupiedKey = key;
+    const set = new Set(key ? key.split(';') : []);
+    for (let row = 0; row < this.height; row++) {
+      for (let col = 0; col < this.width; col++) {
+        if (this.tileAt(col, row) !== 'B') continue;
+        const img = this.tileImages.get(`${col},${row}`);
+        const biome = this.biomeAt(col, row);
+        img?.setTexture(set.has(`${col},${row}`) ? `tiles/ground_${biome}` : `tiles/buildspot_${biome}`);
+      }
+    }
+  }
+
   biomeAt(col: number, row: number): Biome {
     if (this.level.biome === 'mixed') {
       const ch = this.level.biomeMap?.[row]?.[col] as BiomeChar | undefined;

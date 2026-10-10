@@ -436,6 +436,7 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
     const animDt = stepping ? dt * this.speed : 0;
     this.animTime += animDt;
     this.simView.update(this.animTime * 1000, animDt, events);
+    this.mapView.syncOccupied(this.sim.state.towers.map((t) => this.sim.spots[t.spotId]));
     this.mapCamera.update(dt);
     this.interaction.update(time);
     this.markers.update(time);
