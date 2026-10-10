@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { Biome, BiomeChar, LevelDef } from '../../core';
 import { buildRoadRibbon } from './RoadRibbon';
+import { anchorDeco } from './decoAnchors';
 import { TILE_ORIGIN_X, TILE_ORIGIN_Y, depthOf, hash2, isoX, isoY, stringSeed } from './iso';
 
 type Edge = 'NW' | 'NE' | 'SE' | 'SW';
@@ -33,34 +34,31 @@ const BIOME_OF: Record<BiomeChar, Biome> = { s: 'spring', d: 'desert', w: 'winte
 
 interface DecoSpec {
   keys: string[];
-  /** Origin y (0..1) so the base sits on the cell centre. */
-  oy: number;
-  scale: number;
   tint?: number;
 }
 
 const DECO: Record<Biome, { T: DecoSpec; r: DecoSpec; d: DecoSpec; small: DecoSpec }> = {
   spring: {
-    T: { keys: ['spring_tree_1', 'spring_tree_2'], oy: 0.9, scale: 1.55 },
-    r: { keys: ['spring_stone_2', 'spring_stone_3', 'spring_stone_4', 'spring_stone_1'], oy: 0.8, scale: 1.5 },
-    d: { keys: ['spring_grass_decoration_1', 'spring_grass_decoration_2', 'spring_grass_decoration_4', 'spring_grass_decoration_5', 'spring_grass_decoration_6', 'spring_grass_decoration_8'], oy: 0.6, scale: 1.8 },
-    small: { keys: ['spring_grass_decoration_1', 'spring_grass_decoration_2', 'spring_grass_decoration_2_1', 'spring_grass_decoration_5', 'spring_grass_decoration_7', 'spring_grass_decoration_9', 'spring_stone_ground_1'], oy: 0.6, scale: 1.7 },
+    T: { keys: ['spring_tree_1', 'spring_tree_2'] },
+    r: { keys: ['spring_stone_2', 'spring_stone_3', 'spring_stone_4', 'spring_stone_1'] },
+    d: { keys: ['spring_grass_decoration_1', 'spring_grass_decoration_2', 'spring_grass_decoration_4', 'spring_grass_decoration_5', 'spring_grass_decoration_6', 'spring_grass_decoration_8'] },
+    small: { keys: ['spring_grass_decoration_1', 'spring_grass_decoration_2', 'spring_grass_decoration_2_1', 'spring_grass_decoration_5', 'spring_grass_decoration_7', 'spring_grass_decoration_9', 'spring_stone_ground_1'] },
   },
   desert: {
-    T: { keys: ['desert_cactus_1', 'desert_cactus_2', 'desert_cactus_3', 'desert_cactus_4', 'desert_cactus_5'], oy: 0.9, scale: 1.45 },
-    r: { keys: ['desert_stone_sand_1', 'desert_stone_sand_2', 'desert_stone_sand_3', 'desert_stone_sand_4'], oy: 0.8, scale: 1.5 },
-    d: { keys: ['desert_sand_decoration_1', 'desert_sand_decoration_2', 'desert_sand_decoration_3', 'desert_sand_decoration_4', 'desert_sand_decoration_6'], oy: 0.6, scale: 1.8 },
-    small: { keys: ['desert_sand_decoration_5', 'desert_sand_decoration_7', 'desert_sand_decoration_8', 'desert_sand_decoration_9', 'desert_sand_decoration_2'], oy: 0.6, scale: 1.7 },
+    T: { keys: ['desert_cactus_1', 'desert_cactus_2', 'desert_cactus_3', 'desert_cactus_4', 'desert_cactus_5'] },
+    r: { keys: ['desert_stone_sand_1', 'desert_stone_sand_2', 'desert_stone_sand_3', 'desert_stone_sand_4'] },
+    d: { keys: ['desert_sand_decoration_1', 'desert_sand_decoration_2', 'desert_sand_decoration_3', 'desert_sand_decoration_4', 'desert_sand_decoration_6'] },
+    small: { keys: ['desert_sand_decoration_5', 'desert_sand_decoration_7', 'desert_sand_decoration_8', 'desert_sand_decoration_9', 'desert_sand_decoration_2'] },
   },
   winter: {
-    T: { keys: ['winter_tree_winter_1', 'winter_tree_winter_2'], oy: 0.9, scale: 1.5 },
-    r: { keys: ['spring_stone_2', 'spring_stone_3', 'spring_stone_4'], oy: 0.8, scale: 1.5, tint: 0xdfe9ff },
-    d: { keys: ['winter_snow_decoration_1', 'winter_snow_decoration_2', 'winter_snow_decoration_3', 'winter_snow_decoration_4', 'winter_snow_decoration_5'], oy: 0.6, scale: 1.8 },
-    small: { keys: ['winter_snow_decoration_6', 'winter_snow_decoration_7', 'winter_snow_decoration_8', 'winter_snow_decoration_9', 'winter_snow_decoration_3'], oy: 0.6, scale: 1.7 },
+    T: { keys: ['winter_tree_winter_1', 'winter_tree_winter_2'] },
+    r: { keys: ['spring_stone_2', 'spring_stone_3', 'spring_stone_4'], tint: 0xdfe9ff },
+    d: { keys: ['winter_snow_decoration_1', 'winter_snow_decoration_2', 'winter_snow_decoration_3', 'winter_snow_decoration_4', 'winter_snow_decoration_5'] },
+    small: { keys: ['winter_snow_decoration_6', 'winter_snow_decoration_7', 'winter_snow_decoration_8', 'winter_snow_decoration_9', 'winter_snow_decoration_3'] },
   },
 };
 
-const CRYSTAL: DecoSpec = { keys: ['crystal_1', 'crystal_2', 'crystal_3'], oy: 0.85, scale: 1.0 };
+const CRYSTAL: DecoSpec = { keys: ['crystal_1', 'crystal_2', 'crystal_3'] };
 
 export interface MapCell {
   col: number;
@@ -157,10 +155,11 @@ export class MapRenderer {
     }
   }
 
+  /** Native scale, anchored by its measured base (decoAnchors.ts) exactly at grid point (gx, gy). */
   private addDeco(entityC: Phaser.GameObjects.Container, spec: DecoSpec, pick: number, gx: number, gy: number, flipSeed: number): void {
     const key = `deco/${spec.keys[Math.floor(pick * spec.keys.length) % spec.keys.length]}`;
     if (!this.scene.textures.exists(key)) return;
-    const img = this.scene.add.image(isoX(gx, gy), isoY(gx, gy), key).setOrigin(0.5, spec.oy).setScale(spec.scale);
+    const img = anchorDeco(this.scene.add.image(isoX(gx, gy), isoY(gx, gy), key), key);
     if (flipSeed > 0.5) img.setFlipX(true);
     if (spec.tint !== undefined) img.setTint(spec.tint);
     img.setDepth(depthOf(gx, gy));
@@ -181,19 +180,26 @@ export class MapRenderer {
         const h3 = hash2(col, row, seed + 3);
         const cx = col + 0.5;
         const cy = row + 0.5;
+        // Single items sit exactly on the cell centre. Small tufts: at most 2 per cell, mirrored about the centre along the
+        // screen-horizontal grid axis (+a,-a) / (-a,+a), well inside the top diamond (|offset| <= 0.2 in grid space).
+        const A = 0.18;
         if (ch === 'T') {
-          this.addDeco(entityC, set.T, h1, cx + (h2 - 0.5) * 0.18, cy + (h3 - 0.5) * 0.18, h2);
+          this.addDeco(entityC, set.T, h1, cx, cy, h2);
         } else if (ch === 'r') {
-          this.addDeco(entityC, set.r, h1, cx + (h2 - 0.5) * 0.2, cy + (h3 - 0.5) * 0.2, h2);
+          this.addDeco(entityC, set.r, h1, cx, cy, h2);
         } else if (ch === 'c') {
           this.addDeco(entityC, CRYSTAL, h1, cx, cy, h2);
         } else if (ch === 'd') {
-          this.addDeco(entityC, set.d, h1, cx + (h2 - 0.5) * 0.3, cy + (h3 - 0.5) * 0.3, h3);
-          if (h2 > 0.55) this.addDeco(entityC, set.small, h3, cx + (h1 - 0.5) * 0.6, cy + (h2 - 0.5) * 0.6, h1);
+          if (h2 > 0.55) {
+            this.addDeco(entityC, set.d, h1, cx + A, cy - A, h3);
+            this.addDeco(entityC, set.small, h3, cx - A, cy + A, h1);
+          } else {
+            this.addDeco(entityC, set.d, h1, cx, cy, h3);
+          }
         } else if (ch === '.') {
-          // sparse deterministic scatter for richness
-          if (h1 < 0.3) this.addDeco(entityC, set.small, h2, cx + (h3 - 0.5) * 0.6, cy + (h2 - 0.5) * 0.6, h3);
-          if (h3 < 0.06) this.addDeco(entityC, set.T, h2, cx + (h1 - 0.5) * 0.4, cy + (h2 - 0.5) * 0.4, h1);
+          // sparse deterministic scatter: one small tuft on the centre, or (rarely) a tree
+          if (h3 < 0.05) this.addDeco(entityC, set.T, h2, cx, cy, h1);
+          else if (h1 < 0.3) this.addDeco(entityC, set.small, h2, cx, cy, h3);
         }
       }
     }

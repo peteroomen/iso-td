@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Rng, type Biome } from '../../core';
+import { anchorDeco } from '../render/decoAnchors';
 
 /**
  * Decorative isometric scenery built from the pack's tile sprites (used by the Title diorama and the level-select map).
@@ -58,23 +59,23 @@ function roadVariant(nw: boolean, ne: boolean, se: boolean, sw: boolean): number
   return nw || se ? 1 : 2;
 }
 
-function pickDeco(biome: Biome, ch: string, rng: Rng): { key: string; originY: number } | null {
+function pickDeco(biome: Biome, ch: string, rng: Rng): { key: string } | null {
   const pick = (prefix: string, n: number): string => `${prefix}${rng.int(1, n)}`;
   switch (ch) {
     case 'T':
-      if (biome === 'spring') return { key: pick('deco/spring_tree_', 2), originY: 0.86 };
-      if (biome === 'winter') return { key: pick('deco/winter_tree_winter_', 2), originY: 0.86 };
-      return { key: pick('deco/desert_cactus_', 5), originY: 0.86 };
+      if (biome === 'spring') return { key: pick('deco/spring_tree_', 2) };
+      if (biome === 'winter') return { key: pick('deco/winter_tree_winter_', 2) };
+      return { key: pick('deco/desert_cactus_', 5) };
     case 'r':
-      if (biome === 'spring') return { key: pick('deco/spring_stone_', 4), originY: 0.7 };
-      if (biome === 'winter') return { key: pick('deco/spring_stone_ground_', 4), originY: 0.7 };
-      return { key: pick('deco/desert_stone_sand_', 4), originY: 0.7 };
+      if (biome === 'spring') return { key: pick('deco/spring_stone_', 4) };
+      if (biome === 'winter') return { key: pick('deco/spring_stone_ground_', 4) };
+      return { key: pick('deco/desert_stone_sand_', 4) };
     case 'c':
-      return { key: pick('deco/crystal_', 3), originY: 0.82 };
+      return { key: pick('deco/crystal_', 3) };
     case 'd':
-      if (biome === 'spring') return { key: `deco/spring_grass_decoration_${[1, 2, 4, 5, 6, 7, 8, 9][rng.int(0, 7)]}`, originY: 0.55 };
-      if (biome === 'winter') return { key: pick('deco/winter_snow_decoration_', 9), originY: 0.55 };
-      return { key: pick('deco/desert_sand_decoration_', 9), originY: 0.55 };
+      if (biome === 'spring') return { key: `deco/spring_grass_decoration_${[1, 2, 4, 5, 6, 7, 8, 9][rng.int(0, 7)]}` };
+      if (biome === 'winter') return { key: pick('deco/winter_snow_decoration_', 9) };
+      return { key: pick('deco/desert_sand_decoration_', 9) };
     default:
       return null;
   }
@@ -118,10 +119,9 @@ export function buildIsland(scene: Phaser.Scene, x: number, y: number, spec: Isl
       items.push(tile);
       const deco = pickDeco(biome, ch, rng);
       if (deco) {
-        const img = scene.add
-          .image(p.x + rng.range(-4, 4) * scale * 2, p.y + rng.range(-2, 2) * scale * 2, deco.key)
-          .setScale(scale * (ch === 'T' ? 0.95 : 1))
-          .setOrigin(0.5, deco.originY);
+        // Same rule as the in-game map: native scale relative to the tiles (= island scale), anchored by its measured
+        // base exactly on the cell centre, no jitter.
+        const img = anchorDeco(scene.add.image(p.x, p.y, deco.key).setScale(scale), deco.key);
         img.setDepth((col + row) * 10 + 1);
         items.push(img);
       }
