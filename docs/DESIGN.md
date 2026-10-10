@@ -19,7 +19,8 @@ used to tune them and the tuned values live in `src/core/data/*`.
   After a wave finishes spawning, a countdown (`waveGap`, default 18 s) starts toward the next wave. Player can call
   early: **bonus gold = floor(remainingSeconds × 1.5)** and **both ability cooldowns are reduced by remainingSeconds × 0.5**.
 - **Victory**: all waves spawned and no enemies alive and lives > 0.
-- **Selling**: refund 60% of total gold invested in that tower.
+- **Selling**: refund 60% of total gold invested in that tower (specialization cost included).
+- **Specializations**: unlocked on levels 7–10 (`LevelDef.specsUnlocked`, also on replays), see §12.
 - **Gold**: start gold per level + kill bounties + early-call bonus.
 - Game speed 1× / 2×, pause. Build spots are fixed (Kingdom Rush style).
 
@@ -62,7 +63,7 @@ Damage types: `physical` (×(1−armor)), `magic` (×(1−magicResist)), `true`.
 | | 3 | +160 | 13–19 | 0.6 s | 3.8 | **Double Shot**: fires at 2 different targets |
 | Wizard (magic, bolt projectile 7 t/s) | 1 | 100 | 12–20 | 1.5 s | 3.0 | |
 | | 2 | +160 | 25–40 | 1.4 s | 3.0 | |
-| | 3 | +240 | 45–70 | 1.3 s | 3.2 | **Arc Bolt**: chains to 2 more enemies within 1.5 t, 50% dmg |
+| | 3 | +240 | 54–82 | 1.25 s | 3.2 | pure stat tier (the former Arc Bolt chain moved to the **Chain Lightning** specialization, §12; the stats were raised to compensate: ~+23% dps) |
 | Barracks | 1 | 70 | knights 1–3 / 1 s | | rally ≤ 2.5 | 2 knights, 50 HP, 0% armor |
 | | 2 | +110 | 3–5 / 1 s | | | 2 knights, 90 HP, 15% armor |
 | | 3 | +170 | 6–10 / 1 s | | | **3 knights**, 140 HP, 30% armor |
@@ -78,6 +79,8 @@ blast (ties: furthest along the path), so it is a swarm tower. **Cluster Bomb** 
 within 0.8 t of the impact (seeded RNG, deterministic), explode 0.35 s later with radius 0.5 for 30% of the shell's rolled damage.
 Costs match the wizard (100 / 160 / 240); the first-draft numbers (125 / 200 / 300, 8–15 … 35–55 dmg, 2.5 s … 2.3 s, radius 0.8 … 1.0)
 were re-tuned with the balance tool, see `docs/BALANCE.md`. Sim API: projectile kinds `shell` / `bomblet`, events `explode` / `cluster`, see the source comments in `src/core/types.ts`.
+
+From level 7 on a Lv3 tower may buy a **specialization** (§12). Archer/wizard/barracks/bomb numbers above are the *unspecialized* tiers.
 
 Knights: walk 1.6 t/s, respawn 10 s after death at the tower, regen 2% max HP/s when not fighting.
 Each knight engages one blockable enemy within 1.0 t of its rally post; an engaged enemy stops moving and fights back.
@@ -156,6 +159,7 @@ Start gold roughly 250–450, tuned by the balance tool. Grids up to ~14×14; ca
 - **expert**: same plan + optimal early calls and ability timing; assumes 3★ per previous level.
 - **bomb-only** (and archer-only / wizard-only / barracks-only): the competent bot with every build forced to one kind.
 - **naive**: builds only the cheapest tower type on the spots nearest the spawn, upgrades when affordable, no abilities.
+- **nospec** / **spec:<id>** (levels 7–10): the competent bot without / with a forced specialization option (see §12 and BALANCE.md).
 - **idle**: builds nothing (sanity check — must lose every level, ideally on wave 1–2).
 
 Targets: competent wins with 10–17 lives; expert can reach 18+ (3★); naive loses from L4 onward; idle always loses; from L4 on every
@@ -195,6 +199,7 @@ sim.drainEvents(): SimEvent[]         // 'build','upgrade','sell','shoot','hit',
 // commands return { ok: boolean, reason?: string }
 sim.build(spotId, kind); sim.upgrade(towerId); sim.sell(towerId); sim.setRally(towerId, {x,y});
 sim.castOrbital({x,y}); sim.castReinforcements({x,y}); sim.callNextWave();
+sim.specialize(towerId, specId);       // levels 7-10, Lv3 towers, see §12
 sim.canAfford/costOf helpers for UI.
 ```
 
@@ -220,18 +225,37 @@ Entities have stable numeric ids so the renderer can map them to sprites. Render
 archer.png = archer unit, stick = wizard staff, sword, shield), `units/knight_level_1..3.png`, `ufo/ufo_1..7.png`.
 Boss sprite: `ufo/mothership.png` (320×271, generated to match the pack style; hangar opening at bottom-center is where escorts launch).
 
-## 12. Tower specializations (planned, confirmed with the user)
+## 12. Tower specializations
 
-From **level 7** onward (also on replays) a **Lv3** tower can buy **one of two** specializations for **~300 g** (exact
-costs tuned by the balance tool). The choice is permanent for that tower; different towers of the same kind may choose
-differently. Passive triggers only fire when enemies are in range. Each spec gets a code-drawn emblem on the tower plus
-its own effects.
+From **level 7** onward (`LevelDef.specsUnlocked`; levels 7–10, also on replays; levels 1–6 are unaffected) a **Lv3** tower can buy
+**one of two** specializations for **300 g** each. The choice is permanent for that tower (different towers of the same kind may
+choose differently); the cost counts as invested gold (sell refund 60%). Passive powers only fire when UFOs are in range. Each
+spec gets a code-drawn emblem on the tower plus its own effects (visuals: later phase).
+
+Sim API: `sim.specialize(towerId, specId)` / `sim.canSpecialize(...)` (fail reasons `locked`, `wrong_kind`, `not_max_level`,
+`already_specialized`, `gold`, `no_tower`, `ended`), `sim.specCostOf(id)`, `sim.statsFor(kind, level, spec?)`, `sim.statsOf(towerId)`,
+`TowerState.spec / specCooldown / specCooldownMax / specCounter`, event `specialize`. Details in the comments of `src/core/types.ts`;
+numbers in `SPEC_TUNING` (`src/core/data/specs.ts`).
 
 | Tower | Option A | Option B |
 |---|---|---|
-| Archer | **Eagle Eye**: +40% range, +30% damage, every 4th arrow ignores armor | **Hunting Nets**: every 9 s nets the densest cluster in range — everything within ~1 t is rooted 2.5 s; nets also pull fliers down (knights can block them while netted); boss is slowed 50% instead |
-| Wizard | **Chain Lightning**: bolts jump 3 times (70% / 50% / 35%) — base Lv3 loses Arc Bolt and becomes a pure stat tier | **Fire Mages**: hits ignite for true damage (ignores magic resist), ~6 dps for 4 s, refreshes, no stacking; burning enemies show an orange HP bar |
-| Bomb | **Bigger Bombs**: +50% blast radius, +40% damage, cluster bomblets 3 → 5 | **Homing Missiles**: every 6 s, 2 missiles at the furthest-forward enemies, fliers included |
-| Barracks | **Bow Training**: knights shoot (6–9 dmg, 2.5 t) when not in melee, fliers included | **Extra Recruits**: +1 knight (4), +25% knight HP, 30% faster respawn |
+| Archer | **Eagle Eye**: +30% range, +20% damage, every 4th arrow (each arrow of a Double Shot counts) ignores ALL armor | **Hunting Nets**: every 6.5 s (when a UFO is in range) a net is lobbed (~0.4–0.5 s flight) at the densest cluster; every UFO within 1.2 t of the impact is rooted 3 s; netted fliers are pulled down (count as blockable ground UFOs: knights engage them, bombs hit them); bosses are slowed 50% for 3 s instead |
+| Wizard | **Chain Lightning**: bolts jump 3 times within 1.5 t for 50% / 35% / 20% of the bolt's damage | **Fire Mages**: hits ignite: 40 true dps for 4 s (ignores magic resist), a new hit refreshes, never stacks; burning UFOs show an orange HP bar |
+| Bomb | **Bigger Bombs**: +40% blast radius (shell and bomblets), +25% damage, +2 bomblets | **Homing Missiles**: every 5 s (UFOs in range) 2 homing missiles at the furthest-forward UFOs (fliers included): 90 physical damage, 0.7 t splash; normal shells continue |
+| Barracks | **Bow Training**: knights not in melee shoot arrows (9–13 physical, every 1.0 s, 2.5 t from the knight, fliers included) | **Extra Recruits**: +1 knight (4), +25% knight HP, 30% faster respawn |
 
-Balance goal: the two options of each tower within ~10% overall value, each clearly better on some levels/enemy mixes.
+**Interactions with the star tree** (all multiplicative unless stated):
+* Archers ★1 range ×1.1 and ★2 damage ×1.15 multiply with Eagle Eye (×1.3 / ×1.2). ★3 armor piercing (−0.30) applies to every arrow;
+  Eagle Eye's every-4th arrow ignores all armor (the ★3 bonus is irrelevant for it). Nets are unaffected by the stars.
+* Wizards ★1 (−10% cost) discounts build / upgrades only, never the 300 g spec. ★2 +15% damage raises the bolt and so the chain jumps
+  (they are fractions of the bolt); the ignite burn is flat true damage (not scaled). ★3 slow applies to the primary hit and to every chain
+  jump, and to Fire Mages bolts.
+* Barracks ★1 HP ×1.2 × Extra Recruits ×1.25 (= ×1.5); ★2 respawn ×0.7 × spec ×0.7 (= 4.9 s); ★3 idle regen applies to all knights.
+  Bow Training arrows are not affected by any star.
+* Bombs ★1 radius and ★2 damage apply to everything the bomb tower throws: shells, bomblets and Homing Missiles (damage and splash).
+  Bigger Bombs multiplies on top (radius ×1.2 × 1.4, damage ×1.15 × 1.25). Bomblet count: ★3 sets 5 (35% damage), Bigger Bombs adds +2
+  on top: **7 with both**. Bomblet scatter grows with the spec radius.
+* Orbital Strike / Reinforcements are unaffected.
+
+Balance goal: the two options of each tower within ~10% overall value, each clearly better on some levels / enemy mixes; see the
+"Specializations" section of `docs/BALANCE.md` (bots `spec:<id>`, micro-benchmark `tools/specbench.ts`).
