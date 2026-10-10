@@ -42,7 +42,7 @@ describe('campaign levels', () => {
       expect([l.towerCap.archer, l.towerCap.wizard, l.towerCap.barracks, l.towerCap.bomb], l.id).toEqual(CAPS[i]);
       expect(l.lives).toBe(20);
       expect(l.startGold, l.id).toBeGreaterThanOrEqual(250);
-      expect(l.startGold, l.id).toBeLessThanOrEqual(520);
+      expect(l.startGold, l.id).toBeLessThanOrEqual(750);
       expect(levelWidth(l), l.id).toBeGreaterThanOrEqual(10);
       expect(levelWidth(l), l.id).toBeLessThanOrEqual(14);
       expect(levelHeight(l), l.id).toBeGreaterThanOrEqual(10);

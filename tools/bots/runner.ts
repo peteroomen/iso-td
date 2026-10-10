@@ -3,6 +3,7 @@ import { FIXED_DT } from '../../src/core/data/rules';
 import type { LevelDef } from '../../src/core/types';
 import { deriveSpots } from '../../src/core/level';
 import { Bot, towerSummary } from './bot';
+import { withSpecs } from './specs';
 import { starBudget, upgradesForStars } from './stars';
 import type { BotConfig, LevelPlan } from './types';
 
@@ -50,7 +51,7 @@ export function runBot(level: LevelDef, cfg: BotConfig, plan: LevelPlan | undefi
   const upgrades = upgradesForStars(starBudget(levelNumber(level), cfg.starsPerLevel));
   const sim = new Sim(level, { seed, upgrades, events: false });
   const actions = cfg.style === 'plan' ? (cfg.planKind === 'expert' ? plan?.expert ?? plan?.competent : plan?.competent) ?? [] : [];
-  const bot = new Bot(cfg, level, actions);
+  const bot = new Bot(cfg, level, cfg.style === 'plan' ? withSpecs(actions, level, cfg) : actions);
   const log: WaveLogEntry[] = [];
   let lastWave = -1;
   let tick = 0;

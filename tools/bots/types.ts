@@ -1,9 +1,11 @@
-import type { TowerKind, Vec2 } from '../../src/core/types';
+import type { SpecId, TowerKind, Vec2 } from '../../src/core/types';
 
 /** One scripted step of a bot plan. Spots are addressed by their (col,row) cell so plans survive map edits. */
 export type PlanAction =
   | { do: 'build'; at: readonly [number, number]; kind: TowerKind; /** do not start before this many waves have started */ wave?: number }
   | { do: 'up'; at: readonly [number, number]; wave?: number }
+  /** Buy a specialization for the (Lv3) tower on that spot; skipped when the tower is missing / not level 3. Inserted by tools/bots/specs.ts. */
+  | { do: 'spec'; at: readonly [number, number]; spec: SpecId; wave?: number }
   | { do: 'rally'; at: readonly [number, number]; to: readonly [number, number]; wave?: number };
 
 export interface LevelPlan {
@@ -32,6 +34,13 @@ export interface BotConfig {
   planKind: 'competent' | 'expert';
   /** Force every build in the plan to this tower kind (variant bots). */
   onlyKind?: TowerKind;
+  /**
+   * Specialization policy (only matters on levels with specializations): 'auto' = the per-level rule of tools/bots/specs.ts
+   * (a few specs, as many as the plan's economy affords); 'none' = never specialize.
+   */
+  specs: 'auto' | 'none';
+  /** Comparison variants: every Lv3 tower of this spec's kind buys exactly this spec (and nothing else is specialized). */
+  forceSpec?: SpecId;
 }
 
 export type { Vec2 };

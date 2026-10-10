@@ -104,12 +104,7 @@ export const PLANS: Record<string, LevelPlan> = {
       up(1, 2), up(10, 5), up(2, 7),
     ],
     expert: [
-      b(7, 9, 'wizard'), up(7, 9), b(7, 7, 'archer'), up(7, 9), b(2, 7, 'barracks'), up(7, 7), b(7, 11, 'wizard'),
-      b(5, 11, 'archer'), b(5, 9, 'archer'), b(4, 5, 'wizard'), b(5, 7, 'barracks'), b(11, 8, 'archer'), up(2, 7), up(2, 7),
-      up(4, 5), up(5, 7), b(8, 5, 'barracks'), b(2, 4, 'archer'), b(10, 5, 'wizard'), b(10, 10, 'barracks'), up(8, 5),
-      up(7, 11), up(5, 9), up(8, 5), up(2, 4), up(11, 8), up(4, 5), b(1, 2, 'barracks'),
-      up(1, 2), up(10, 10), up(5, 7), up(2, 4), up(5, 11), up(7, 7), up(11, 8),
-      up(5, 11),
+      b(7, 7, 'archer'), b(7, 11, 'wizard'), b(4, 5, 'barracks'), b(7, 9, 'archer'), up(7, 9), up(7, 9), up(7, 7), b(10, 5, 'archer'), b(2, 7, 'barracks'), b(5, 9, 'barracks'), b(2, 4, 'archer'), up(7, 11), b(11, 8, 'bomb'), b(5, 7, 'bomb'), b(5, 11, 'barracks'), up(5, 11), b(8, 5, 'archer'), up(5, 7), up(8, 5), up(11, 8), up(2, 4), up(7, 11), up(2, 7), b(10, 10, 'bomb'), b(1, 2, 'barracks'), up(1, 2), up(5, 11),
     ],
   },
   level09: {
@@ -119,9 +114,7 @@ export const PLANS: Record<string, LevelPlan> = {
       up(9, 2), up(10, 6), up(3, 2), up(6, 4), up(5, 8), up(13, 3), up(0, 7),
     ],
     expert: [
-      b(13, 3, 'archer'), b(6, 4, 'wizard'), b(10, 6, 'archer'), b(9, 2, 'archer'), b(3, 2, 'archer'), up(6, 4), up(6, 4),
-      up(13, 3), b(5, 8, 'archer'), up(9, 2), up(3, 2), up(10, 6), b(0, 7, 'barracks'), up(0, 7),
-      up(5, 8), up(5, 8), up(3, 2), up(13, 3), up(9, 2),
+      b(5, 8, 'archer'), b(9, 2, 'barracks'), b(3, 2, 'wizard'), b(13, 3, 'barracks'), b(10, 6, 'archer'), b(0, 7, 'bomb'), up(0, 7), b(6, 4, 'barracks'), up(13, 3), up(9, 2), up(5, 8), up(3, 2), up(10, 6),
     ],
   },
   level10: {

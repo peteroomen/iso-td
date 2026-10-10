@@ -106,6 +106,7 @@ function mutate(g: Genome, level: LevelDef, rng: Rng, spots: { col: number; row:
 function fmt(a: PlanAction): string {
   if (a.do === 'build') return `b(${a.at[0]}, ${a.at[1]}, '${a.kind}')`;
   if (a.do === 'up') return `up(${a.at[0]}, ${a.at[1]})`;
+  if (a.do === 'spec') return `// spec(${a.at[0]}, ${a.at[1]}, '${a.spec}') is inserted by specs.ts`;
   return `rally(${a.at[0]}, ${a.at[1]}, ${a.to[0]}, ${a.to[1]})`;
 }
 

@@ -1,7 +1,9 @@
 /* eslint-disable no-console */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { LEVELS } from '../src/core/data/levels';
-import { BOTS, MAIN_BOTS, VARIANT_BOTS } from './bots/bots';
+import { SPECS_BY_TOWER } from '../src/core/data/specs';
+import { BOTS, MAIN_BOTS, SPEC_BOTS, VARIANT_BOTS } from './bots/bots';
+import { markdown as specBenchMarkdown } from './specbench';
 import { PLANS } from './bots/plans';
 import { runBot, type RunResult } from './bots/runner';
 import { upgradesForStars, starBudget } from './bots/stars';
@@ -97,7 +99,7 @@ function cell(a: Agg): string {
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
   const levels = LEVELS.filter((l) => args.level === null || levelNumber(l) === args.level);
-  const botNames = args.bots ?? [...MAIN_BOTS, ...VARIANT_BOTS];
+  const botNames = args.bots ?? [...MAIN_BOTS, ...VARIANT_BOTS, ...SPEC_BOTS];
   for (const n of botNames) if (!BOTS[n]) throw new Error(`unknown bot '${n}'`);
   const t0 = Date.now();
   const results = new Map<string, Agg>(); // key level|bot
@@ -105,6 +107,8 @@ function main(): void {
   for (const level of levels) {
     for (const name of botNames) {
       const cfg = BOTS[name];
+      // spec comparison bots only make sense where specializations exist
+      if ((SPEC_BOTS as readonly string[]).includes(name) && !level.specsUnlocked) continue;
       const runs: RunResult[] = [];
       for (let seed = 1; seed <= args.seeds; seed++) runs.push(runBot(level, cfg, PLANS[level.id], seed));
       const agg = aggregate(runs);
@@ -153,7 +157,7 @@ function markdown(levelIds: string[], botNames: string[], results: Map<string, A
   out.push('| bot | stars assumed | abilities | early calls | build |', '|---|---|---|---|---|');
   for (const n of botNames) {
     const c = BOTS[n];
-    const build = c.style === 'plan' ? `plan (${c.planKind})${c.onlyKind ? `, only ${c.onlyKind}` : ''}` : c.style === 'naive' ? 'cheapest tower (archers) on the spots nearest the spawn, upgrades when affordable' : 'nothing';
+    const build = c.style === 'plan' ? `plan (${c.planKind})${c.onlyKind ? `, only ${c.onlyKind}` : ''}${c.forceSpec ? `, every spec slot of its kind = ${c.forceSpec}` : c.specs === 'none' ? ', no specializations' : ''}` : c.style === 'naive' ? 'cheapest tower (archers) on the spots nearest the spawn, upgrades when affordable' : 'nothing';
     out.push(`| ${n} | ${c.starsPerLevel}/level | ${c.abilities} | ${c.early} | ${build} |`);
   }
   out.push('');
@@ -188,6 +192,48 @@ function markdown(levelIds: string[], botNames: string[], results: Map<string, A
     out.push('### Single-tower-type variants', '');
     out.push('Competent bot (same plan, stars and abilities) but every tower is forced to one kind. Shows which enemy introductions punish which mix.', '');
     table(varCols);
+  }
+  const specCols = botNames.filter((n) => (SPEC_BOTS as readonly string[]).includes(n));
+  if (specCols.length) {
+    out.push('## Specializations', '');
+    out.push('Levels 7-10 only. `competent` buys specs by the per-level rule of `tools/bots/specs.ts`; `nospec` is the same bot that never specializes; `spec:<id>` is the competent bot where every tower of that spec\'s kind that gets a spec uses exactly that option (and two towers of that kind are specialized), i.e. the two options of a tower are compared on the same economy and the same waves.', '');
+    const specLevels = levelIds.filter((id) => LEVELS.find((l) => l.id === id)!.specsUnlocked);
+    out.push('Lives left per level (average over the seeds; win rate in brackets):', '');
+    const cols = ['competent', ...specCols];
+    out.push(`| level | ${cols.join(' | ')} |`, `|---|${cols.map(() => '---|').join('')}`);
+    const avgOf = new Map<string, { lives: number; wins: number; runs: number }>();
+    for (const id of specLevels) {
+      const lvl = LEVELS.find((l) => l.id === id)!;
+      const row = cols.map((c) => {
+        const a = results.get(`${id}|${c}`);
+        if (!a) return '';
+        const t = avgOf.get(c) ?? { lives: 0, wins: 0, runs: 0 };
+        t.lives += a.avg * a.runs.length;
+        t.wins += a.wins;
+        t.runs += a.runs.length;
+        avgOf.set(c, t);
+        return `${f1(a.avg)} (${a.wins}/${a.runs.length})`;
+      });
+      out.push(`| ${levelNumber(lvl)} ${lvl.name} | ${row.join(' | ')} |`);
+    }
+    out.push(`| **all of L7-L10** | ${cols.map((c) => { const t = avgOf.get(c); return t ? `**${f1(t.lives / t.runs)}** (${t.wins}/${t.runs})` : ''; }).join(' | ')} |`, '');
+    out.push('Option A vs option B of each tower (lives averaged over L7-L10, same seeds; a gap below ~10% of the plain competent result is "balanced"):', '');
+    out.push('| tower | option A | lives (wins) | option B | lives (wins) | gap |', '|---|---|---|---|---|---|');
+    for (const kind of ['archer', 'wizard', 'bomb', 'barracks'] as const) {
+      const [a, b] = SPECS_BY_TOWER[kind];
+      const ta = avgOf.get(`spec:${a}`);
+      const tb = avgOf.get(`spec:${b}`);
+      if (!ta || !tb) continue;
+      const la = ta.lives / ta.runs;
+      const lb = tb.lives / tb.runs;
+      out.push(`| ${kind} | ${a} | ${f1(la)} (${ta.wins}/${ta.runs}) | ${b} | ${f1(lb)} (${tb.wins}/${tb.runs}) | ${f1(Math.abs(la - lb))} lives |`);
+    }
+    out.push('');
+    {
+      out.push('### Single-tower micro-benchmark', '');
+      out.push('`npx tsx tools/specbench.ts`: one Lv3 tower (plain / each spec) beside plain Lv3 companions on a straight road against fixed UFO mixes; the cell is the share of the wave\'s HP that was removed before it left the map and the lives leaked. This is where the two options of a tower show their different strengths.', '');
+      out.push(specBenchMarkdown(), '');
+    }
   }
   out.push('### Economy', '');
   out.push('Gold left at the end, total gold earned, the time at which every build spot held a tower at its level cap ("maxed", with the share of the run it took and in how many seeds it happened) and how late the bot was still buying (time of its last purchase as a share of the run). The goal: little gold left over, and no maxing before the last third of the level.', '');

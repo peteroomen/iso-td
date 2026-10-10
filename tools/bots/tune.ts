@@ -66,7 +66,7 @@ function main(): void {
   if (fixed !== null) k = fixed;
   else {
     let lo = 0.3;
-    let hi = 3;
+    let hi = Number(arg('hi', '3'));
     for (let i = 0; i < 11; i++) {
       const mid = Math.sqrt(lo * hi);
       const r = avgLives(scaleLevel(level, mid), botName, seeds);

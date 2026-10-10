@@ -132,7 +132,7 @@ function main(): void {
     for (let j = 0; j < nChange; j++) {
       const pick = rng.int(0, CLASSES.length); // CLASSES.length = K itself
       const step = Math.exp((rng.next() - 0.5) * (rng.next() < 0.3 ? 1.4 : 0.5));
-      if (pick === CLASSES.length) cand.k = Math.min(2.2, Math.max(0.2, cand.k * step));
+      if (pick === CLASSES.length) cand.k = Math.min(Number(arg('kmax', '2.2')), Math.max(0.2, cand.k * step));
       else cand.m[CLASSES[pick]] = Math.min(5, Math.max(0.2, cand.m[CLASSES[pick]] * step));
     }
     const e = score(cand);

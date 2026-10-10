@@ -75,6 +75,12 @@ export class Bot {
           const r = sim.upgrade(t.id);
           if (!r.ok && r.reason === 'gold') return;
         }
+      } else if (a.do === 'spec') {
+        const t = sim.towerAtSpot(this.spotId(a.at));
+        if (t && t.level >= 3 && t.spec === null) {
+          const r = sim.specialize(t.id, a.spec);
+          if (!r.ok && r.reason === 'gold') return;
+        }
       } else {
         const t = sim.towerAtSpot(this.spotId(a.at));
         if (t && t.kind === 'barracks') sim.setRally(t.id, { x: a.to[0], y: a.to[1] });
@@ -101,6 +107,10 @@ export class Bot {
           continue;
         }
         return sim.canAfford(c);
+      }
+      if (a.do === 'spec') {
+        const t = sim.towerAtSpot(this.spotId(a.at));
+        if (t && t.level >= 3 && t.spec === null) return sim.canAfford(sim.specCostOf(a.spec));
       }
       this.idx++;
     }
@@ -222,5 +232,5 @@ export class Bot {
 
 export function towerSummary(towers: readonly TowerState[]): string {
   const k = { archer: 'A', wizard: 'W', barracks: 'B', bomb: 'X' } as const;
-  return towers.map((t) => `${k[t.kind]}${t.level}`).join(' ');
+  return towers.map((t) => `${k[t.kind]}${t.level}${t.spec ? '*' : ''}`).join(' ');
 }
