@@ -82,7 +82,9 @@ describe('star tree modifiers (applied at construction)', () => {
     const s = towerStats('archer', 3, emptyUpgrades());
     expect(s).toMatchObject({ damageMin: 13, damageMax: 19, cooldown: 0.6, range: 3.8, shots: 2 });
     expect(s.dps).toBeCloseTo((16 * 2) / 0.6);
-    expect(towerStats('wizard', 3, emptyUpgrades())).toMatchObject({ chainCount: 2, chainRange: 1.5, chainFactor: 0.5 });
+    // Lv3 wizard is a pure stat tier since the specializations: the chain belongs to Chain Lightning
+    expect(towerStats('wizard', 3, emptyUpgrades())).toMatchObject({ chainCount: 0, chainRange: 0, chainFactor: 0 });
+    expect(towerStats('wizard', 3, emptyUpgrades(), 'chain_lightning')).toMatchObject({ chainCount: 3, chainRange: 1.5, chainFactors: [0.5, 0.35, 0.2] });
     expect(towerStats('barracks', 3, emptyUpgrades())).toMatchObject({ knights: 3, knightHp: 140, knightArmor: 0.3 });
   });
 });

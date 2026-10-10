@@ -6,6 +6,15 @@
 export type Biome = 'spring' | 'desert' | 'winter';
 export type TowerKind = 'archer' | 'wizard' | 'barracks' | 'bomb';
 export type EnemyId = 'scout' | 'dart' | 'skimmer' | 'plated' | 'prism' | 'carrier' | 'dread' | 'mothership';
+/**
+ * Tower specializations (docs/DESIGN.md section 12). Two per tower kind, bought once per Lv3 tower on levels with
+ * `LevelDef.specsUnlocked` (levels 7-10), permanent.
+ */
+export type SpecId =
+  | 'eagle_eye' | 'hunting_nets' // archer
+  | 'chain_lightning' | 'fire_mages' // wizard
+  | 'bigger_bombs' | 'homing_missiles' // bomb
+  | 'bow_training' | 'extra_recruits'; // barracks
 export type DamageType = 'physical' | 'magic' | 'true';
 export type AbilityId = 'orbital' | 'reinforce';
 
@@ -78,6 +87,11 @@ export interface LevelDef {
   /** Seconds between the end of a wave's spawning and the automatic start of the next wave (default 18). */
   waveGap?: number;
   towerCap: TowerCap;
+  /**
+   * Tower specializations can be bought on this level (campaign: true on levels 7-10, absent/false before). Because it is a
+   * property of the level, replays of a level behave exactly like the first play. `SimOptions.specs` overrides it.
+   */
+  specsUnlocked?: boolean;
   waves: WaveDef[];
   hints?: LevelHint[];
 }
@@ -117,6 +131,9 @@ export type FailReason =
   | 'out_of_range' // rally point too far from tower / target outside map
   | 'not_on_road' // point not close enough to an enemy path
   | 'cooldown' // ability on cooldown
+  | 'locked' // specialize on a level without specializations (before level 7)
+  | 'not_max_level' // specialize before the tower is level 3
+  | 'already_specialized' // the tower already has its (permanent) specialization
   | 'wave_in_progress' // callNextWave while the current wave is still spawning
   | 'no_more_waves' // callNextWave after the last wave started
   | 'not_running' // abilities before the first wave
@@ -160,6 +177,23 @@ export interface TowerState {
   readonly attacking: boolean;
   /** Incremented on every shot (handy for triggering animations without events). */
   readonly shotCount: number;
+  /**
+   * Specialization bought for this tower (null = none). Permanent. Changes `range`, damage and behaviour, see `SPEC_TUNING`
+   * in data/specs.ts. Use for the tower emblem.
+   */
+  readonly spec: SpecId | null;
+  /**
+   * Seconds until the spec's periodic power fires (hunting_nets: next net, homing_missiles: next missile volley); 0 = ready,
+   * it fires as soon as a UFO is in range. The timer counts down continuously. Always 0 for other specs / no spec.
+   */
+  readonly specCooldown: number;
+  /** Full period of `specCooldown` in seconds (0 when the spec has no periodic power). Use for a charge indicator. */
+  readonly specCooldownMax: number;
+  /**
+   * eagle_eye only: arrows fired since the last armor-ignoring one (0..3). The arrow fired while this is 3 ignores all armor,
+   * and resets it to 0. 0 for other specs.
+   */
+  readonly specCounter: number;
   /** Barracks only: rally post (grid units). */
   readonly rallyX: number | null;
   readonly rallyY: number | null;
@@ -190,6 +224,12 @@ export interface KnightState {
   readonly targetId: number | null;
   /** True for ~0.25 s after a swing. */
   readonly attacking: boolean;
+  /** Bow Training: this knight shoots arrows when not in melee (its barracks has the spec). */
+  readonly bow: boolean;
+  /** Bow Training: seconds until the next arrow (0 = ready). */
+  readonly bowCooldown: number;
+  /** Bow Training: true for ~0.25 s after an arrow was shot (bow-draw animation). */
+  readonly shooting: boolean;
   /** Rally post the knight defends (engagement radius is measured from here). */
   readonly postX: number;
   readonly postY: number;
@@ -219,6 +259,19 @@ export interface EnemyState {
   /** Knight ids in contact with this enemy this tick. */
   readonly engagedBy: readonly number[];
   readonly slowed: boolean;
+  /**
+   * Hunting Nets: true while caught in a net. A netted UFO cannot move (it can still fight knights it is engaged with, and be
+   * shot). A netted FLIER is pulled down: it counts as a blockable ground UFO (knights engage it, bombs hit it), so the
+   * renderer should draw it low (`flier && !netted` = high flier). Bosses are never netted (they are slowed instead).
+   */
+  readonly netted: boolean;
+  /** Seconds of root left (0 when not netted). */
+  readonly netTimer: number;
+  /** Fire Mages: true while burning (draw an orange HP bar). Burn deals `burnDps` true damage per second. */
+  readonly burning: boolean;
+  /** Seconds of burning left (0 when not burning). */
+  readonly burnTimer: number;
+  readonly burnDps: number;
   /** True for ~0.25 s after its melee swing. */
   readonly attacking: boolean;
   readonly pathIndex: number;
@@ -241,10 +294,16 @@ export interface EnemyState {
  * - 'shell': bomb-tower artillery shell. Lobbed to a FIXED ground point (tx, ty = target position at fire time, no lead),
  *   flies `flightTime` seconds, then explodes (splash `radius`). x/y move linearly on the ground from (fromX, fromY) to
  *   (tx, ty); the renderer adds the height arc using `progress` and `arc`.
+ * - 'net': Hunting Nets (archer spec). Lobbed like a shell to a FIXED ground point (tx, ty = predicted cluster centre), `radius` =
+ *   catch radius, `flightTime` ~0.4-0.5 s, `arc` apex height. On landing it emits 'net' (and roots the UFOs in `radius`).
+ * - 'missile': Homing Missiles (bomb spec). Homing like an arrow (speed ~6.5 t/s, `targetId`), explodes on reaching the target
+ *   (or at its last known position when the target died) with splash `radius` (0.5), `damage` physical. Hits fliers too.
+ *   Emits 'explode' (kind 'missile').
+ * - 'knightArrow': Bow Training arrow shot by a knight (`knightId`), homing like an 'arrow', `towerId` = its barracks.
  * - 'bomblet': Cluster Bomb sub-munition. Spawned at the shell's impact point (fromX, fromY), hops to a scatter point
  *   (tx, ty) in `flightTime` (~0.35 s) and explodes there with `radius`. Same fields as a shell.
  */
-export type ProjectileKind = 'arrow' | 'bolt' | 'shell' | 'bomblet';
+export type ProjectileKind = 'arrow' | 'bolt' | 'shell' | 'bomblet' | 'net' | 'missile' | 'knightArrow';
 
 export interface ProjectileState {
   readonly id: number;
@@ -267,10 +326,19 @@ export interface ProjectileState {
   /** Wizard tier-3 star upgrade: speed multiplier applied for slowDuration seconds (1 = none). */
   readonly slowFactor: number;
   readonly slowDuration: number;
-  /** Number of additional chain targets on impact (wizard L3). */
+  /** Number of additional chain targets on impact (Chain Lightning: 3; 0 otherwise). */
   readonly chainCount: number;
   readonly chainRange: number;
   readonly chainFactor: number;
+  /** Damage factor of each chain jump (Chain Lightning: [0.7, 0.5, 0.35]); empty when no chain. `chainFactor` = factors[0]. */
+  readonly chainFactors: readonly number[];
+  /** Fire Mages: burn applied to the target on impact (true dps / seconds); 0 = none. */
+  readonly igniteDps: number;
+  readonly igniteDuration: number;
+  /** Eagle Eye: this arrow ignores ALL armor (every 4th arrow). Draw it differently (golden). `armorPierce` is 1 then. */
+  readonly armorIgnore: boolean;
+  /** 'knightArrow' only: the shooting knight's id (-1 otherwise). */
+  readonly knightId: number;
   /** Unit direction of travel (for rotating the sprite). */
   readonly dirX: number;
   readonly dirY: number;
@@ -280,7 +348,7 @@ export interface ProjectileState {
   readonly elapsed: number;
   /** Shell/bomblet only: elapsed / flightTime, 0..1 (use for the arc: height = 4 * progress * (1 - progress) * arc). */
   readonly progress: number;
-  /** Shell/bomblet only: splash radius in tiles at the landing point (star-tree radius bonus included). */
+  /** Shell/bomblet/missile: splash radius in tiles at the landing point (star-tree + spec bonuses included); net: catch radius. */
   readonly radius: number;
   /** Shell/bomblet only: suggested apex height of the visual arc, in tiles (shell 1.6, bomblet 0.5). */
   readonly arc: number;
@@ -288,8 +356,10 @@ export interface ProjectileState {
   readonly bombletCount: number;
   /** Shell only: bomblet damage as a fraction of the shell's rolled damage (0.30, or 0.35 with the star upgrade). */
   readonly bombletFactor: number;
-  /** Shell only: blast radius of each bomblet (0.5 x star radius bonus). */
+  /** Shell only: blast radius of each bomblet (0.5 x star radius bonus x Bigger Bombs). */
   readonly bombletRadius: number;
+  /** Shell only: bomblets land uniformly within this distance of the impact point (0.8, x1.5 with Bigger Bombs). */
+  readonly bombletScatter: number;
 }
 
 export interface StrikeState {
@@ -409,7 +479,7 @@ export interface SimState {
 // Events
 // --------------------------------------------------------------------------------------------
 
-export type HitSource = 'arrow' | 'bolt' | 'chain' | 'shell' | 'bomblet' | 'orbital' | 'knight' | 'militia';
+export type HitSource = 'arrow' | 'bolt' | 'chain' | 'shell' | 'bomblet' | 'missile' | 'knightArrow' | 'orbital' | 'knight' | 'militia';
 export type SpawnSource = 'wave' | 'carrier' | 'mothership';
 
 export type SimEvent =
@@ -429,10 +499,31 @@ export type SimEvent =
    * Emitted BEFORE the per-enemy 'hit' / 'kill' events of that explosion. A shell with Cluster Bomb emits its own
    * 'explode' (kind 'shell') and, ~0.35 s later, one 'explode' (kind 'bomblet') per bomblet.
    */
-  | { type: 'explode'; towerId: number; kind: 'shell' | 'bomblet'; projectileId: number; x: number; y: number; radius: number; hits: number }
+  | { type: 'explode'; towerId: number; kind: 'shell' | 'bomblet' | 'missile'; projectileId: number; x: number; y: number; radius: number; hits: number }
   /** Cluster Bomb: a Lv3 shell released its bomblets at (x, y). Each is a 'bomblet' projectile in `state.projectiles`. */
   | { type: 'cluster'; towerId: number; shellId: number; x: number; y: number; bomblets: { projectileId: number; tx: number; ty: number }[] }
-  | { type: 'chain'; towerId: number; fromX: number; fromY: number; toX: number; toY: number; targetId: number }
+  /**
+   * One Chain Lightning jump (from the previously hit UFO's position to the next UFO), emitted before the jump's 'hit'.
+   * `jump` is 1-based (1..3), `factor` the damage factor of this jump (0.7 / 0.5 / 0.35).
+   */
+  | { type: 'chain'; towerId: number; fromX: number; fromY: number; toX: number; toY: number; targetId: number; jump: number; factor: number }
+  /** A tower bought its specialization (permanent). `cost` is the gold paid. */
+  | { type: 'specialize'; towerId: number; kind: TowerKind; specId: SpecId; x: number; y: number; cost: number }
+  /** Hunting Nets: a net was thrown (a 'net' projectile is in `state.projectiles`, lobbed from (fromX, fromY) to (tx, ty)). */
+  | { type: 'netLaunch'; towerId: number; projectileId: number; fromX: number; fromY: number; tx: number; ty: number; radius: number; flightTime: number }
+  /**
+   * Hunting Nets: the net landed at (x, y). `enemyIds` = every UFO caught (rooted for `duration` s; fliers are pulled down).
+   * `slowedIds` is the subset that was only slowed (bosses). May be empty (net missed). Also see 'netExpire'.
+   */
+  | { type: 'net'; towerId: number; projectileId: number; x: number; y: number; radius: number; duration: number; enemyIds: number[]; slowedIds: number[] }
+  /** Hunting Nets: the root of a UFO ran out (not emitted if it died first; fliers rise again). */
+  | { type: 'netExpire'; enemyId: number; x: number; y: number }
+  /** Homing Missiles: a volley left the tower, one entry per missile (each is a 'missile' projectile in `state.projectiles`). */
+  | { type: 'missileLaunch'; towerId: number; x: number; y: number; missiles: { projectileId: number; targetId: number }[] }
+  /** Fire Mages: a hit ignited (or refreshed, `refreshed: true`) a UFO. dps/duration are the burn's values. */
+  | { type: 'ignite'; towerId: number; enemyId: number; x: number; y: number; dps: number; duration: number; refreshed: boolean }
+  /** Bow Training: a knight shot an arrow (a 'knightArrow' projectile). (x, y) is the knight's position. */
+  | { type: 'knightShoot'; towerId: number; knightId: number; projectileId: number; x: number; y: number; targetId: number; tx: number; ty: number }
   | { type: 'fizzle'; projectileId: number; x: number; y: number }
   | { type: 'kill'; enemyId: number; enemy: EnemyId; x: number; y: number; gold: number; flier: boolean; boss: boolean }
   | { type: 'leak'; enemyId: number; enemy: EnemyId; x: number; y: number; lives: number }

@@ -30,6 +30,9 @@ const REASON: Record<FailReason, string> = {
   no_more_waves: 'No more waves',
   not_running: 'Start the first wave first',
   ended: 'The battle is over',
+  locked: 'Specializations unlock on level 7', // placeholder (core phase)
+  not_max_level: 'Upgrade to level 3 first', // placeholder
+  already_specialized: 'Already specialized', // placeholder
 };
 
 const TOWER_ICON: Record<TowerKind, { key: (lvl: number) => string; h: number }> = {

@@ -74,8 +74,7 @@ describe('towers', () => {
     }
   });
 
-  it('wizard level 3 arc bolt chains to 2 more enemies for 50% damage', () => {
-    // enemies spawn in a tight group (interval 0.2 => 0.2 tiles apart)
+  it('the base level 3 wizard has no chain (it moved to the Chain Lightning specialization)', () => {
     const sim = makeSim(straightLevel({ waves: [wave({ enemy: 'plated', count: 4, interval: 0.4 })] }));
     sim.build(1, 'wizard');
     const id = sim.state.towers[0].id;
@@ -83,16 +82,9 @@ describe('towers', () => {
     sim.upgrade(id);
     sim.callNextWave();
     const rec = new Recorder(sim);
-    expect(rec.until(() => rec.of('chain').length >= 2, 40)).toBe(true);
-    const hits = rec.log.filter((x) => x.e.type === 'hit');
-    const chains = rec.of('chain');
-    expect(chains.length % 2).toBe(0);
-    const chainHits = hits.filter((h) => h.e.type === 'hit' && h.e.source === 'chain');
-    const bolts = hits.filter((h) => h.e.type === 'hit' && h.e.source === 'bolt');
-    expect(chainHits.length).toBeGreaterThanOrEqual(2);
-    const b = bolts[0].e as Extract<typeof bolts[0]['e'], { type: 'hit' }>;
-    const c = chainHits[0].e as Extract<typeof chainHits[0]['e'], { type: 'hit' }>;
-    expect(c.raw).toBeCloseTo(b.raw * 0.5);
+    rec.seconds(20);
+    expect(rec.of('hit').length).toBeGreaterThan(0);
+    expect(rec.of('chain').length).toBe(0);
   });
 
   it('level 1 wizard does not chain', () => {

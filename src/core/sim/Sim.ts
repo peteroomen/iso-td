@@ -9,6 +9,7 @@ import {
   MAX_TOWER_LEVEL,
   RALLY_PATH_TOLERANCE,
 } from '../data/rules';
+import { SPECS, SPEC_TUNING, specCost } from '../data/specs';
 import { BOMB, KNIGHT, TOWERS, splashFactor } from '../data/towers';
 import { emptyUpgrades, resolveModifiers, type Modifiers } from '../data/upgrades';
 import { deriveSpots, levelHeight, levelWidth, validateLevel, waveGapOf } from '../level';
@@ -25,10 +26,12 @@ import type {
   KnightKind,
   KnightState,
   LevelDef,
+  ProjectileKind,
   ProjectileState,
   SimEvent,
   SimState,
   SimStats,
+  SpecId,
   SpawnSource,
   StrikeState,
   TowerCap,
@@ -50,6 +53,8 @@ export interface SimOptions {
   upgrades?: UpgradeState;
   /** Overrides `level.towerCap`. */
   towerCap?: TowerCap;
+  /** Overrides `level.specsUnlocked` (tests / tools). */
+  specs?: boolean;
   /** Set false to skip recording events (e.g. headless balance runs). Default true. */
   events?: boolean;
 }
@@ -64,6 +69,7 @@ interface TowerRt extends Omit<Mutable<TowerState>, 'knightIds'> {
 }
 
 interface KnightRt extends Mutable<KnightState> {
+  shootAnim: number;
   offX: number;
   offY: number;
   dmgMin: number;
@@ -121,6 +127,8 @@ export class Sim {
   readonly upgrades: UpgradeState;
   readonly modifiers: Modifiers;
   readonly towerCap: TowerCap;
+  /** True if tower specializations can be bought on this level (`LevelDef.specsUnlocked`, or `SimOptions.specs`). */
+  readonly specsUnlocked: boolean;
   readonly width: number;
   readonly height: number;
 
@@ -147,6 +155,7 @@ export class Sim {
     this.upgrades = { ...emptyUpgrades(), ...(options.upgrades ?? {}) };
     this.modifiers = resolveModifiers(this.upgrades);
     this.towerCap = { ...(options.towerCap ?? level.towerCap) };
+    this.specsUnlocked = options.specs ?? level.specsUnlocked ?? false;
     this.width = levelWidth(level);
     this.height = levelHeight(level);
     this.rng = new Rng(options.seed ?? 1);
@@ -236,9 +245,22 @@ export class Sim {
     return this.towerBySpot.get(spotId);
   }
 
-  /** Stats (with star-tree modifiers) of a tower kind at a level, for tooltips. */
-  statsFor(kind: TowerKind, level: number): TowerStatsView {
-    return resolveTowerStats(kind, level, this.modifiers);
+  /**
+   * Stats (with star-tree modifiers) of a tower kind at a level, for tooltips. Pass `spec` to preview a specialization
+   * (only meaningful at level 3; ignored for a spec of another kind).
+   */
+  statsFor(kind: TowerKind, level: number, spec: SpecId | null = null): TowerStatsView {
+    return resolveTowerStats(kind, level, this.modifiers, spec);
+  }
+
+  /** Current stats of a built tower (level, star tree and specialization included). */
+  statsOf(towerId: number): TowerStatsView | undefined {
+    return this.towerStats.get(towerId);
+  }
+
+  /** Gold cost of a specialization (not discounted by the star tree). */
+  specCostOf(specId: SpecId): number {
+    return specCost(specId);
   }
 
   /** Gold cost to build a tower of this kind (level 1). */
@@ -315,6 +337,10 @@ export class Sim {
       facingY: 1,
       attacking: false,
       shotCount: 0,
+      spec: null,
+      specCooldown: 0,
+      specCooldownMax: 0,
+      specCounter: 0,
       rallyX: null,
       rallyY: null,
       knightIds: [],
@@ -367,6 +393,52 @@ export class Sim {
       this.reform(t);
     }
     this.emit({ type: 'upgrade', towerId: t.id, kind: t.kind, level: t.level, x: t.x, y: t.y, cost: stats.cost });
+    return { ok: true };
+  }
+
+  /**
+   * Can this tower buy this specialization right now? Failure reasons, in check order: 'ended', 'no_tower', 'locked' (level
+   * without specializations), 'wrong_kind' (spec belongs to another tower kind / unknown spec), 'not_max_level' (tower below
+   * level 3), 'already_specialized', 'gold'.
+   */
+  canSpecialize(towerId: number, specId: SpecId): CommandResult {
+    if (this.ended()) return fail('ended');
+    const t = this.towerById.get(towerId);
+    if (!t) return fail('no_tower');
+    if (!this.specsUnlocked) return fail('locked');
+    if (SPECS[specId]?.tower !== t.kind) return fail('wrong_kind');
+    if (t.level < MAX_TOWER_LEVEL) return fail('not_max_level');
+    if (t.spec !== null) return fail('already_specialized');
+    if (this.s.gold < specCost(specId)) return fail('gold');
+    return { ok: true };
+  }
+
+  /** Buys a specialization for a Lv3 tower (permanent, exactly one per tower). Emits 'specialize'. */
+  specialize(towerId: number, specId: SpecId): CommandResult {
+    const check = this.canSpecialize(towerId, specId);
+    if (!check.ok) return check;
+    const t = this.towerById.get(towerId)!;
+    const cost = specCost(specId);
+    this.spend(cost);
+    t.spec = specId;
+    t.invested += cost;
+    t.sellValue = sellValue(t.invested);
+    const stats = this.statsFor(t.kind, t.level, specId);
+    this.towerStats.set(t.id, stats);
+    t.range = stats.range;
+    t.specCooldownMax = stats.netCooldown || stats.missileCooldown;
+    t.specCooldown = 0;
+    t.specCounter = 0;
+    if (t.kind === 'barracks') {
+      for (const kid of t.knightIds) {
+        const k = this.knightById.get(kid)!;
+        this.applyKnightStats(k, t, stats);
+        if (k.mode !== 'dead') k.hp = k.maxHp;
+      }
+      while (t.knightIds.length < stats.knights) this.addKnight(t, stats);
+      this.reform(t);
+    }
+    this.emit({ type: 'specialize', towerId: t.id, kind: t.kind, specId, x: t.x, y: t.y, cost });
     return { ok: true };
   }
 
@@ -643,6 +715,11 @@ export class Sim {
       lateral,
       slowTimer: 0,
       slowFactor: 1,
+      netted: false,
+      netTimer: 0,
+      burning: false,
+      burnTimer: 0,
+      burnDps: 0,
       attackTimer: def.meleeCooldown * 0.5,
       launchTimer: def.launcher ? def.launcher.interval : 0,
       dead: false,
@@ -684,6 +761,25 @@ export class Sim {
           e.slowed = false;
         }
       }
+      if (e.burnTimer > 0) {
+        const dealt = e.burnDps * Math.min(dt, e.burnTimer);
+        e.burnTimer -= dt;
+        if (e.burnTimer <= 0) {
+          e.burnTimer = 0;
+          e.burnDps = 0;
+          e.burning = false;
+        }
+        this.damageEnemy(e, dealt, 'true', 0, null);
+        if (e.dead) continue;
+      }
+      if (e.netTimer > 0) {
+        e.netTimer -= dt;
+        if (e.netTimer <= 0) {
+          e.netTimer = 0;
+          e.netted = false;
+          this.emit({ type: 'netExpire', enemyId: e.id, x: e.x, y: e.y });
+        }
+      }
       if (def.launcher) {
         e.launchTimer -= dt;
         if (e.launchTimer <= 0) {
@@ -703,6 +799,7 @@ export class Sim {
         continue;
       }
       e.attackTimer = def.meleeCooldown * 0.5;
+      if (e.netted) continue; // rooted by a net
       e.progress += def.speed * e.slowFactor * dt;
       if (e.progress >= e.pathLength) {
         this.leak(e, def);
@@ -799,6 +896,10 @@ export class Sim {
       mode: 'idle',
       targetId: null,
       attacking: false,
+      bow: false,
+      bowCooldown: 0,
+      shooting: false,
+      shootAnim: 0,
       postX: init.postX,
       postY: init.postY,
       homeX: init.postX + init.offX,
@@ -839,6 +940,8 @@ export class Sim {
       offX: 0,
       offY: 0,
     });
+    k.bow = stats.bowCooldown > 0;
+    k.respawnTime = stats.knightRespawn;
     t.knightIds.push(k.id);
     k.mode = 'walking';
     return k;
@@ -851,6 +954,8 @@ export class Sim {
     k.dmgMin = stats.damageMin;
     k.dmgMax = stats.damageMax;
     k.attackCd = stats.cooldown;
+    k.bow = stats.bowCooldown > 0;
+    k.respawnTime = stats.knightRespawn;
   }
 
   /** Recomputes the formation slots of a barracks' knights around its rally post. */
@@ -924,7 +1029,7 @@ export class Sim {
       let target: EnemyRt | undefined;
       if (k.targetId !== null) {
         const cur = this.enemyById.get(k.targetId);
-        if (cur && !cur.dead && Math.hypot(cur.x - k.postX, cur.y - k.postY) <= KNIGHT.leashRange) target = cur;
+        if (cur && !cur.dead && (cur.netted || ENEMIES[cur.type].blockable) && Math.hypot(cur.x - k.postX, cur.y - k.postY) <= KNIGHT.leashRange) target = cur;
         else {
           const c = counts.get(k.targetId) ?? 0;
           if (c > 0) counts.set(k.targetId, c - 1);
@@ -982,6 +1087,15 @@ export class Sim {
         }
       }
 
+      if (k.bow) {
+        if (k.shootAnim > 0) {
+          k.shootAnim -= dt;
+          k.shooting = k.shootAnim > 0;
+        }
+        if (k.bowCooldown > 0) k.bowCooldown = Math.max(0, k.bowCooldown - dt);
+        if (k.mode !== 'fighting' && k.bowCooldown <= 0) this.knightShoot(k);
+      }
+
       if (k.mode !== 'fighting' && k.hp < k.maxHp && k.regenRate > 0) {
         k.hp = Math.min(k.maxHp, k.hp + k.maxHp * k.regenRate * dt);
       }
@@ -993,7 +1107,7 @@ export class Sim {
     let bestCount = Infinity;
     let bestRemaining = Infinity;
     for (const e of this.s.enemies) {
-      if (e.dead || !ENEMIES[e.type].blockable) continue;
+      if (e.dead || !(e.netted || ENEMIES[e.type].blockable)) continue;
       if (Math.hypot(e.x - k.postX, e.y - k.postY) > KNIGHT.engageRange) continue;
       const c = counts.get(e.id) ?? 0;
       const remaining = e.pathLength - e.progress;
@@ -1004,6 +1118,48 @@ export class Sim {
       }
     }
     return best;
+  }
+
+  /** Bow Training: a knight that is not in melee shoots the furthest-forward UFO within its bow range (fliers included). */
+  private knightShoot(k: KnightRt): void {
+    const stats = k.towerId !== null ? this.towerStats.get(k.towerId) : undefined;
+    if (!stats || stats.bowCooldown <= 0) return;
+    const r2 = stats.bowRange * stats.bowRange;
+    let best: EnemyRt | undefined;
+    let bestRem = Infinity;
+    for (const e of this.s.enemies) {
+      if (e.dead) continue;
+      const dx = e.x - k.x;
+      const dy = e.y - k.y;
+      if (dx * dx + dy * dy > r2) continue;
+      const rem = e.pathLength - e.progress;
+      if (rem < bestRem || (rem === bestRem && best && e.id < best.id)) {
+        best = e;
+        bestRem = rem;
+      }
+    }
+    if (!best) return;
+    const dx = best.x - k.x;
+    const dy = best.y - k.y;
+    const d = Math.hypot(dx, dy) || 1;
+    k.facingX = dx / d;
+    k.facingY = dy / d;
+    k.bowCooldown = stats.bowCooldown;
+    k.shootAnim = ATTACK_ANIM_TIME;
+    k.shooting = true;
+    const p = this.newProjectile({
+      kind: 'knightArrow',
+      x: k.x,
+      y: k.y,
+      target: best,
+      speed: SPEC_TUNING.bow_training.arrowSpeed,
+      damage: this.rng.int(stats.bowDamageMin, stats.bowDamageMax),
+      damageType: 'physical',
+      towerId: k.towerId!,
+      knightId: k.id,
+    });
+    this.s.projectiles.push(p);
+    this.emit({ type: 'knightShoot', towerId: k.towerId!, knightId: k.id, projectileId: p.id, x: k.x, y: k.y, targetId: best.id, tx: best.x, ty: best.y });
   }
 
   private respawnKnight(k: KnightRt): void {
@@ -1028,6 +1184,7 @@ export class Sim {
       if (t.kind === 'barracks') continue;
       const stats = this.towerStats.get(t.id)!;
       if (t.cooldown > 0) t.cooldown = Math.max(0, t.cooldown - dt);
+      if (t.specCooldown > 0) t.specCooldown = Math.max(0, t.specCooldown - dt);
       if (t.attackAnim > 0) {
         t.attackAnim -= dt;
         t.attacking = t.attackAnim > 0;
@@ -1057,6 +1214,11 @@ export class Sim {
         t.attacking = true;
         t.shotCount++;
       }
+      // specialization powers on their own timer (independent of the normal shot cooldown)
+      if (t.specCooldownMax > 0 && t.specCooldown <= 0) {
+        if (t.spec === 'hunting_nets') this.throwNet(t, stats);
+        else if (t.spec === 'homing_missiles') this.fireMissiles(t, stats);
+      }
     }
   }
 
@@ -1076,7 +1238,7 @@ export class Sim {
   }
 
   /**
-   * Bomb targeting: ground enemies in range only (fliers are ignored, the boss is fair game). While the tower is ready it
+   * Bomb targeting: ground enemies in range only (high fliers are ignored, a netted flier counts as ground, the boss is fair game). While the tower is ready it
    * picks the enemy whose position has the most ground enemies inside the splash radius (itself included); ties go to
    * the one furthest along its path. While reloading it just keeps its previous target (or the "first" ground enemy).
    */
@@ -1084,7 +1246,7 @@ export class Sim {
     const r2 = stats.range * stats.range;
     const cand: EnemyRt[] = [];
     for (const e of this.s.enemies) {
-      if (e.dead || e.flier) continue;
+      if (e.dead || isAirborne(e)) continue;
       const dx = e.x - t.x;
       const dy = e.y - t.y;
       if (dx * dx + dy * dy <= r2) cand.push(e);
@@ -1104,7 +1266,7 @@ export class Sim {
     for (const c of cand) {
       let n = 0;
       for (const e of this.s.enemies) {
-        if (e.dead || e.flier) continue;
+        if (e.dead || isAirborne(e)) continue;
         const dx = e.x - c.x;
         const dy = e.y - c.y;
         if (dx * dx + dy * dy <= sr2) n++;
@@ -1117,45 +1279,72 @@ export class Sim {
     return [best];
   }
 
-  private fireBomb(t: TowerRt, stats: TowerStatsView, target: EnemyRt): void {
-    const lv = TOWERS.bomb.levels[t.level - 1];
-    const base = this.rng.int(lv.damageMin, lv.damageMax);
-    const dmgMult = stats.damageMin / lv.damageMin;
-    const dx = target.x - t.x;
-    const dy = target.y - t.y;
+  /** Fresh projectile with all optional fields defaulted. Direction/target point come from `target` or `tx`/`ty`. */
+  private newProjectile(
+    o: Partial<ProjectileRt> & { kind: ProjectileKind; x: number; y: number; speed: number; damage: number; damageType: DamageType; towerId: number; target?: EnemyRt },
+  ): ProjectileRt {
+    const { target, ...rest } = o;
+    const tx = target ? target.x : (o.tx ?? o.x);
+    const ty = target ? target.y : (o.ty ?? o.y);
+    const dx = tx - o.x;
+    const dy = ty - o.y;
     const d = Math.hypot(dx, dy);
-    const flight = BOMB.flightBase + BOMB.flightPerTile * d;
-    const p: ProjectileRt = {
+    return {
       id: this.nextId++,
-      kind: 'shell',
-      x: t.x,
-      y: t.y,
-      fromX: t.x,
-      fromY: t.y,
-      targetId: target.id,
-      tx: target.x,
-      ty: target.y,
-      speed: d / flight,
-      damage: base * dmgMult,
-      damageType: 'physical',
-      towerId: t.id,
+      fromX: o.x,
+      fromY: o.y,
+      targetId: target ? target.id : -1,
+      tx,
+      ty,
       armorPierce: 0,
       slowFactor: 1,
       slowDuration: 0,
       chainCount: 0,
       chainRange: 0,
       chainFactor: 0,
+      chainFactors: [],
+      igniteDps: 0,
+      igniteDuration: 0,
+      armorIgnore: false,
+      knightId: -1,
       dirX: d > EPS ? dx / d : 0,
       dirY: d > EPS ? dy / d : 1,
-      flightTime: flight,
+      flightTime: 0,
       elapsed: 0,
       progress: 0,
+      radius: 0,
+      arc: 0,
+      bombletCount: 0,
+      bombletFactor: 0,
+      bombletRadius: 0,
+      bombletScatter: 0,
+      ...rest,
+    };
+  }
+
+  private fireBomb(t: TowerRt, stats: TowerStatsView, target: EnemyRt): void {
+    const lv = TOWERS.bomb.levels[t.level - 1];
+    const base = this.rng.int(lv.damageMin, lv.damageMax);
+    const dmgMult = stats.damageMin / lv.damageMin;
+    const d = Math.hypot(target.x - t.x, target.y - t.y);
+    const flight = BOMB.flightBase + BOMB.flightPerTile * d;
+    const p = this.newProjectile({
+      kind: 'shell',
+      x: t.x,
+      y: t.y,
+      target,
+      speed: d / flight,
+      damage: base * dmgMult,
+      damageType: 'physical',
+      towerId: t.id,
+      flightTime: flight,
       radius: stats.splashRadius,
       arc: BOMB.shellArc,
       bombletCount: stats.bomblets,
       bombletFactor: stats.bombletDamageFactor,
       bombletRadius: stats.bombletRadius,
-    };
+      bombletScatter: stats.bombletScatter,
+    });
     this.s.projectiles.push(p);
     this.emit({ type: 'shoot', towerId: t.id, kind: 'bomb', projectileId: p.id, x: t.x, y: t.y, targetId: target.id, tx: p.tx, ty: p.ty });
   }
@@ -1171,43 +1360,143 @@ export class Sim {
     const dmgMult = stats.damageMin / lv.damageMin;
     for (const target of targets) {
       const base = this.rng.int(lv.damageMin, lv.damageMax);
-      const dx = target.x - t.x;
-      const dy = target.y - t.y;
-      const d = Math.hypot(dx, dy) || 1;
-      const p: ProjectileRt = {
-        id: this.nextId++,
+      let ignore = false;
+      if (stats.armorIgnoreEvery > 0) {
+        // Eagle Eye: every Nth arrow (each arrow of a double-shot volley counts) ignores all armor
+        ignore = t.specCounter >= stats.armorIgnoreEvery - 1;
+        t.specCounter = ignore ? 0 : t.specCounter + 1;
+      }
+      const p = this.newProjectile({
         kind,
         x: t.x,
         y: t.y,
-        fromX: t.x,
-        fromY: t.y,
-        targetId: target.id,
-        tx: target.x,
-        ty: target.y,
+        target,
         speed: def.projectileSpeed,
         damage: base * dmgMult,
         damageType: def.damageType,
         towerId: t.id,
-        armorPierce: stats.armorPierce,
+        armorPierce: ignore ? 1 : stats.armorPierce,
+        armorIgnore: ignore,
         slowFactor: stats.slowFactor,
         slowDuration: stats.slowDuration,
         chainCount: stats.chainCount,
         chainRange: stats.chainRange,
         chainFactor: stats.chainFactor,
-        dirX: dx / d,
-        dirY: dy / d,
-        flightTime: 0,
-        elapsed: 0,
-        progress: 0,
-        radius: 0,
-        arc: 0,
-        bombletCount: 0,
-        bombletFactor: 0,
-        bombletRadius: 0,
-      };
+        chainFactors: stats.chainFactors,
+        igniteDps: stats.igniteDps,
+        igniteDuration: stats.igniteDuration,
+      });
       this.s.projectiles.push(p);
       this.emit({ type: 'shoot', towerId: t.id, kind: t.kind, projectileId: p.id, x: t.x, y: t.y, targetId: target.id, tx: target.x, ty: target.y });
     }
+  }
+
+  /** Where a UFO will be in `secs` seconds if nothing changes (straight line along its heading; rooted / engaged ones stay put). */
+  private leadPosition(e: EnemyRt, secs: number): Vec2 {
+    if (e.netted || e.engaged) return { x: e.x, y: e.y };
+    const sp = ENEMIES[e.type].speed * e.slowFactor;
+    return { x: e.x + e.dirX * sp * secs, y: e.y + e.dirY * sp * secs };
+  }
+
+  /**
+   * Hunting Nets: throws a net at the densest cluster among the UFOs in range (cluster = UFOs within the net radius of a
+   * candidate's predicted landing position; ties: the furthest-forward candidate). Fires only when something is in range.
+   */
+  private throwNet(t: TowerRt, stats: TowerStatsView): void {
+    const inRange = this.targetsInRange(t.x, t.y, stats.range, Infinity);
+    if (inRange.length === 0) return;
+    const alive = this.s.enemies.filter((e) => !e.dead);
+    const r2 = stats.netRadius * stats.netRadius;
+    const N = SPEC_TUNING.hunting_nets;
+    let best: Vec2 | null = null;
+    let bestCount = -1;
+    for (const c of inRange) {
+      const d0 = Math.hypot(c.x - t.x, c.y - t.y);
+      const aim = this.leadPosition(c, N.flightBase + N.flightPerTile * d0);
+      const flight = N.flightBase + N.flightPerTile * Math.hypot(aim.x - t.x, aim.y - t.y);
+      let n = 0;
+      for (const e of alive) {
+        const pe = this.leadPosition(e, flight);
+        const dx = pe.x - aim.x;
+        const dy = pe.y - aim.y;
+        if (dx * dx + dy * dy <= r2) n++;
+      }
+      // inRange is sorted furthest-forward first, so a strict '>' keeps the furthest candidate on ties
+      if (n > bestCount) {
+        bestCount = n;
+        best = aim;
+      }
+    }
+    if (!best) return;
+    const d = Math.hypot(best.x - t.x, best.y - t.y);
+    const flight = N.flightBase + N.flightPerTile * d;
+    const p = this.newProjectile({
+      kind: 'net',
+      x: t.x,
+      y: t.y,
+      tx: best.x,
+      ty: best.y,
+      speed: d / flight,
+      damage: 0,
+      damageType: 'physical',
+      towerId: t.id,
+      flightTime: flight,
+      radius: stats.netRadius,
+      arc: N.arc,
+    });
+    this.s.projectiles.push(p);
+    t.specCooldown = stats.netCooldown;
+    this.emit({ type: 'netLaunch', towerId: t.id, projectileId: p.id, fromX: t.x, fromY: t.y, tx: p.tx, ty: p.ty, radius: p.radius, flightTime: flight });
+  }
+
+  /** Hunting Nets landing: roots UFOs within the radius (fliers are pulled down); bosses are slowed instead. */
+  private landNet(p: ProjectileRt, stats: TowerStatsView | undefined): void {
+    const dur = stats?.netDuration ?? SPEC_TUNING.hunting_nets.rootDuration;
+    const bossFactor = stats?.netBossSlowFactor ?? SPEC_TUNING.hunting_nets.bossSlowFactor;
+    const bossDur = stats?.netBossSlowDuration ?? SPEC_TUNING.hunting_nets.bossSlowDuration;
+    const caught: number[] = [];
+    const slowed: number[] = [];
+    const r2 = p.radius * p.radius;
+    for (const e of this.s.enemies) {
+      if (e.dead) continue;
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      if (dx * dx + dy * dy > r2) continue;
+      caught.push(e.id);
+      if (e.boss) {
+        this.applySlow(e, bossFactor, bossDur);
+        slowed.push(e.id);
+      } else {
+        e.netted = true;
+        e.netTimer = Math.max(e.netTimer, dur);
+      }
+    }
+    this.emit({ type: 'net', towerId: p.towerId, projectileId: p.id, x: p.x, y: p.y, radius: p.radius, duration: dur, enemyIds: caught, slowedIds: slowed });
+  }
+
+  /** Homing Missiles: one volley at the furthest-forward UFOs in range (fliers included); fewer UFOs than missiles = several missiles per UFO. */
+  private fireMissiles(t: TowerRt, stats: TowerStatsView): void {
+    const targets = this.targetsInRange(t.x, t.y, stats.range, stats.missileCount);
+    if (targets.length === 0) return;
+    const out: { projectileId: number; targetId: number }[] = [];
+    for (let i = 0; i < stats.missileCount; i++) {
+      const target = targets[i % targets.length];
+      const p = this.newProjectile({
+        kind: 'missile',
+        x: t.x,
+        y: t.y,
+        target,
+        speed: SPEC_TUNING.homing_missiles.speed,
+        damage: stats.missileDamage,
+        damageType: 'physical',
+        towerId: t.id,
+        radius: stats.missileSplash,
+      });
+      this.s.projectiles.push(p);
+      out.push({ projectileId: p.id, targetId: target.id });
+    }
+    t.specCooldown = stats.missileCooldown;
+    this.emit({ type: 'missileLaunch', towerId: t.id, x: t.x, y: t.y, missiles: out });
   }
 
   private tickProjectiles(dt: number): void {
@@ -1216,15 +1505,16 @@ export class Sim {
     const keep: ProjectileRt[] = [];
     const spawned: ProjectileRt[] = [];
     for (const p of s.projectiles) {
-      if (p.kind === 'shell' || p.kind === 'bomblet') {
-        // lobbed: flies to a fixed point and explodes there, whether or not anything is still underneath
+      if (p.kind === 'shell' || p.kind === 'bomblet' || p.kind === 'net') {
+        // lobbed: flies to a fixed point and lands there, whether or not anything is still underneath
         p.elapsed += dt;
         if (p.elapsed + EPS >= p.flightTime) {
           p.elapsed = p.flightTime;
           p.progress = 1;
           p.x = p.tx;
           p.y = p.ty;
-          this.explode(p, spawned);
+          if (p.kind === 'net') this.landNet(p, this.towerStats.get(p.towerId));
+          else this.explode(p, spawned);
         } else {
           p.progress = p.elapsed / p.flightTime;
           p.x = p.fromX + (p.tx - p.fromX) * p.progress;
@@ -1246,7 +1536,8 @@ export class Sim {
       if (dist <= step + EPS) {
         p.x = p.tx;
         p.y = p.ty;
-        if (alive) this.impact(p, target!);
+        if (p.kind === 'missile') this.explode(p, spawned); // detonates even if its target died on the way
+        else if (alive) this.impact(p, target!);
         else this.emit({ type: 'fizzle', projectileId: p.id, x: p.x, y: p.y });
         continue;
       }
@@ -1260,12 +1551,15 @@ export class Sim {
     s.projectiles = keep;
   }
 
-  /** Shell / bomblet detonation: splash damage to ground enemies (falloff), then the Cluster Bomb release. */
+  /**
+   * Shell / bomblet / missile detonation: splash damage (falloff) to grounded UFOs (missiles also hit high fliers), then the
+   * Cluster Bomb release of a shell.
+   */
   private explode(p: ProjectileRt, spawned: ProjectileRt[]): void {
-    const kind = p.kind as 'shell' | 'bomblet';
+    const kind = p.kind as 'shell' | 'bomblet' | 'missile';
     const hit: { e: EnemyRt; f: number }[] = [];
     for (const e of this.s.enemies) {
-      if (e.dead || e.flier) continue;
+      if (e.dead || (kind !== 'missile' && isAirborne(e))) continue;
       const f = splashFactor(Math.hypot(e.x - p.x, e.y - p.y), p.radius);
       if (f > 0) hit.push({ e, f });
     }
@@ -1275,40 +1569,23 @@ export class Sim {
       const out: { projectileId: number; tx: number; ty: number }[] = [];
       for (let i = 0; i < p.bombletCount; i++) {
         const a = this.rng.range(0, Math.PI * 2);
-        const r = BOMB.bombletScatter * Math.sqrt(this.rng.next());
+        const r = p.bombletScatter * Math.sqrt(this.rng.next());
         const tx = p.x + Math.cos(a) * r;
         const ty = p.y + Math.sin(a) * r;
-        const b: ProjectileRt = {
-          id: this.nextId++,
+        const b = this.newProjectile({
           kind: 'bomblet',
           x: p.x,
           y: p.y,
-          fromX: p.x,
-          fromY: p.y,
-          targetId: -1,
           tx,
           ty,
           speed: r / BOMB.bombletFuse,
           damage: p.damage * p.bombletFactor,
           damageType: p.damageType,
           towerId: p.towerId,
-          armorPierce: 0,
-          slowFactor: 1,
-          slowDuration: 0,
-          chainCount: 0,
-          chainRange: 0,
-          chainFactor: 0,
-          dirX: r > EPS ? Math.cos(a) : 0,
-          dirY: r > EPS ? Math.sin(a) : 1,
           flightTime: BOMB.bombletFuse,
-          elapsed: 0,
-          progress: 0,
           radius: p.bombletRadius,
           arc: BOMB.bombletArc,
-          bombletCount: 0,
-          bombletFactor: 0,
-          bombletRadius: 0,
-        };
+        });
         spawned.push(b);
         out.push({ projectileId: b.id, tx, ty });
       }
@@ -1316,10 +1593,20 @@ export class Sim {
     }
   }
 
+  private applyIgnite(target: EnemyRt, p: ProjectileRt): void {
+    if (target.dead || p.igniteDps <= 0) return;
+    const refreshed = target.burning;
+    target.burning = true;
+    target.burnDps = Math.max(target.burnDps, p.igniteDps); // refresh, never stack
+    target.burnTimer = Math.max(target.burnTimer, p.igniteDuration);
+    this.emit({ type: 'ignite', towerId: p.towerId, enemyId: target.id, x: target.x, y: target.y, dps: target.burnDps, duration: target.burnTimer, refreshed });
+  }
+
   private impact(p: ProjectileRt, target: EnemyRt): void {
-    const source: HitSource = p.kind === 'arrow' ? 'arrow' : 'bolt';
+    const source: HitSource = p.kind === 'arrow' ? 'arrow' : p.kind === 'knightArrow' ? 'knightArrow' : 'bolt';
     this.damageEnemy(target, p.damage, p.damageType, p.armorPierce, source);
     this.applySlow(target, p.slowFactor, p.slowDuration);
+    this.applyIgnite(target, p);
     if (p.chainCount > 0) {
       const hit = new Set<number>([target.id]);
       let fromX = target.x;
@@ -1337,8 +1624,9 @@ export class Sim {
         }
         if (!best) break;
         hit.add(best.id);
-        this.emit({ type: 'chain', towerId: p.towerId, fromX, fromY, toX: best.x, toY: best.y, targetId: best.id });
-        this.damageEnemy(best, p.damage * p.chainFactor, p.damageType, p.armorPierce, 'chain');
+        const factor = p.chainFactors[c] ?? p.chainFactor;
+        this.emit({ type: 'chain', towerId: p.towerId, fromX, fromY, toX: best.x, toY: best.y, targetId: best.id, jump: c + 1, factor });
+        this.damageEnemy(best, p.damage * factor, p.damageType, p.armorPierce, 'chain');
         this.applySlow(best, p.slowFactor, p.slowDuration);
         fromX = best.x;
         fromY = best.y;
@@ -1467,6 +1755,11 @@ export class Sim {
       this.emit({ type: 'won', lives: s.lives, stars: s.stars });
     }
   }
+}
+
+/** High flier = not catchable by knights or bombs. A netted flier is pulled down and counts as a ground UFO. */
+function isAirborne(e: { flier: boolean; netted: boolean }): boolean {
+  return e.flier && !e.netted;
 }
 
 function fail(reason: NonNullable<CommandResult['reason']>): CommandResult {

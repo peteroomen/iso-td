@@ -14,7 +14,7 @@ export interface TowerLevelDef {
   range: number;
   /** Simultaneous targets per shot (archer double shot = 2). */
   shots: number;
-  /** Wizard arc bolt: extra chain targets / chain radius / damage factor on chained hits. */
+  /** Chain jumps (all 0 in the base table: since the specializations the Lv3 wizard has no chain; Chain Lightning adds it, see data/specs.ts). */
   chainCount: number;
   chainRange: number;
   chainFactor: number;
@@ -66,7 +66,7 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
     levels: [
       { ...NONE, cost: 100, damageMin: 12, damageMax: 20, cooldown: 1.5, range: 3.0 },
       { ...NONE, cost: 160, damageMin: 25, damageMax: 40, cooldown: 1.4, range: 3.0 },
-      { ...NONE, cost: 240, damageMin: 45, damageMax: 70, cooldown: 1.3, range: 3.2, chainCount: 2, chainRange: 1.5, chainFactor: 0.5 },
+      { ...NONE, cost: 240, damageMin: 54, damageMax: 82, cooldown: 1.25, range: 3.2 },
     ],
   },
   barracks: {

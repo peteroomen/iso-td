@@ -8,6 +8,7 @@ export * from './data/towers';
 export * from './data/enemies';
 export * from './data/abilities';
 export * from './data/upgrades';
+export * from './data/specs';
 export { LEVELS, getLevel } from './data/levels';
 export { Sim } from './sim/Sim';
 export type { SimOptions } from './sim/Sim';
