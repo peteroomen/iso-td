@@ -14,6 +14,7 @@ const TIPS = [
   'Prism UFOs resist magic. Send in the archers.',
   'Spend your stars on upgrades between levels.',
   'Orbital Strike hits fliers too. Time it on a crowd.',
+  'Bomb towers blast whole groups of ground UFOs, but cannot hit fliers.',
 ];
 
 const DEV_SCENES = ['Title', 'LevelSelect', 'Upgrades', 'Ending', 'Game'];

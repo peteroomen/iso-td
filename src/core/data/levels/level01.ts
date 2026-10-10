@@ -69,5 +69,6 @@ export const level01: LevelDef = {
     { waveIndex: 2, text: 'Use Orbital Strike on a crowd of UFOs. Reinforcements drop militia anywhere near the road.' },
     { waveIndex: 3, text: 'Calling the next wave early pays bonus gold and speeds up your abilities.' },
     { waveIndex: 4, text: 'Darts are fast - knights and archers placed near the exit are your last line of defense.' },
+    { waveIndex: 5, text: "Bomb towers blast groups of ground UFOs - but can't hit fliers." },
   ],
 };

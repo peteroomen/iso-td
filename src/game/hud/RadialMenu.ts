@@ -19,7 +19,7 @@ export interface RadialItem {
   cost?: () => number | null;
   state: () => ItemState;
   tip: () => TipSpec;
-  /** One-word role shown under the icon on touch screens (where there is no hover tooltip). */
+  /** One-word role shown under the icon (touch screens have no hover tooltip). */
   role?: string;
   /** Destructive items: the first tap only arms the button and shows this text, a second tap runs `onSelect`. */
   confirmText?: () => string;
@@ -29,20 +29,14 @@ export interface RadialItem {
 
 const BTN_R = 31;
 const RING_R = 70;
+/** 4+ buttons: a wider ring, so cost chips and role labels of neighbours never touch. */
+const RING_R4 = 80;
 /** Touch: holding an icon this long shows its stats (and range) instead of choosing it. */
 const LONG_PRESS_MS = 350;
 /** Presses landing this soon after the ring opened are the opening tap's own leftovers. */
 const OPEN_GUARD_MS = 150;
 /** An armed (confirm) button disarms itself after this long. */
 const ARM_MS = 4000;
-
-const coarsePointer = (): boolean => {
-  try {
-    return window.matchMedia('(pointer: coarse)').matches;
-  } catch {
-    return false;
-  }
-};
 
 interface Btn {
   item: RadialItem;
@@ -71,9 +65,9 @@ export class RadialMenu {
   private armed = -1;
   private armTimer?: Phaser.Time.TimerEvent;
   private openedAt = 0;
-  private coarse = false;
   open_ = false;
   private u = 1;
+  private R = RING_R;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -92,9 +86,17 @@ export class RadialMenu {
     this.close(true);
     const u = Math.min(UI_SCALE, 1.6);
     this.u = u;
-    const margin = (RING_R + BTN_R + 26) * u;
-    const x = Phaser.Math.Clamp(ax, margin + SAFE.l, GAME_W - margin - SAFE.r);
-    const y = Phaser.Math.Clamp(ay, margin + 40 + 20 * u + SAFE.t, GAME_H - margin - 8 - SAFE.b);
+    const n = items.length;
+    const R = n >= 4 ? RING_R4 : RING_R;
+    this.R = R;
+    // the backdrop is a slightly tall ellipse centred a bit below the anchor: the bottom button's cost chip + role label hang under it
+    const rx = R + BTN_R + 14;
+    const ry = rx + 20;
+    const dy = 12;
+    const mx = (rx + 8) * u;
+    const my = (R + BTN_R + 12) * u;
+    const x = Phaser.Math.Clamp(ax, mx + SAFE.l, GAME_W - mx - SAFE.r);
+    const y = Phaser.Math.Clamp(ay, my + 40 + 20 * u + SAFE.t, GAME_H - (R + BTN_R + 56) * u - 4 - SAFE.b);
     this.anchor = { x, y };
     const s = this.scene;
     const root = s.add.container(x, y).setDepth(DEPTH.menu);
@@ -102,22 +104,20 @@ export class RadialMenu {
     this.open_ = true;
     this.armed = -1;
     this.openedAt = performance.now();
-    this.coarse = coarsePointer();
 
     const disc = s.add.graphics();
-    disc.fillStyle(0x1b1226, 0.5).fillCircle(0, 0, RING_R + BTN_R + 12);
-    disc.lineStyle(4, COLORS.ink, 0.9).strokeCircle(0, 0, RING_R + BTN_R + 12);
-    disc.lineStyle(2, 0xffffff, 0.15).strokeCircle(0, 0, RING_R + BTN_R + 8);
+    disc.fillStyle(0x1b1226, 0.55).fillEllipse(0, dy, rx * 2, ry * 2);
+    disc.lineStyle(4, COLORS.ink, 0.9).strokeEllipse(0, dy, rx * 2, ry * 2);
+    disc.lineStyle(2, 0xffffff, 0.15).strokeEllipse(0, dy, rx * 2 - 8, ry * 2 - 8);
     root.add(disc);
     root.setScale(0.55 * u).setAlpha(0);
     s.tweens.add({ targets: root, scale: u, alpha: 1, duration: 220, ease: 'Back.easeOut' });
 
-    const n = items.length;
     const angles = n === 1 ? [-90] : n === 2 ? [-90, 90] : n === 3 ? [-90, 30, 150] : items.map((_, i) => -90 + (360 / n) * i);
     this.btns = items.map((item, i) => {
       const a = (angles[i] * Math.PI) / 180;
-      const bx = Math.cos(a) * RING_R;
-      const by = Math.sin(a) * RING_R;
+      const bx = Math.cos(a) * R;
+      const by = Math.sin(a) * R;
       const c = s.add.container(bx, by);
       const dg = s.add.graphics();
       const icon = s.add.image(0, -2, item.icon);
@@ -228,7 +228,7 @@ export class RadialMenu {
 
   private showTip(b: Btn): void {
     const side = this.anchor.x < GAME_W / 2 ? 'right' : 'left';
-    const off = (RING_R + BTN_R + 16) * this.u;
+    const off = (this.R + BTN_R + 24) * this.u;
     this.hud.tooltip.show(b.item.tip(), this.anchor.x + (side === 'right' ? off : -off), this.anchor.y, side);
   }
 
@@ -265,7 +265,7 @@ export class RadialMenu {
       b.costText.x = -w / 2 + 20;
     }
     if (armed && b.item.confirmText) b.label.setText(b.item.confirmText()).setColor('#ffd0c8');
-    else b.label.setText(this.coarse ? (b.item.role ?? '') : '').setColor('#ffffff');
+    else b.label.setText(b.item.role ?? '').setColor('#ffffff');
     if (b.hovered) this.showTip(b);
   }
 

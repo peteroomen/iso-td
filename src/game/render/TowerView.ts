@@ -25,6 +25,8 @@ interface FootSpec {
   /** archer: y of the runtime archer's feet / wizard: staff gem (x, y) in sprite px. */
   unitY?: number;
   gem?: [number, number];
+  /** bomb: barrel mouth (x, y) in sprite px. */
+  muzzle?: [number, number];
   /** y (px above the footprint centre) of arrow / bolt launch. */
   shootH: number;
 }
@@ -44,11 +46,12 @@ const FOOT: Record<TowerState['kind'], FootSpec[]> = {
     { x: 70.5, y: 118, shootH: 60 },
     { x: 70.5, y: 118, shootH: 60 },
   ],
-  // PLACEHOLDER (core phase): same footprint as the barracks until the bomb visuals land.
+  // bomb (PIL, alpha>128): L1 W=136 / walls 122 wide (bottom 140 -> 35 px up), L2 W=146 (bottom 167 -> 42 up), L3 W=147 (bottom 182 -> 42 up).
+  // `muzzle` = centre of the barrel mouth (the barrel points up-right), shootH = its height above the footprint centre.
   bomb: [
-    { x: 70.5, y: 118, shootH: 60 },
-    { x: 70.5, y: 118, shootH: 60 },
-    { x: 70.5, y: 118, shootH: 60 },
+    { x: 67.5, y: 105, muzzle: [91, 16], shootH: 89 },
+    { x: 73, y: 125, muzzle: [104, 18], shootH: 107 },
+    { x: 73.5, y: 140, muzzle: [115, 24], shootH: 116 },
   ],
 };
 /** Half-height of the base diamond + margin: where the level pips sit below the footprint centre. */
@@ -64,7 +67,14 @@ export function towerShootHeight(kind: TowerState['kind'], level: number): numbe
   return footOf(kind, level).shootH;
 }
 
+/** Offset (px, relative to the footprint centre / container origin) of a bomb tower's barrel mouth. */
+export function towerMuzzleOffset(kind: TowerState['kind'], level: number): { x: number; y: number } | null {
+  const f = footOf(kind, level);
+  return f.muzzle ? { x: f.muzzle[0] - f.x, y: f.muzzle[1] - f.y } : null;
+}
+
 function bodyKey(t: TowerState, door: number): string {
+  if (t.kind === 'bomb') return `towers/bomb_level_${t.level}`;
   if (t.kind === 'archer') return `towers/archer_level_${t.level}`;
   if (t.kind === 'wizard') return `towers/wizard_level_${t.level}`;
   return `towers/barrack_level_${t.level}_${door === 2 ? 2 : 1}`;
@@ -84,6 +94,7 @@ export class TowerView {
   private lastShots: number;
   private bowT = 99;
   private flashT = 99;
+  private recoilT = 99;
   private flipped = false;
   private door = 1;
   private popTween?: Phaser.Tweens.Tween;
@@ -149,12 +160,14 @@ export class TowerView {
     if (st.level !== this.level) this.applyLevel(st);
     this.bowT += dt;
     this.flashT += dt;
+    this.recoilT += dt;
     const sdx = st.facingX - st.facingY;
     if (Math.abs(sdx) > 0.05) this.flipped = sdx < 0;
     if (st.shotCount !== this.lastShots) {
       this.lastShots = st.shotCount;
       this.bowT = 0;
       this.flashT = 0;
+      this.recoilT = 0;
     }
     if (this.unit && this.bow) {
       this.unit.setFlipX(this.flipped);
@@ -166,6 +179,18 @@ export class TowerView {
         this.bow.y = this.unit.y - 20;
       } else {
         this.bow.setVisible(false);
+      }
+    }
+    if (this.kind === 'bomb') {
+      // mortar recoil: a hard squash + kick away from the barrel (down-left), settling back with a little bounce
+      const T = 0.34;
+      if (this.recoilT < T) {
+        const u = this.recoilT / T;
+        const k = u < 0.18 ? u / 0.18 : Math.pow(1 - (u - 0.18) / 0.82, 2) * (1 + 0.25 * Math.cos((u - 0.18) * 14));
+        this.body.setScale(1 + 0.045 * k, 1 - 0.075 * k);
+        this.body.setPosition(-4 * k, 3 * k);
+      } else if (this.body.scaleY !== 1 || this.body.x !== 0) {
+        this.body.setScale(1).setPosition(0, 0);
       }
     }
     if (this.glow) {

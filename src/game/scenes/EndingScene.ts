@@ -15,8 +15,8 @@ export interface EndingData {
 
 /** Decorative island: 'B' build spot. A calm little base that has just saved the day. */
 const ROWS = ['T.dB.T', '####d.', '.B.#B.', 'T..###', '.d.B.T'];
-const TOWERS: [number, number, 'archer' | 'wizard' | 'barracks'][] = [
-  [3, 0, 'archer'], [1, 2, 'wizard'], [4, 2, 'archer'], [3, 4, 'barracks'],
+const TOWERS: [number, number, 'archer' | 'wizard' | 'barracks' | 'bomb'][] = [
+  [3, 0, 'archer'], [1, 2, 'wizard'], [4, 2, 'bomb'], [3, 4, 'barracks'],
 ];
 const KNIGHTS: [number, number][] = [[3, 2], [3, 3], [4, 3]];
 
@@ -126,8 +126,8 @@ export class EndingScene extends Phaser.Scene {
       this.tweens.add({ targets: island.root, y: ISLAND_Y - 6, duration: 2500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     });
     for (const [col, row, kind] of TOWERS) {
-      const key = kind === 'archer' ? 'towers/archer_level_3' : kind === 'wizard' ? 'towers/wizard_level_3' : 'towers/barrack_level_3_1';
-      const img = this.add.image(0, 0, key).setScale(ISLAND_SCALE * 0.95).setOrigin(0.5, kind === 'wizard' ? 0.82 : 0.84);
+      const key = kind === 'archer' ? 'towers/archer_level_3' : kind === 'wizard' ? 'towers/wizard_level_3' : kind === 'bomb' ? 'towers/bomb_level_3' : 'towers/barrack_level_3_1';
+      const img = this.add.image(0, 0, key).setScale(ISLAND_SCALE * 0.95).setOrigin(0.5, kind === 'wizard' ? 0.82 : kind === 'bomb' ? 0.76 : 0.84);
       island.addProp(col, row, img, 5, 0, 4);
     }
     // the knights are in a good mood: they hop once the danger is over

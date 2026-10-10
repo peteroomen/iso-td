@@ -36,16 +36,14 @@ const TOWER_ICON: Record<TowerKind, { key: (lvl: number) => string; h: number }>
   archer: { key: (l) => `towers/archer_level_${l}`, h: 52 },
   wizard: { key: (l) => `towers/wizard_level_${l}`, h: 44 },
   barracks: { key: (l) => `towers/barrack_level_${l}_1`, h: 50 },
-  // PLACEHOLDER (core phase): reuses the barracks sprite until the bomb visuals land.
-  bomb: { key: (l) => `towers/barrack_level_${l}_1`, h: 50 },
+  bomb: { key: (l) => `towers/bomb_level_${l}`, h: 52 },
 };
 
 const TOWER_BLURB: Record<TowerKind, string> = {
   archer: 'Fast and cheap. Shoots ground UFOs and fliers.',
   wizard: 'Magic bolts ignore armor. Shoots ground UFOs and fliers.',
   barracks: 'Knights block ground UFOs and fight them. Cannot stop fliers.',
-  // PLACEHOLDER (core phase)
-  bomb: 'Splash shells hurt ground UFO crowds. Cannot hit fliers.',
+  bomb: 'Lobs shells that blast whole groups of ground UFOs.',
 };
 
 const TOWER_ROLE: Record<TowerKind, string> = { archer: 'Fast', wizard: 'Magic', barracks: 'Blocks', bomb: 'Splash' };
@@ -215,7 +213,7 @@ export class InteractionController {
     const items: RadialItem[] = TOWER_KINDS.map((kind) => ({
       icon: TOWER_ICON[kind].key(1),
       iconH: TOWER_ICON[kind].h,
-      color: kind === 'archer' ? 0x4f7d3a : kind === 'wizard' ? 0x4a5cb0 : 0x8a5a3a,
+      color: kind === 'archer' ? 0x4f7d3a : kind === 'wizard' ? 0x4a5cb0 : kind === 'bomb' ? 0xb0502e : 0x8a5a3a,
       cost: () => sim.costOf(kind),
       state: () => {
         const r = sim.canBuild(spotId, kind);
@@ -336,9 +334,11 @@ export class InteractionController {
       rows.push({ text: 'Damage', ...pair(o ? dmg(o) : '', dmg(s)) });
       rows.push({ text: 'Fire rate', ...pair(o ? `${fmt(o.cooldown)}s` : '', `${fmt(s.cooldown)}s`) });
       rows.push({ text: 'Range', ...pair(o ? fmt(o.range) : '', fmt(s.range)) });
-      rows.push({ text: 'DPS', ...pair(o ? fmt(o.dps) : '', fmt(s.dps)) });
+      if (kind === 'bomb') rows.push({ text: 'Splash radius', ...pair(o ? fmt(o.splashRadius) : '', fmt(s.splashRadius)) });
+      rows.push({ text: kind === 'bomb' ? 'DPS (per target)' : 'DPS', ...pair(o ? fmt(o.dps) : '', fmt(s.dps)) });
     }
     if (s.special) rows.push({ text: s.special, color: '#ffe27a', size: 15 });
+    if (s.groundOnly) rows.push({ text: "Ground only: can't hit fliers", color: '#ff9a8a', size: 15 });
     return rows;
   }
 

@@ -65,11 +65,11 @@ interface Column {
   root: Phaser.GameObjects.Container;
 }
 
-const CARD_W = 218;
-const CARD_GAP = 18;
+const CARD_W_MAX = 218;
+const CARD_W_MIN = 168;
+const CARD_GAP_MAX = 18;
 const CARD_TOP = 114;
 const CARD_H = 552;
-const NODE_W = 192;
 const NODE_H = 104;
 const NODE_YS = [378, 490, 602];
 
@@ -83,6 +83,10 @@ export class UpgradesScene extends Phaser.Scene {
   private resetBtn!: Button;
   private shown = 0;
   private modalOpen = false;
+  /** Card / node widths adapt to the number of tracks and the canvas width (6 tracks at 1280 wide are tighter than the old 5). */
+  private cardW = CARD_W_MAX;
+  private nodeW = CARD_W_MAX - 26;
+  private cardGap = CARD_GAP_MAX;
 
   constructor() {
     super('Upgrades');
@@ -140,10 +144,16 @@ export class UpgradesScene extends Phaser.Scene {
   }
 
   private buildColumns(): void {
-    const totalW = UPGRADE_TRACKS.length * CARD_W + (UPGRADE_TRACKS.length - 1) * CARD_GAP;
-    const x0 = (GAME_W - totalW) / 2 + CARD_W / 2;
+    const n = UPGRADE_TRACKS.length;
+    const avail = viewW(this) - 2 * Math.max(16, SAFE.l, SAFE.r);
+    this.cardGap = Math.min(CARD_GAP_MAX, 12);
+    this.cardW = Math.max(CARD_W_MIN, Math.min(CARD_W_MAX, Math.floor((avail - (n - 1) * this.cardGap) / n)));
+    this.nodeW = this.cardW - 26;
+    const CARD_W = this.cardW;
+    const totalW = n * CARD_W + (n - 1) * this.cardGap;
+    const x0 = (viewW(this) - totalW) / 2 + CARD_W / 2;
     UPGRADE_TRACKS.forEach((track, i) => {
-      const cx = x0 + i * (CARD_W + CARD_GAP);
+      const cx = x0 + i * (CARD_W + this.cardGap);
       const root = this.add.container(cx, Math.max(0, Math.floor(designOffsetY(this)))).setDepth(5);
       const card = this.add.graphics();
       card.fillStyle(COLORS.ink, 0.35);
@@ -167,6 +177,7 @@ export class UpgradesScene extends Phaser.Scene {
       this.tweens.add({ targets: icon, y: icon.y - 4, duration: 1400 + i * 140, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: i * 120 });
 
       const name = this.add.text(0, CARD_TOP + 162, TRACK_INFO[track].name, textStyle(TRACK_INFO[track].name.length > 12 ? 27 : 31, COLORS.textGold, { strokeThickness: 6 })).setOrigin(0.5);
+      if (name.width > CARD_W - 20) name.setScale((CARD_W - 20) / name.width);
       const pips = this.add.graphics();
       root.add([name, pips]);
 
@@ -203,6 +214,8 @@ export class UpgradesScene extends Phaser.Scene {
         return fitImage(this.add.image(x, y, 'towers/wizard_level_3'), 96, 88);
       case 'barracks':
         return fitImage(this.add.image(x, y, 'towers/barrack_level_3_1'), 92, 92);
+      case 'bombs':
+        return fitImage(this.add.image(x, y, 'towers/bomb_level_1'), 100, 92);
       case 'orbital':
         return this.add.image(x, y + 4, 'ui_orbital').setDisplaySize(92, 92);
       case 'reinforcements':
@@ -216,6 +229,7 @@ export class UpgradesScene extends Phaser.Scene {
     const glow = this.add.graphics();
     const face = this.add.container(0, 0);
     const gfx = this.add.graphics();
+    const NODE_W = this.nodeW;
     const label = this.add.text(-NODE_W / 2 + 16, -NODE_H / 2 + 12, `TIER ${tier + 1}`, textStyle(17, '#d8cbe8', { strokeThickness: 0 })).setOrigin(0, 0);
     const costStar = this.add.image(NODE_W / 2 - 54, -NODE_H / 2 + 22, 'ui_star').setDisplaySize(26, 26);
     const costText = this.add.text(NODE_W / 2 - 38, -NODE_H / 2 + 22, String(TIER_COSTS[tier]), textStyle(24, COLORS.textGold, { strokeThickness: 4 })).setOrigin(0, 0.5);
@@ -223,6 +237,8 @@ export class UpgradesScene extends Phaser.Scene {
     const desc = this.add
       .text(0, 10, TRACK_INFO[track].tiers[tier], textStyle(19, COLORS.text, { strokeThickness: 3, align: 'center', wordWrap: { width: NODE_W - 24 }, lineSpacing: 0 }))
       .setOrigin(0.5, 0.5);
+    // long tier texts shrink to stay clear of the "TIER n" / cost row
+    for (let fs = 19; desc.height > 66 && fs > 13; ) desc.setFontSize(--fs);
     face.add([gfx, label, costStar, costText, icon, desc]);
     root.add([glow, face]);
     const view: TierView = { track, tier, root, face, gfx, glow, desc, label, costText, costStar, icon, state: 'locked' };
@@ -279,14 +295,14 @@ export class UpgradesScene extends Phaser.Scene {
     else this.chipText.setText(`${avail} to spend`);
     this.shown = avail;
     this.resetBtn.setDisabled(starsSpent(save) === 0);
-    this.footer.setText(`Earned ${starsEarned(save)} / 30 stars   |   Spent ${starsSpent(save)}   |   Tiers unlock in order`);
+    this.footer.setText(`Earned ${starsEarned(save)} / 30   |   Spent ${starsSpent(save)}   |   The tree costs ${TREE_COST} but only 30 can be earned: choose wisely!`);
   }
 
   private paintTier(v: TierView, state: TierState): void {
     v.state = state;
     const g = v.gfx;
     g.clear();
-    const w = NODE_W, h = NODE_H;
+    const w = this.nodeW, h = NODE_H;
     const fills: Record<TierState, { fill: number; border: number; borderW: number }> = {
       owned: { fill: 0x3f7a3c, border: 0xffd34e, borderW: 4 },
       buyable: { fill: 0x6a58a0, border: 0xffd34e, borderW: 4 },
@@ -428,11 +444,13 @@ export class UpgradesScene extends Phaser.Scene {
   }
 }
 
+const TREE_COST = UPGRADE_TRACKS.length * TIER_COSTS.reduce((a, b) => a + b, 0);
+
 const PLATE_COLORS: Record<UpgradeTrack, number> = {
   archers: 0x5aa14b,
   wizards: 0x4f77c9,
   barracks: 0xa06a45,
   orbital: 0xb04a5a,
   reinforcements: 0x8a62b8,
-  bombs: 0xc9833a, // PLACEHOLDER (core phase)
+  bombs: 0xc9833a,
 };

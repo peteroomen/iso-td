@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { COLORS, textStyle } from './theme';
 import { drawOutlinedRect, ensureUi, sparkBurst } from './widgets';
-import { fitImage, towerSprite, type TowerIconKind, type TowerUnlock } from '../scenes/metaData';
+import { KINDS, fitImage, towerSprite, type TowerIconKind, type TowerUnlock } from '../scenes/metaData';
 
 /** Glowing tower icon with a level badge: the "something new is available" marker used by the unlock UI. */
 export function unlockIcon(scene: Phaser.Scene, x: number, y: number, u: TowerUnlock, size = 76): Phaser.GameObjects.Container {
@@ -14,12 +14,13 @@ export function unlockIcon(scene: Phaser.Scene, x: number, y: number, u: TowerUn
   plate.lineStyle(3, COLORS.gold, 1);
   plate.strokeRoundedRect(-size / 2 + 3, -size / 2 + 3, size - 6, size - 6, 17);
   root.add([glow, plate]);
-  const kinds: TowerIconKind[] = u.kind === 'all' ? ['archer', 'wizard', 'barracks'] : [u.kind];
+  const kinds: TowerIconKind[] = u.kind === 'all' ? [...KINDS] : [u.kind];
   if (kinds.length === 1) {
     root.add(fitImage(scene.add.image(0, -2, towerSprite(kinds[0], u.level)), size * 0.82, size * 0.82));
   } else {
-    const s = size * 0.46;
-    const pos: [number, number][] = [[-size * 0.2, -size * 0.17], [size * 0.2, -size * 0.17], [0, size * 0.17]];
+    // 2 x 2 grid for the four tower kinds
+    const s = size * 0.42;
+    const pos: [number, number][] = [[-size * 0.21, -size * 0.2], [size * 0.21, -size * 0.2], [-size * 0.21, size * 0.18], [size * 0.21, size * 0.18]];
     kinds.forEach((k, i) => root.add(fitImage(scene.add.image(pos[i][0], pos[i][1], towerSprite(k, u.level)), s, s)));
   }
   // level badge

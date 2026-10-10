@@ -45,6 +45,6 @@ export const level02: LevelDef = {
     { groups: [g('scout', 29, 0.6, 0), g('skimmer', 15, 0.75, 6), g('dart', 22, 0.45, 10), g('skimmer', 9, 0.6, 20)] },
   ],
   hints: [
-    { waveIndex: 2, text: 'Skimmers fly over knights - archers and wizards can hit them.' },
+    { waveIndex: 2, text: 'Skimmers fly over knights - archers and wizards can hit them, bombs cannot.' },
   ],
 };

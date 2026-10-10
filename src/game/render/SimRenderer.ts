@@ -8,7 +8,7 @@ import { IsoView, TH, TW, isoX, isoY } from './iso';
 import { BarInfo, KnightView } from './KnightView';
 import { ProjectileView } from './ProjectileView';
 import { HOVER_BOSS, HOVER_FLIER, HOVER_GROUND, bodyHeightOf } from './style';
-import { TowerView, towerShootHeight } from './TowerView';
+import { TowerView, towerMuzzleOffset, towerShootHeight } from './TowerView';
 
 const killNow = (v: { destroy(): void }): void => v.destroy();
 const killAnimated = (v: { destroyAnimated(): void }): void => v.destroyAnimated();
@@ -90,6 +90,12 @@ export class SimRenderer {
         this.projectiles.set(p.id, v);
       }
       const tower = this.sim.getTower(p.towerId);
+      if (v.isLob) {
+        v.stamp = frame;
+        v.setHeights(p.kind === 'shell' && tower ? towerShootHeight('bomb', tower.level) : 0, 0);
+        v.update(p, 0);
+        continue;
+      }
       const tgt = this.sim.getEnemy(p.targetId);
       const th = tower ? towerShootHeight(tower.kind, tower.level) : 70;
       const targetH = tgt ? bodyHeightOf(tgt) : 30;
@@ -258,18 +264,29 @@ export class SimRenderer {
         Audio.sfx('coin', { throttleMs: 60 });
         break;
       case 'shoot':
-        if (e.kind === 'wizard') {
+        if (e.kind === 'bomb') {
+          this.bombLaunch(e.towerId);
+        } else if (e.kind === 'wizard') {
           Audio.sfx('wizard_cast', { volume: 0.55, detune: (Math.random() - 0.5) * 200, throttleMs: 60 });
           fx.hitSpark(e.x, e.y, towerShootHeight('wizard', 2), 'blue', 3);
         } else {
           Audio.sfx('arrow_shoot', { volume: 0.5, detune: (Math.random() - 0.5) * 240, throttleMs: 50 });
         }
         break;
+      case 'explode':
+        this.bombBlast(e);
+        break;
+      case 'cluster':
+        fx.puff(e.x, e.y, 14);
+        fx.hitSpark(e.x, e.y, 16, 'gold', 6);
+        Audio.sfx('build_tower', { volume: 0.12, detune: 1200, throttleMs: 120 });
+        break;
       case 'hit': {
         const v = this.enemies.get(e.enemyId);
         v?.flash();
         const h = this.enemyHeight(e.enemy) - 4;
         if (e.source === 'orbital') break;
+        if (e.source === 'shell' || e.source === 'bomblet') break; // the explosion already shows it
         if (e.source === 'knight' || e.source === 'militia') break;
         fx.hitSpark(e.x, e.y, h, e.damageType === 'magic' ? 'blue' : 'white', e.source === 'bolt' || e.source === 'chain' ? 6 : 3);
         if (e.source === 'arrow') Audio.sfx('arrow_hit', { volume: 0.5, throttleMs: 60 });
@@ -364,6 +381,26 @@ export class SimRenderer {
       default:
         break;
     }
+  }
+
+  // ----------------------------------------------------------------------------------- bomb tower
+
+  private bombLaunch(towerId: number): void {
+    const v = this.towers.get(towerId);
+    const t = this.sim.getTower(towerId);
+    if (v && t) {
+      const m = towerMuzzleOffset('bomb', t.level);
+      if (m) this.fx.muzzleBlast(v.container.x + m.x, v.container.y + m.y);
+    }
+    // a low "thump": the build sound pitched way down (the cannon sounds least wrong of the existing sfx)
+    Audio.sfx('build_tower', { volume: 0.32, detune: -1000 + (Math.random() - 0.5) * 160, throttleMs: 80 });
+  }
+
+  private bombBlast(e: Extract<SimEvent, { type: 'explode' }>): void {
+    const shell = e.kind === 'shell';
+    this.fx.bombBlast(e.x, e.y, e.radius, shell, shell && this.sim.getTower(e.towerId)?.level === 3);
+    if (shell) Audio.sfx('ufo_explode_small', { volume: 0.55, detune: -500 + (Math.random() - 0.5) * 200, throttleMs: 60 });
+    else Audio.sfx('ufo_explode_small', { volume: 0.22, detune: 100 + Math.random() * 300, throttleMs: 90 });
   }
 
   // ----------------------------------------------------------------------------------- hit-testing

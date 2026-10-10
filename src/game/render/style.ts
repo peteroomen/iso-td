@@ -33,3 +33,7 @@ export function bodyHeightOf(e: Pick<EnemyState, 'flier' | 'boss' | 'type'>): nu
 
 export const MILITIA_TINT = 0xffd88a;
 export const SLOW_TINT = 0x8fb8ff;
+
+/** Bomb shell / bomblet render scale (texture is 40 px, the ball itself ~25 px). */
+export const SHELL_SCALE = 1.25;
+export const BOMBLET_SCALE = 0.7;

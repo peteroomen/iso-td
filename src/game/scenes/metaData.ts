@@ -1,4 +1,4 @@
-import { LEVELS, hasFlag, type Biome, type LevelDef, type SaveData } from '../../core';
+import { LEVELS, TOWER_KINDS, hasFlag, type Biome, type LevelDef, type SaveData, type TowerKind } from '../../core';
 import { getSave } from '../services/save';
 
 /** Data helpers shared by the meta scenes (level map, upgrades). */
@@ -88,13 +88,14 @@ export const BIOME_COLORS: Record<Biome | 'mixed', number> = {
   mixed: 0xc06bff,
 };
 
-export type TowerIconKind = 'archer' | 'wizard' | 'barracks';
+export type TowerIconKind = TowerKind;
 
 /** Sprite key of a tower at a given level (1..3). */
 export function towerSprite(kind: TowerIconKind, level: number): string {
   const lv = Math.max(1, Math.min(3, Math.round(level)));
   if (kind === 'archer') return `towers/archer_level_${lv}`;
   if (kind === 'wizard') return `towers/wizard_level_${lv}`;
+  if (kind === 'bomb') return `towers/bomb_level_${lv}`;
   return `towers/barrack_level_${lv}_1`;
 }
 
@@ -118,15 +119,17 @@ export interface TowerUnlock {
   text: string;
 }
 
-const KIND_NAMES: Record<TowerIconKind, string> = { archer: 'Archer', wizard: 'Wizard', barracks: 'Barracks' };
+const KIND_NAMES: Record<TowerIconKind, string> = { archer: 'Archer', wizard: 'Wizard', barracks: 'Barracks', bomb: 'Bomb' };
 
 const TIER_TEXT: Record<TowerIconKind, Record<number, string>> = {
   archer: { 2: 'Faster, harder-hitting arrows', 3: 'Double Shot: hits 2 targets' },
   wizard: { 2: 'Heavier magic bolts', 3: 'Arc Bolt: chains to 2 more enemies' },
   barracks: { 2: 'Tougher knights', 3: '3 knights with heavy armor' },
+  bomb: { 2: 'Heavier shells, bigger blast', 3: 'Cluster Bomb: shells burst into bomblets' },
 };
 
-const KINDS: TowerIconKind[] = ['archer', 'wizard', 'barracks'];
+/** All tower kinds in menu order (archer, wizard, barracks, bomb). */
+export const KINDS: readonly TowerIconKind[] = TOWER_KINDS;
 
 /**
  * Tower tiers that level `index` (0-based) makes available for the first time: its `towerCap` compared with the
@@ -136,7 +139,7 @@ export function levelUnlocks(index: number): TowerUnlock[] {
   const nodes = levelNodes();
   const def = nodes[index]?.def;
   if (!def || index === 0) return [];
-  const prev: Record<TowerIconKind, number> = { archer: 1, wizard: 1, barracks: 1 };
+  const prev: Record<TowerIconKind, number> = { archer: 1, wizard: 1, barracks: 1, bomb: 1 };
   for (let i = 0; i < index; i++) {
     const d = nodes[i].def;
     if (!d) continue;
@@ -146,7 +149,7 @@ export function levelUnlocks(index: number): TowerUnlock[] {
   if (gains.length === 0) return [];
   const lv = def.towerCap[gains[0]];
   if (gains.length === KINDS.length && gains.every((k) => def.towerCap[k] === lv)) {
-    return [{ kind: 'all', level: lv, title: `All Lv${lv} towers`, text: 'Archers, Wizards and Barracks can reach Lv' + lv }];
+    return [{ kind: 'all', level: lv, title: `All Lv${lv} towers`, text: 'Archers, Wizards, Barracks and Bombs can reach Lv' + lv }];
   }
   return gains.map((k) => {
     const level = def.towerCap[k];

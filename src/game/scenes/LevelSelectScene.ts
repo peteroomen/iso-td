@@ -27,6 +27,7 @@ import { unlockBanner, unlockToast } from '../ui/unlockUi';
 import {
   BIOME_COLORS,
   BIOME_NAMES,
+  KINDS,
   fitImage,
   levelNodes,
   levelOrder,
@@ -36,6 +37,7 @@ import {
   towerSprite,
   unlockFlag,
   type LevelNode,
+  type TowerIconKind,
   type TowerUnlock,
 } from './metaData';
 
@@ -534,23 +536,22 @@ export class LevelSelectScene extends Phaser.Scene {
           const label = this.add.text(0, top + 196 + shift, 'TOWERS AVAILABLE', textStyle(20, '#b9a9d6', { strokeThickness: 0 })).setOrigin(0.5);
           root.add(label);
           const cap = def.towerCap;
-          const cards: ['archer' | 'wizard' | 'barracks', number, string][] = [
-            ['archer', cap.archer, towerName('archer')],
-            ['wizard', cap.wizard, towerName('wizard')],
-            ['barracks', cap.barracks, towerName('barracks')],
-          ];
+          const cards: [TowerIconKind, number, string][] = KINDS.map((k) => [k, cap[k], towerName(k)]);
+          const CW = 144;
+          const step = CW + 12;
           cards.forEach(([kind, lv, name], i) => {
-            const x = (i - 1) * 190;
+            const x = (i - (cards.length - 1) / 2) * step;
             const y = top + 306 + shift;
             const fresh = isNew(kind);
             const g = this.add.graphics();
-            drawOutlinedRect(g, x - 82, y - 78, 164, 156, 18, fresh ? 0x4b3a2a : 0x2a2038, 4);
+            drawOutlinedRect(g, x - CW / 2, y - 78, CW, 156, 18, fresh ? 0x4b3a2a : 0x2a2038, 4);
             if (fresh) {
               g.lineStyle(3, COLORS.gold, 1);
-              g.strokeRoundedRect(x - 78, y - 74, 156, 148, 15);
+              g.strokeRoundedRect(x - CW / 2 + 4, y - 74, CW - 8, 148, 15);
             }
-            const img = fitImage(this.add.image(x, y - 16, towerSprite(kind, lv)), 92, 92);
-            const nameT = this.add.text(x, y + 44, `${name}  Lv ${lv}`, textStyle(20, COLORS.textGold, { strokeThickness: 4 })).setOrigin(0.5);
+            const img = fitImage(this.add.image(x, y - 16, towerSprite(kind, lv)), 88, 88);
+            const nameT = this.add.text(x, y + 44, `${name} Lv${lv}`, textStyle(19, COLORS.textGold, { strokeThickness: 4 })).setOrigin(0.5);
+            if (nameT.width > CW - 14) nameT.setScale((CW - 14) / nameT.width);
             // little pips for the level
             const pips = this.add.graphics();
             for (let k = 0; k < 3; k++) {
@@ -561,7 +562,7 @@ export class LevelSelectScene extends Phaser.Scene {
             }
             root.add([g, img, nameT, pips]);
             if (fresh) {
-              const tag = this.add.container(x + 62, y - 70);
+              const tag = this.add.container(x + CW / 2 - 20, y - 70);
               const tg = this.add.graphics();
               drawOutlinedRect(tg, -27, -13, 54, 26, 13, 0xe5484d, 3);
               tag.add([tg, this.add.text(0, 0, 'NEW', textStyle(16, COLORS.text, { strokeThickness: 3 })).setOrigin(0.5)]);
@@ -570,7 +571,7 @@ export class LevelSelectScene extends Phaser.Scene {
               this.tweens.add({ targets: tag, scale: 1.12, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
             }
             img.setScale(0);
-            this.tweens.add({ targets: img, scale: Math.min(92 / img.width, 92 / img.height), duration: 350, delay: 200 + i * 90, ease: 'Back.easeOut' });
+            this.tweens.add({ targets: img, scale: Math.min(88 / img.width, 88 / img.height), duration: 350, delay: 200 + i * 90, ease: 'Back.easeOut' });
           });
         }
       },

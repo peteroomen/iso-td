@@ -8,6 +8,7 @@ export const TEX = {
   smoke: 'g_smoke',
   ring: 'g_ring',
   shadow: 'g_shadow',
+  shell: 'g_shell',
   debris: 'g_debris',
   beam: 'g_beam',
   vignette: 'g_vignette',
@@ -129,6 +130,25 @@ export function generateTextures(scene: Phaser.Scene): void {
     c.arc(0, 0, w / 2, 0, Math.PI * 2);
     c.fill();
     c.restore();
+  });
+  // bomb shell: dark round bomb with a pack-style ink outline, a highlight and a stubby fuse (the spark is a separate glow)
+  make(scene, TEX.shell, 40, 40, (c) => {
+    c.beginPath();
+    c.arc(19, 23, 12.5, 0, Math.PI * 2);
+    ink(c, vgrad(c, 10, 36, '#6b6580', '#2c2838'), 5);
+    c.fillStyle = 'rgba(255,255,255,0.35)';
+    c.beginPath();
+    c.ellipse(15, 18, 4.5, 3, -0.6, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.rect(16, 7, 6, 5);
+    ink(c, '#8a5a3a', 3);
+    c.strokeStyle = '#d9a35a';
+    c.lineWidth = 2.5;
+    c.beginPath();
+    c.moveTo(21, 8);
+    c.quadraticCurveTo(25, 4, 28, 5);
+    c.stroke();
   });
   make(scene, TEX.debris, 12, 12, (c) => {
     c.fillStyle = '#fff';

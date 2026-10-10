@@ -254,15 +254,15 @@ export class TitleScene extends Phaser.Scene {
     });
 
     // towers on build spots: [col,row,kind]
-    const spots: [number, number, 'archer' | 'wizard' | 'barracks'][] = [
-      [3, 0, 'archer'], [1, 2, 'wizard'], [4, 2, 'archer'], [3, 4, 'barracks'],
+    const spots: [number, number, 'archer' | 'wizard' | 'bomb'][] = [
+      [3, 0, 'archer'], [1, 2, 'wizard'], [4, 2, 'archer'], [3, 4, 'bomb'],
     ];
     for (const [col, row, kind] of spots) {
-      const key = kind === 'archer' ? 'towers/archer_level_3' : kind === 'wizard' ? 'towers/wizard_level_3' : 'towers/barrack_level_3_1';
-      const img = this.add.image(0, 0, key).setScale(scale * 0.95).setOrigin(0.5, kind === 'wizard' ? 0.82 : 0.84);
+      const key = kind === 'archer' ? 'towers/archer_level_3' : kind === 'wizard' ? 'towers/wizard_level_3' : 'towers/bomb_level_3';
+      const img = this.add.image(0, 0, key).setScale(scale * 0.95).setOrigin(0.5, kind === 'wizard' ? 0.82 : kind === 'bomb' ? 0.76 : 0.84);
       island.addProp(col, row, img, 5, 0, 4);
       const p = island.cellPos(col, row);
-      if (kind !== 'barracks') {
+      if (kind !== 'bomb') {
         this.turrets.push({
           kind, x: p.x, y: p.y - 34, cooldown: Math.random() * 1.2, rate: kind === 'archer' ? 1.15 : 1.9,
           range: kind === 'archer' ? 230 : 210, sprite: img,

@@ -34,7 +34,10 @@ export function traitsOf(id: EnemyId): Trait[] {
     const n = d.launcher.spawns.reduce((a, s) => a + s.count, 0);
     out.push({ icon: TEX.ufo, label: `Launches ${n} UFOs every ${Math.round(d.launcher.interval)}s`, color: 0xa8483a, text: '#ff9a8a' });
   }
-  if (d.flier) out.push({ icon: TEX.wing, label: 'Flies over knights', color: 0x3f7fb5, text: '#9ee6ff' });
+  if (d.flier) {
+    out.push({ icon: TEX.wing, label: 'Flies over knights', color: 0x3f7fb5, text: '#9ee6ff' });
+    out.push({ icon: TEX.close, label: "Bombs can't hit it", color: 0xa8483a, text: '#ff9a8a' });
+  }
   if (d.armor >= 0.1) {
     const counter = d.armor >= 0.5 && d.armor - d.magicResist >= 0.2 ? ' - use Wizards' : '';
     out.push({ icon: TEX.shield, label: `Armor ${pct(d.armor)}%${counter}`, color: 0x6c7488, text: '#d6dcea' });

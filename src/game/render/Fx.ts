@@ -401,6 +401,46 @@ export class Fx {
     this.scene.tweens.add({ targets: img, scale: size / 64, alpha: 0, duration: seconds * 1000, ease: 'Quad.easeOut', onComplete: () => img.destroy() });
   }
 
+  /** Mortar launch at a world-local px point (the barrel mouth): hot flash + smoke puff drifting up-right. */
+  muzzleBlast(x: number, y: number): void {
+    const flash = this.scene.add.image(x, y, TEX.glow).setBlendMode(ADD).setTint(0xffd27a).setScale(0.3).setAlpha(1);
+    const core = this.scene.add.image(x, y, TEX.glow).setBlendMode(ADD).setTint(0xffffff).setScale(0.15).setAlpha(1);
+    this.L.fxC.add([flash, core]);
+    flash.setDepth(1e6);
+    core.setDepth(1e6 + 1);
+    this.scene.tweens.add({ targets: flash, scale: 1.5, alpha: 0, duration: 190, ease: 'Quad.easeOut', onComplete: () => flash.destroy() });
+    this.scene.tweens.add({ targets: core, scale: 0.7, alpha: 0, duration: 110, ease: 'Quad.easeOut', onComplete: () => core.destroy() });
+    this.smoke.explode(4, x + 6, y - 6);
+    this.sparkGold.explode(5, x, y);
+    this.sparkWhite.explode(3, x, y);
+  }
+
+  /**
+   * Bomb tower blast (shell or bomblet) scaled to the sim's splash `radius` (tiles): flash, fireball, smoke, debris,
+   * a shockwave ellipse that ends exactly on the radius and a scorch decal fading over ~2 s. Only a Lv3 shell shakes the view.
+   */
+  bombBlast(gx: number, gy: number, radius: number, shell: boolean, shake: boolean): void {
+    const p = this.pt(gx, gy, 10);
+    const k = Math.max(0.5, radius);
+    this.glowFlash(gx, gy, 12, 0xfff0b0, shell ? 220 * k : 130 * k, 0.2);
+    this.glowFlash(gx, gy, 10, 0xff8a2a, shell ? 330 * k : 190 * k, 0.32);
+    this.fire.explode(shell ? 16 : 6, p.x, p.y);
+    this.fire.explode(shell ? 8 : 3, p.x, p.y - 16);
+    this.sparkWhite.explode(shell ? 8 : 3, p.x, p.y);
+    this.debris.explode(shell ? 9 : 3, p.x, p.y);
+    this.smoke.explode(shell ? 6 : 2, p.x, p.y - 8);
+    this.dust(gx, gy, shell ? 8 : 3);
+    this.shockwave(gx, gy, radius / 1.1, shell ? 0xffc060 : 0xffd890, shell ? 0.42 : 0.3, shell ? 7 : 4);
+    const rx = radius * TW * 0.7071 * 0.85;
+    const ry = radius * TH * 0.7071 * 0.85;
+    const g = this.scene.add.graphics({ x: p.x, y: p.y + 10 });
+    g.fillStyle(0x1a1020, 0.34).fillEllipse(0, 0, rx * 2, ry * 2);
+    g.fillStyle(0x1a1020, 0.3).fillEllipse(0, 0, rx * 1.1, ry * 1.1);
+    this.L.groundFxC.add(g);
+    this.scene.tweens.add({ targets: g, alpha: 0, delay: 500, duration: 1500, ease: 'Quad.easeIn', onComplete: () => g.destroy() });
+    if (shell && shake) this.shake(3.5, 0.22);
+  }
+
   /** Drops a sprite-ish pop ring when a tower is built/upgraded. */
   buildBurst(gx: number, gy: number, upgrade: boolean): void {
     this.dust(gx, gy, upgrade ? 10 : 16);
