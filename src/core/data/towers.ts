@@ -100,8 +100,8 @@ export const TOWER_KINDS: readonly TowerKind[] = ['archer', 'wizard', 'barracks'
 /** Bomb tower shell / splash / cluster constants (docs/DESIGN.md section 3). */
 export const BOMB = {
   /** Shell flight time = flightBase + flightPerTile * distance(tower, landing point), seconds. */
-  flightBase: 0.9,
-  flightPerTile: 0.08,
+  flightBase: 0.65,
+  flightPerTile: 0.06,
   /** Splash damage is 100% within `falloffInner` x radius of the centre, then falls linearly to `falloffEdge` at the edge. */
   falloffInner: 0.4,
   falloffEdge: 0.5,
@@ -111,7 +111,7 @@ export const BOMB = {
   /** Cluster Bomb: bomblets land uniformly within this distance of the shell's impact point... */
   bombletScatter: 0.8,
   /** ...and explode after this many seconds, with this radius (before the star-tree radius bonus). */
-  bombletFuse: 0.35,
+  bombletFuse: 0.28,
   bombletRadius: 0.5,
 } as const;
 

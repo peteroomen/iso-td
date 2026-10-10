@@ -7,7 +7,7 @@ export const ORBITAL = {
   delay: 1.0,
   /** True damage to every enemy in radius (fliers and boss included). */
   damage: 60,
-  radius: 1.4,
+  radius: 1.7,
   /** Tier-3 burning ground. */
   burnDuration: 3,
   burnDps: 15,

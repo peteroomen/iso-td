@@ -296,7 +296,7 @@ export interface EnemyState {
  *   (tx, ty); the renderer adds the height arc using `progress` and `arc`.
  * - 'net': Hunting Nets (archer spec). Lobbed like a shell to a FIXED ground point (tx, ty = predicted cluster centre), `radius` =
  *   catch radius, `flightTime` ~0.4-0.5 s, `arc` apex height. On landing it emits 'net' (and roots the UFOs in `radius`).
- * - 'missile': Homing Missiles (bomb spec). Homing like an arrow (speed ~6.5 t/s, `targetId`), explodes on reaching the target
+ * - 'missile': Homing Missiles (bomb spec). Homing like an arrow (speed ~8 t/s, `targetId`), explodes on reaching the target
  *   (or at its last known position when the target died) with splash `radius` (0.5), `damage` physical. Hits fliers too.
  *   Emits 'explode' (kind 'missile').
  * - 'knightArrow': Bow Training arrow shot by a knight (`knightId`), homing like an 'arrow', `towerId` = its barracks.

@@ -216,16 +216,16 @@ Star upgrades by level (competent / expert; A archers, W wizards, B barracks, O 
 
 | level | competent | expert | naive | idle |
 |---|---|---|---|---|
-| 1 Meadow Landing | 8/8 win / 20/20.0/20 / - / g54 | 8/8 win / 20/20.0/20 / - / g112 | 8/8 win / 20/20.0/20 / - / g106 | 0/8 win / 0/0.0/0 / 3.0 / g300 |
-| 2 Blossom Bend | 8/8 win / 20/20.0/20 / - / g93 | 8/8 win / 20/20.0/20 / - / g55 | 5/8 win / 0/3.1/8 / 6.0 / g44 | 0/8 win / 0/0.0/0 / 2.0 / g320 |
-| 3 Twin Creeks | 8/8 win / 12/16.3/20 / - / g114 | 8/8 win / 20/20.0/20 / - / g139 | 0/8 win / 0/0.0/0 / 5.6 / g32 | 0/8 win / 0/0.0/0 / 2.0 / g340 |
-| 4 Dune Crossing | 8/8 win / 8/12.4/17 / - / g91 | 8/8 win / 17/19.6/20 / - / g417 | 0/8 win / 0/0.0/0 / 6.0 / g55 | 0/8 win / 0/0.0/0 / 2.0 / g360 |
-| 5 Oasis Crossroads | 8/8 win / 12/13.8/17 / - / g116 | 8/8 win / 20/20.0/20 / - / g1246 | 0/8 win / 0/0.0/0 / 4.9 / g59 | 0/8 win / 0/0.0/0 / 1.0 / g400 |
-| 6 Scorpion Loop | 8/8 win / 8/13.8/18 / - / g83 | 8/8 win / 20/20.0/20 / - / g2331 | 0/8 win / 0/0.0/0 / 4.0 / g34 | 0/8 win / 0/0.0/0 / 3.0 / g420 |
-| 7 Frostbite Pass | 8/8 win / 13/15.3/17 / - / g97 | 8/8 win / 20/20.0/20 / - / g94 | 0/8 win / 0/0.0/0 / 7.0 / g76 | 0/8 win / 0/0.0/0 / 4.0 / g440 |
-| 8 Glacier Junction | 8/8 win / 6/12.1/18 / - / g213 | 8/8 win / 20/20.0/20 / - / g2479 | 0/8 win / 0/0.0/0 / 3.8 / g40 | 0/8 win / 0/0.0/0 / 1.0 / g450 |
-| 9 Icebound Bastion | 8/8 win / 8/11.4/14 / - / g450 | 8/8 win / 14/19.3/20 / - / g1445 | 0/8 win / 0/0.0/0 / 5.4 / g79 | 0/8 win / 0/0.0/0 / 4.0 / g450 |
-| 10 The Mothership | 8/8 win / 8/12.4/14 / - / g74 | 8/8 win / 20/20.0/20 / - / g189 | 0/8 win / 0/0.0/0 / 7.0 / g42 | 0/8 win / 0/0.0/0 / 4.0 / g700 |
+| 1 Meadow Landing | 8/8 win / 20/20.0/20 / - / g57 | 8/8 win / 20/20.0/20 / - / g111 | 8/8 win / 20/20.0/20 / - / g106 | 0/8 win / 0/0.0/0 / 3.0 / g300 |
+| 2 Blossom Bend | 8/8 win / 20/20.0/20 / - / g107 | 8/8 win / 20/20.0/20 / - / g67 | 5/8 win / 0/3.1/8 / 6.0 / g44 | 0/8 win / 0/0.0/0 / 2.0 / g320 |
+| 3 Twin Creeks | 8/8 win / 13/13.9/15 / - / g114 | 8/8 win / 18/19.5/20 / - / g150 | 0/8 win / 0/0.0/0 / 4.0 / g11 | 0/8 win / 0/0.0/0 / 1.0 / g340 |
+| 4 Dune Crossing | 8/8 win / 11/15.6/18 / - / g127 | 8/8 win / 20/20.0/20 / - / g439 | 0/8 win / 0/0.0/0 / 6.0 / g55 | 0/8 win / 0/0.0/0 / 2.0 / g360 |
+| 5 Oasis Crossroads | 8/8 win / 16/17.1/19 / - / g34 | 8/8 win / 17/19.1/20 / - / g2310 | 0/8 win / 0/0.0/0 / 2.0 / g26 | 0/8 win / 0/0.0/0 / 1.0 / g400 |
+| 6 Scorpion Loop | 8/8 win / 11/15.9/19 / - / g90 | 8/8 win / 20/20.0/20 / - / g2341 | 0/8 win / 0/0.0/0 / 4.0 / g34 | 0/8 win / 0/0.0/0 / 3.0 / g420 |
+| 7 Frostbite Pass | 8/8 win / 14/16.1/20 / - / g120 | 8/8 win / 20/20.0/20 / - / g86 | 0/8 win / 0/0.0/0 / 7.0 / g76 | 0/8 win / 0/0.0/0 / 4.0 / g440 |
+| 8 Glacier Junction | 8/8 win / 11/15.1/18 / - / g244 | 8/8 win / 20/20.0/20 / - / g2480 | 0/8 win / 0/0.0/0 / 3.8 / g40 | 0/8 win / 0/0.0/0 / 1.0 / g450 |
+| 9 Icebound Bastion | 8/8 win / 10/13.5/17 / - / g573 | 8/8 win / 20/20.0/20 / - / g1545 | 0/8 win / 0/0.0/0 / 5.3 / g85 | 0/8 win / 0/0.0/0 / 4.0 / g450 |
+| 10 The Mothership | 8/8 win / 14/14.8/17 / - / g100 | 8/8 win / 20/20.0/20 / - / g193 | 0/8 win / 0/0.0/0 / 7.0 / g42 | 0/8 win / 0/0.0/0 / 4.0 / g700 |
 
 ### Single-tower-type variants
 
@@ -233,16 +233,16 @@ Competent bot (same plan, stars and abilities) but every tower is forced to one 
 
 | level | archer-only | wizard-only | barracks-only | bomb-only |
 |---|---|---|---|---|
-| 1 Meadow Landing | 8/8 win / 20/20.0/20 / - / g156 | 8/8 win / 20/20.0/20 / - / g43 | 8/8 win / 19/19.9/20 / - / g112 | 8/8 win / 16/18.0/19 / - / g74 |
-| 2 Blossom Bend | 8/8 win / 20/20.0/20 / - / g170 | 8/8 win / 20/20.0/20 / - / g80 | 0/8 win / 0/0.0/0 / 5.0 / g34 | 0/8 win / 0/0.0/0 / 5.4 / g102 |
-| 3 Twin Creeks | 8/8 win / 10/10.8/12 / - / g64 | 8/8 win / 17/18.6/20 / - / g27 | 0/8 win / 0/0.0/0 / 4.0 / g58 | 0/8 win / 0/0.0/0 / 6.5 / g59 |
-| 4 Dune Crossing | 1/8 win / 0/0.1/1 / 9.0 / g64 | 0/8 win / 0/0.0/0 / 8.0 / g57 | 0/8 win / 0/0.0/0 / 5.3 / g75 | 0/8 win / 0/0.0/0 / 5.9 / g46 |
-| 5 Oasis Crossroads | 3/8 win / 0/0.8/3 / 9.0 / g41 | 4/8 win / 0/1.8/6 / 7.0 / g139 | 0/8 win / 0/0.0/0 / 3.9 / g68 | 0/8 win / 0/0.0/0 / 4.0 / g76 |
-| 6 Scorpion Loop | 8/8 win / 6/9.4/11 / - / g484 | 5/8 win / 0/2.0/7 / 7.3 / g103 | 0/8 win / 0/0.0/0 / 3.6 / g36 | 0/8 win / 0/0.0/0 / 4.0 / g28 |
-| 7 Frostbite Pass | 0/8 win / 0/0.0/0 / 10.0 / g48 | 8/8 win / 10/12.6/16 / - / g136 | 0/8 win / 0/0.0/0 / 5.1 / g37 | 0/8 win / 0/0.0/0 / 5.9 / g73 |
-| 8 Glacier Junction | 1/8 win / 0/0.8/6 / 4.1 / g252 | 7/8 win / 0/7.3/13 / 4.0 / g150 | 0/8 win / 0/0.0/0 / 2.0 / g27 | 0/8 win / 0/0.0/0 / 3.4 / g74 |
-| 9 Icebound Bastion | 8/8 win / 1/6.0/12 / - / g1302 | 8/8 win / 6/9.3/14 / - / g589 | 0/8 win / 0/0.0/0 / 5.9 / g19 | 0/8 win / 0/0.0/0 / 5.5 / g97 |
-| 10 The Mothership | 1/8 win / 0/0.3/2 / 7.1 / g280 | 6/8 win / 0/13.0/20 / 15.0 / g43 | 0/8 win / 0/0.0/0 / 6.1 / g37 | 0/8 win / 0/0.0/0 / 6.9 / g82 |
+| 1 Meadow Landing | 8/8 win / 20/20.0/20 / - / g156 | 8/8 win / 20/20.0/20 / - / g22 | 8/8 win / 20/20.0/20 / - / g116 | 8/8 win / 19/19.3/20 / - / g15 |
+| 2 Blossom Bend | 8/8 win / 20/20.0/20 / - / g170 | 8/8 win / 15/19.0/20 / - / g33 | 0/8 win / 0/0.0/0 / 5.4 / g25 | 0/8 win / 0/0.0/0 / 5.5 / g124 |
+| 3 Twin Creeks | 8/8 win / 1/5.1/9 / - / g70 | 8/8 win / 10/12.0/15 / - / g105 | 0/8 win / 0/0.0/0 / 4.0 / g31 | 0/8 win / 0/0.0/0 / 6.3 / g65 |
+| 4 Dune Crossing | 4/8 win / 0/1.1/3 / 9.0 / g82 | 0/8 win / 0/0.0/0 / 7.8 / g69 | 0/8 win / 0/0.0/0 / 5.5 / g70 | 0/8 win / 0/0.0/0 / 6.1 / g57 |
+| 5 Oasis Crossroads | 8/8 win / 11/12.9/14 / - / g125 | 7/8 win / 0/3.9/7 / 5.0 / g142 | 0/8 win / 0/0.0/0 / 2.0 / g19 | 0/8 win / 0/0.0/0 / 4.0 / g112 |
+| 6 Scorpion Loop | 8/8 win / 8/12.6/17 / - / g532 | 7/8 win / 0/4.4/11 / 6.0 / g136 | 0/8 win / 0/0.0/0 / 3.4 / g35 | 0/8 win / 0/0.0/0 / 4.0 / g29 |
+| 7 Frostbite Pass | 5/8 win / 0/3.3/8 / 11.0 / g78 | 8/8 win / 9/11.9/14 / - / g157 | 0/8 win / 0/0.0/0 / 6.5 / g60 | 0/8 win / 0/0.0/0 / 7.0 / g50 |
+| 8 Glacier Junction | 2/8 win / 0/1.4/10 / 4.0 / g419 | 8/8 win / 3/9.8/13 / - / g182 | 0/8 win / 0/0.0/0 / 2.0 / g21 | 0/8 win / 0/0.0/0 / 4.0 / g107 |
+| 9 Icebound Bastion | 7/8 win / 0/6.4/14 / 7.0 / g1241 | 8/8 win / 7/11.0/14 / - / g703 | 0/8 win / 0/0.0/0 / 5.8 / g28 | 0/8 win / 0/0.0/0 / 5.9 / g50 |
+| 10 The Mothership | 7/8 win / 0/7.3/14 / 7.0 / g1279 | 7/8 win / 0/14.1/20 / 15.0 / g145 | 0/8 win / 0/0.0/0 / 6.0 / g38 | 0/8 win / 0/0.0/0 / 7.3 / g77 |
 
 ## Specializations
 
@@ -252,20 +252,20 @@ Lives left per level (average over the seeds; win rate in brackets):
 
 | level | competent | nospec | spec:eagle_eye | spec:hunting_nets | spec:chain_lightning | spec:fire_mages | spec:bigger_bombs | spec:homing_missiles | spec:bow_training | spec:extra_recruits |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 7 Frostbite Pass | 15.3 (8/8) | 2.5 (6/8) | 15.3 (8/8) | 9.3 (8/8) | 15.3 (8/8) | 15.3 (8/8) | 15.3 (8/8) | 15.3 (8/8) | 17.1 (8/8) | 17.1 (8/8) |
-| 8 Glacier Junction | 12.1 (8/8) | 0.1 (1/8) | 12.1 (8/8) | 14.5 (8/8) | 12.1 (8/8) | 10.8 (7/8) | 10.3 (7/8) | 12.1 (8/8) | 12.1 (8/8) | 12.1 (8/8) |
-| 9 Icebound Bastion | 11.4 (8/8) | 6.0 (8/8) | 11.4 (8/8) | 11.4 (8/8) | 11.4 (8/8) | 11.4 (8/8) | 11.4 (8/8) | 11.4 (8/8) | 11.4 (8/8) | 11.4 (8/8) |
-| 10 The Mothership | 12.4 (8/8) | 12.4 (8/8) | 12.4 (8/8) | 12.4 (8/8) | 12.4 (8/8) | 12.4 (8/8) | 12.4 (8/8) | 12.4 (8/8) | 12.4 (8/8) | 12.4 (8/8) |
-| **all of L7-L10** | **12.8** (32/32) | **5.3** (23/32) | **12.8** (32/32) | **11.9** (32/32) | **12.8** (32/32) | **12.4** (31/32) | **12.3** (31/32) | **12.8** (32/32) | **13.3** (32/32) | **13.3** (32/32) |
+| 7 Frostbite Pass | 16.1 (8/8) | 5.6 (7/8) | 16.1 (8/8) | 11.8 (8/8) | 16.1 (8/8) | 16.1 (8/8) | 16.1 (8/8) | 16.1 (8/8) | 18.0 (8/8) | 18.0 (8/8) |
+| 8 Glacier Junction | 15.1 (8/8) | 0.8 (3/8) | 15.1 (8/8) | 12.8 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) |
+| 9 Icebound Bastion | 13.5 (8/8) | 10.6 (8/8) | 13.5 (8/8) | 13.5 (8/8) | 13.5 (8/8) | 13.5 (8/8) | 13.9 (8/8) | 13.9 (8/8) | 13.5 (8/8) | 13.5 (8/8) |
+| 10 The Mothership | 14.8 (8/8) | 15.1 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) |
+| **all of L7-L10** | **14.9** (32/32) | **8.0** (26/32) | **14.9** (32/32) | **13.2** (32/32) | **14.9** (32/32) | **14.9** (32/32) | **15.0** (32/32) | **15.0** (32/32) | **15.3** (32/32) | **15.3** (32/32) |
 
 Option A vs option B of each tower (lives averaged over L7-L10, same seeds; a gap below ~10% of the plain competent result is "balanced"):
 
 | tower | option A | lives (wins) | option B | lives (wins) | gap |
 |---|---|---|---|---|---|
-| archer | eagle_eye | 12.8 (32/32) | hunting_nets | 11.9 (32/32) | 0.9 lives |
-| wizard | chain_lightning | 12.8 (32/32) | fire_mages | 12.4 (31/32) | 0.3 lives |
-| bomb | bigger_bombs | 12.3 (31/32) | homing_missiles | 12.8 (32/32) | 0.5 lives |
-| barracks | bow_training | 13.3 (32/32) | extra_recruits | 13.3 (32/32) | 0.0 lives |
+| archer | eagle_eye | 14.9 (32/32) | hunting_nets | 13.2 (32/32) | 1.7 lives |
+| wizard | chain_lightning | 14.9 (32/32) | fire_mages | 14.9 (32/32) | 0.0 lives |
+| bomb | bigger_bombs | 15.0 (32/32) | homing_missiles | 15.0 (32/32) | 0.0 lives |
+| barracks | bow_training | 15.3 (32/32) | extra_recruits | 15.3 (32/32) | 0.0 lives |
 
 ### Single-tower micro-benchmark
 
@@ -275,49 +275,49 @@ Option A vs option B of each tower (lives averaged over L7-L10, same seeds; a ga
 
 | UFO mix | companions only | plain Lv3 | eagle_eye | hunting_nets | better |
 |---|---|---|---|---|---|
-| swarm (scouts + darts) | 93% / 34.4 | 98% / 12.8 | 99% / 2.6 | 99% / 5.5 | tie |
-| armor (plated) | 53% / 34.9 | 58% / 33.8 | 70% / 27.3 | 68% / 27.8 | tie |
-| magic resist (prism) | 89% / 20.5 | 98% / 6.1 | 100% / 1.1 | 100% / 1.8 | tie |
-| fliers (skimmers) | 61% / 32.1 | 84% / 23.4 | 89% / 19.1 | 92% / 11.1 | hunting_nets |
-| heavies (dreadnought + carrier) | 57% / 28.6 | 64% / 25.3 | 67% / 25.4 | 75% / 20.0 | hunting_nets |
-| mixed wave | 59% / 35.0 | 65% / 29.0 | 69% / 26.6 | 74% / 19.5 | hunting_nets |
-| Mothership | 20% / 21.0 | 23% / 20.9 | 25% / 21.3 | 28% / 20.0 | hunting_nets |
+| swarm (scouts + darts) | 98% / 7.4 | 100% / 1.3 | 100% / 0.0 | 100% / 1.3 | tie |
+| armor (plated) | 54% / 34.3 | 59% / 33.0 | 71% / 27.4 | 71% / 27.5 | tie |
+| magic resist (prism) | 91% / 17.4 | 99% / 4.5 | 99% / 3.4 | 100% / 2.5 | tie |
+| fliers (skimmers) | 61% / 32.1 | 84% / 23.4 | 89% / 19.1 | 92% / 11.4 | hunting_nets |
+| heavies (dreadnought + carrier) | 57% / 27.1 | 65% / 24.3 | 69% / 23.8 | 76% / 19.5 | hunting_nets |
+| mixed wave | 60% / 34.6 | 66% / 26.8 | 69% / 26.0 | 75% / 20.1 | hunting_nets |
+| Mothership | 20% / 23.0 | 23% / 23.0 | 25% / 23.0 | 28% / 20.0 | hunting_nets |
 
 **wizard** (Lv3 wizard beside plain Lv3 companions (archer, wizard, bomb, barracks); cells: % of the wave's HP stopped / lives leaked)
 
 | UFO mix | companions only | plain Lv3 | chain_lightning | fire_mages | better |
 |---|---|---|---|---|---|
-| swarm (scouts + darts) | 93% / 34.4 | 94% / 28.0 | 97% / 15.3 | 94% / 28.0 | chain_lightning |
-| armor (plated) | 53% / 34.9 | 72% / 24.8 | 92% / 13.6 | 88% / 13.4 | chain_lightning |
-| magic resist (prism) | 89% / 20.5 | 90% / 18.6 | 95% / 13.4 | 95% / 12.8 | tie |
+| swarm (scouts + darts) | 98% / 7.4 | 99% / 4.1 | 100% / 1.3 | 99% / 4.1 | tie |
+| armor (plated) | 54% / 34.3 | 74% / 23.1 | 92% / 13.5 | 89% / 13.1 | chain_lightning |
+| magic resist (prism) | 91% / 17.4 | 94% / 15.8 | 96% / 11.0 | 96% / 11.4 | tie |
 | fliers (skimmers) | 61% / 32.1 | 77% / 18.9 | 96% / 7.5 | 77% / 18.9 | chain_lightning |
-| heavies (dreadnought + carrier) | 57% / 28.6 | 64% / 25.8 | 73% / 22.1 | 76% / 22.3 | fire_mages |
-| mixed wave | 59% / 35.0 | 65% / 30.4 | 71% / 27.4 | 69% / 25.9 | tie |
-| Mothership | 20% / 21.0 | 24% / 20.8 | 24% / 20.6 | 30% / 20.8 | fire_mages |
+| heavies (dreadnought + carrier) | 57% / 27.1 | 64% / 24.5 | 73% / 21.8 | 77% / 21.5 | fire_mages |
+| mixed wave | 60% / 34.6 | 66% / 29.0 | 70% / 27.0 | 69% / 24.8 | tie |
+| Mothership | 20% / 23.0 | 25% / 23.0 | 25% / 23.0 | 30% / 23.0 | fire_mages |
 
 **bomb** (Lv3 bomb beside plain Lv3 companions (archer, wizard, bomb, barracks); cells: % of the wave's HP stopped / lives leaked)
 
 | UFO mix | companions only | plain Lv3 | bigger_bombs | homing_missiles | better |
 |---|---|---|---|---|---|
-| swarm (scouts + darts) | 93% / 34.4 | 100% / 2.5 | 100% / 0.0 | 100% / 0.0 | tie |
-| armor (plated) | 53% / 34.9 | 78% / 23.9 | 91% / 14.3 | 83% / 21.6 | bigger_bombs |
-| magic resist (prism) | 89% / 20.5 | 100% / 0.0 | 100% / 0.0 | 100% / 0.0 | tie |
+| swarm (scouts + darts) | 98% / 7.4 | 100% / 0.0 | 100% / 0.0 | 100% / 0.0 | tie |
+| armor (plated) | 54% / 34.3 | 80% / 23.8 | 91% / 12.5 | 85% / 20.8 | bigger_bombs |
+| magic resist (prism) | 91% / 17.4 | 100% / 0.0 | 100% / 0.0 | 100% / 0.0 | tie |
 | fliers (skimmers) | 61% / 32.1 | 61% / 32.1 | 61% / 32.1 | 78% / 17.5 | homing_missiles |
-| heavies (dreadnought + carrier) | 57% / 28.6 | 69% / 22.1 | 80% / 14.3 | 75% / 17.6 | bigger_bombs |
-| mixed wave | 59% / 35.0 | 82% / 19.0 | 91% / 15.3 | 88% / 11.0 | bigger_bombs |
-| Mothership | 20% / 21.0 | 24% / 21.3 | 26% / 21.8 | 27% / 21.5 | tie |
+| heavies (dreadnought + carrier) | 57% / 27.1 | 70% / 21.5 | 80% / 14.4 | 77% / 18.1 | bigger_bombs |
+| mixed wave | 60% / 34.6 | 83% / 17.0 | 91% / 14.3 | 89% / 9.9 | bigger_bombs |
+| Mothership | 20% / 23.0 | 25% / 23.0 | 26% / 23.0 | 28% / 23.0 | tie |
 
 **barracks** (Lv3 barracks beside plain Lv3 companions (archer, wizard, bomb, barracks); cells: % of the wave's HP stopped / lives leaked)
 
 | UFO mix | companions only | plain Lv3 | bow_training | extra_recruits | better |
 |---|---|---|---|---|---|
-| swarm (scouts + darts) | 93% / 34.4 | 94% / 27.8 | 94% / 27.9 | 94% / 27.4 | tie |
-| armor (plated) | 53% / 34.9 | 59% / 30.1 | 60% / 30.6 | 63% / 29.1 | extra_recruits |
-| magic resist (prism) | 89% / 20.5 | 91% / 18.1 | 90% / 18.1 | 91% / 17.1 | tie |
+| swarm (scouts + darts) | 98% / 7.4 | 98% / 6.9 | 98% / 7.9 | 98% / 8.5 | tie |
+| armor (plated) | 54% / 34.3 | 60% / 30.1 | 61% / 30.5 | 63% / 28.9 | tie |
+| magic resist (prism) | 91% / 17.4 | 93% / 16.1 | 92% / 15.6 | 94% / 14.1 | extra_recruits |
 | fliers (skimmers) | 61% / 32.1 | 61% / 32.1 | 74% / 27.8 | 61% / 32.1 | bow_training |
-| heavies (dreadnought + carrier) | 57% / 28.6 | 70% / 21.6 | 73% / 21.0 | 74% / 20.8 | tie |
-| mixed wave | 59% / 35.0 | 63% / 30.9 | 62% / 29.9 | 63% / 29.6 | tie |
-| Mothership | 20% / 21.0 | 20% / 21.3 | 22% / 22.0 | 20% / 20.6 | tie |
+| heavies (dreadnought + carrier) | 57% / 27.1 | 71% / 21.1 | 73% / 20.8 | 75% / 20.1 | tie |
+| mixed wave | 60% / 34.6 | 62% / 30.1 | 63% / 29.3 | 62% / 29.9 | tie |
+| Mothership | 20% / 23.0 | 20% / 23.0 | 22% / 23.0 | 20% / 23.0 | tie |
 
 
 ### Economy
@@ -326,18 +326,18 @@ Gold left at the end, total gold earned, the time at which every build spot held
 
 | level | competent gold left | competent earned | competent maxed at | competent last buy | expert gold left | expert earned | expert maxed at | expert last buy |
 |---|---|---|---|---|---|---|---|---|
-| 1 Meadow Landing | 54 | 434 | 114 s (90%, 8/8) | 90% | 112 | 492 | 69 s (77%, 8/8) | 77% |
-| 2 Blossom Bend | 93 | 1664 | never | 98% | 55 | 1695 | never | 98% |
-| 3 Twin Creeks | 114 | 994 | never | 94% | 139 | 1089 | never | 93% |
-| 4 Dune Crossing | 91 | 2291 | never | 97% | 417 | 2477 | never | 88% |
-| 5 Oasis Crossroads | 116 | 3094 | never | 99% | 1246 | 3246 | never | 73% |
-| 6 Scorpion Loop | 83 | 4907 | never | 99% | 2331 | 5025 | never | 61% |
-| 7 Frostbite Pass | 97 | 2815 | never | 98% | 94 | 2888 | never | 99% |
-| 8 Glacier Junction | 213 | 6143 | 399 s (99%, 8/8) | 99% | 2479 | 6239 | never | 70% |
-| 9 Icebound Bastion | 450 | 3620 | 372 s (95%, 8/8) | 95% | 1445 | 3725 | never | 67% |
-| 10 The Mothership | 74 | 6922 | never | 91% | 189 | 7037 | never | 86% |
+| 1 Meadow Landing | 57 | 437 | 111 s (90%, 8/8) | 90% | 111 | 491 | 69 s (78%, 8/8) | 78% |
+| 2 Blossom Bend | 107 | 1665 | never | 97% | 67 | 1707 | never | 98% |
+| 3 Twin Creeks | 114 | 1214 | never | 94% | 150 | 1330 | never | 94% |
+| 4 Dune Crossing | 127 | 2327 | never | 96% | 439 | 2499 | never | 88% |
+| 5 Oasis Crossroads | 34 | 4258 | never | 100% | 2310 | 4310 | never | 61% |
+| 6 Scorpion Loop | 90 | 4934 | never | 99% | 2341 | 5035 | never | 57% |
+| 7 Frostbite Pass | 120 | 2709 | never | 98% | 86 | 2770 | never | 99% |
+| 8 Glacier Junction | 244 | 6174 | 394 s (98%, 8/8) | 98% | 2480 | 6240 | never | 70% |
+| 9 Icebound Bastion | 573 | 3743 | 358 s (91%, 8/8) | 91% | 1545 | 3825 | never | 65% |
+| 10 The Mothership | 100 | 6948 | never | 88% | 193 | 7041 | never | 86% |
 
-Mothership (level 10): where on the road the boss was when it died (won runs) or when the run ended (lost runs): competent 85%, expert 82%, archer-only 65%, wizard-only 97%.
+Mothership (level 10): where on the road the boss was when it died (won runs) or when the run ended (lost runs): competent 84%, expert 82%, archer-only 64%, wizard-only 95%.
 
 ## Levels
 
@@ -345,13 +345,13 @@ Mothership (level 10): where on the road the boss was when it died (won runs) or
 |---|---|---|---|---|---|---|---|---|
 | 1 | Meadow Landing | spring | 6 | 300 | 8 | 1/1/1/1 | scout, dart | 36 |
 | 2 | Blossom Bend | spring | 7 | 320 | 10 | 2/2/2/2 | skimmer | 77 |
-| 3 | Twin Creeks | spring | 8 | 340 | 12 | 3/2/2/2 | plated | 33 |
+| 3 | Twin Creeks | spring | 8 | 340 | 12 | 3/2/2/2 | plated | 43 |
 | 4 | Dune Crossing | desert | 9 | 360 | 12 | 3/3/2/2 | prism | 64 |
-| 5 | Oasis Crossroads | desert | 10 | 400 | 14 | 3/3/3/2 | carrier | 90 |
+| 5 | Oasis Crossroads | desert | 10 | 400 | 14 | 3/3/3/2 | carrier | 133 |
 | 6 | Scorpion Loop | desert | 10 | 420 | 14 | 3/3/3/3 | - | 99 |
-| 7 | Frostbite Pass | winter | 12 | 440 | 11 | 3/3/3/3 | dread | 35 |
+| 7 | Frostbite Pass | winter | 12 | 440 | 11 | 3/3/3/3 | dread | 33 |
 | 8 | Glacier Junction | winter | 12 | 450 | 14 | 3/3/3/3 | - | 121 |
-| 9 | Icebound Bastion | winter | 12 | 450 | 7 | 3/3/3/3 | - | 37 |
+| 9 | Icebound Bastion | winter | 12 | 450 | 7 | 3/3/3/3 | - | 38 |
 | 10 | The Mothership | mixed | 15 | 700 | 17 | 3/3/3/3 | mothership | 57 |
 
 <!-- balance:generated:end -->

@@ -212,7 +212,7 @@ describe('bomb targeting', () => {
 });
 
 describe('lobbed shells', () => {
-  it('fly for ~0.9 s + a little per tile to a fixed point, emitting shoot(kind bomb) with the arc fields', () => {
+  it('fly for ~0.65 s + a little per tile to a fixed point, emitting shoot(kind bomb) with the arc fields', () => {
     const { sim } = setup(['plated']);
     const rec = new Recorder(sim);
     rec.flush();
@@ -224,7 +224,7 @@ describe('lobbed shells', () => {
     expect(shell).toBeDefined();
     const d = Math.hypot(shell.tx - shell.fromX, shell.ty - shell.fromY);
     expect(shell.flightTime).toBeCloseTo(BOMB.flightBase + BOMB.flightPerTile * d);
-    expect(shell.flightTime).toBeGreaterThanOrEqual(0.9);
+    expect(shell.flightTime).toBeGreaterThanOrEqual(0.65);
     expect(shell.radius).toBeCloseTo(1.0);
     expect(shell.arc).toBe(BOMB.shellArc);
     expect(shell.progress).toBeGreaterThan(0);
@@ -248,7 +248,7 @@ describe('lobbed shells', () => {
     expect(rec.until(() => rec.of('explode').length > 0, 5)).toBe(true);
     const ex = rec.of('explode')[0].e;
     expect(ex.hits).toBe(0);
-    expect(dart.x).toBeGreaterThan(start + 1.5);
+    expect(dart.x).toBeGreaterThan(start + 1.2);
     expect(rec.of('hit').filter((h) => h.e.source === 'shell').length).toBe(0);
     expect(dart.hp).toBe(dart.maxHp);
   });
@@ -280,7 +280,7 @@ describe('Cluster Bomb (level 3)', () => {
     return { sim, rec, cluster, flying };
   }
 
-  it('releases 3 bomblets within ~0.8 tile that explode after ~0.35 s with radius 0.5 and 30% damage', () => {
+  it('releases 3 bomblets within ~0.8 tile that explode after ~0.28 s with radius 0.5 and 30% damage', () => {
     const { sim, rec, cluster, flying } = clusterRun(1);
     const e = cluster.e;
     expect(e.bomblets.length).toBe(3);

@@ -72,11 +72,11 @@ Damage types: `physical` (×(1−armor)), `magic` (×(1−magicResist)), `true`.
 | | 3 | +240 | 54–84 | 1.8 s | 3.4 | blast radius 1.2, **Cluster Bomb**: 3 bomblets (radius 0.5, 30% dmg) |
 
 **Bomb tower.** Cannot target high fliers (skimmers) and its splash never touches them; the Mothership *is* hit. It lobs a
-shell at the target's position **at fire time** (no lead), flight time `0.9 s + 0.08 s/tile`, so fast Darts (and anything that
+shell at the target's position **at fire time** (no lead), flight time `0.65 s + 0.06 s/tile`, so fast Darts (and anything that
 keeps walking) can dodge it; engaged / slowed enemies cannot. Splash damage (physical, armor applies) is 100% within 40% of
 the radius and falls linearly to 50% at the edge. Targeting: the ground enemy in range that has the most ground enemies in its
 blast (ties: furthest along the path), so it is a swarm tower. **Cluster Bomb** (Lv3): on impact 3 bomblets scatter uniformly
-within 0.8 t of the impact (seeded RNG, deterministic), explode 0.35 s later with radius 0.5 for 30% of the shell's rolled damage.
+within 0.8 t of the impact (seeded RNG, deterministic), explode 0.28 s later with radius 0.5 for 30% of the shell's rolled damage.
 Costs match the wizard (100 / 160 / 240); the first-draft numbers (125 / 200 / 300, 8–15 … 35–55 dmg, 2.5 s … 2.3 s, radius 0.8 … 1.0)
 were re-tuned with the balance tool, see `docs/BALANCE.md`. Sim API: projectile kinds `shell` / `bomblet`, events `explode` / `cluster`, see the source comments in `src/core/types.ts`.
 
@@ -90,7 +90,7 @@ Upgrading a barracks heals/upgrades existing knights in place.
 ## 4. Abilities
 
 - **Orbital Strike** — cooldown 40 s. Click ability then a map point. 1.0 s reticle, then beam: 60 **true** damage to all
-  enemies (incl. fliers & boss) within radius 1.4 t. Screen shake + flash.
+  enemies (incl. fliers & boss) within radius 1.7 t. Screen shake + flash.
 - **Reinforcements** — cooldown 15 s. Click then a point within 1.0 t of a path. Spawns 2 militia (knight_level_1 sprite,
   tinted) for 12 s: 30 HP, 1–3 dmg / 1 s, fight like knights with their rally fixed at the spawn point.
 

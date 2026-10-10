@@ -76,7 +76,7 @@ describe('orbital strike', () => {
     const ab = sim.state.abilities.orbital;
     expect(ab.cooldownMax).toBe(30);
     expect(ab.damage).toBeCloseTo(84);
-    expect(ab.radius).toBeCloseTo(1.96);
+    expect(ab.radius).toBeCloseTo(1.7 * 1.4);
     sim.callNextWave();
     const rec = new Recorder(sim);
     rec.seconds(3);
@@ -87,7 +87,7 @@ describe('orbital strike', () => {
     expect(sim.state.burns.length).toBe(1);
     const hp = dread.hp;
     rec.seconds(1);
-    // 15 true dps while standing in the fire (0.6 t/s: still in the 1.96 radius)
+    // 15 true dps while standing in the fire (0.6 t/s: still in the 2.38 radius)
     expect(hp - dread.hp).toBeCloseTo(15, 0);
     rec.seconds(2.5);
     expect(sim.state.burns.length).toBe(0);

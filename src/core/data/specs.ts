@@ -143,7 +143,7 @@ export const SPEC_TUNING = {
     /** Splash radius in tiles (the Bombs star radius bonus applies); hits grounded UFOs AND fliers. */
     splash: 0.7,
     /** Tiles per second. */
-    speed: 6.5,
+    speed: 8,
   },
   bow_training: {
     damageMin: 9,

@@ -86,19 +86,25 @@ export class RadialMenu {
 
   open(ax: number, ay: number, items: RadialItem[]): void {
     this.close(true);
-    const u = Math.min(UI_SCALE, 1.6);
-    this.u = u;
     const n = items.length;
     const R = n >= 4 ? RING_R4 : RING_R;
     this.R = R;
-    // the backdrop is a slightly tall ellipse centred a bit below the anchor: the bottom button's cost chip + role label hang under it
-    const rx = R + BTN_R + 14;
-    const ry = rx + 20;
-    const dy = 12;
-    const mx = (rx + 8) * u;
-    const my = (R + BTN_R + 12) * u;
+    // the backdrop is a true circle (the camera zoom is uniform, so equal logical radii stay round on screen). It must enclose the top
+    // button and the bottom button's cost chip + role label, so its centre sits a little below the anchor.
+    const topExt = R + BTN_R + 8;
+    const botExt = R + BTN_R + 46;
+    const rad = (topExt + botExt) / 2;
+    const dy = (botExt - topExt) / 2;
+    // phones are short: shrink the whole menu rather than letting the circle run off the top / bottom
+    const top = SAFE.t + 46 * UI_SCALE + 10;
+    const availH = GAME_H - SAFE.b - top - 6;
+    const u = Math.min(UI_SCALE, 1.6, availH / (2 * rad));
+    this.u = u;
+    const mx = rad * u + 4;
     const x = Phaser.Math.Clamp(ax, mx + SAFE.l, GAME_W - mx - SAFE.r);
-    const y = Phaser.Math.Clamp(ay, my + 40 + 20 * u + SAFE.t, GAME_H - (R + BTN_R + 56) * u - 4 - SAFE.b);
+    const yMin = top + (rad - dy) * u;
+    const yMax = GAME_H - SAFE.b - 4 - (rad + dy) * u;
+    const y = yMax >= yMin ? Phaser.Math.Clamp(ay, yMin, yMax) : (yMin + yMax) / 2;
     this.anchor = { x, y };
     const s = this.scene;
     const root = s.add.container(x, y).setDepth(DEPTH.menu);
@@ -108,9 +114,9 @@ export class RadialMenu {
     this.openedAt = performance.now();
 
     const disc = s.add.graphics();
-    disc.fillStyle(0x1b1226, 0.55).fillEllipse(0, dy, rx * 2, ry * 2);
-    disc.lineStyle(4, COLORS.ink, 0.9).strokeEllipse(0, dy, rx * 2, ry * 2);
-    disc.lineStyle(2, 0xffffff, 0.15).strokeEllipse(0, dy, rx * 2 - 8, ry * 2 - 8);
+    disc.fillStyle(0x1b1226, 0.55).fillCircle(0, dy, rad);
+    disc.lineStyle(4, COLORS.ink, 0.9).strokeCircle(0, dy, rad);
+    disc.lineStyle(2, 0xffffff, 0.15).strokeCircle(0, dy, rad - 4);
     root.add(disc);
     root.setScale(0.55 * u).setAlpha(0);
     s.tweens.add({ targets: root, scale: u, alpha: 1, duration: 220, ease: 'Back.easeOut' });
