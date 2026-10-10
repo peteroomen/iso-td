@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { pauseReasons } from './pauseReasons';
-import { BASE_H, BASE_W, setViewMetrics, textResolution } from './theme';
+import { BASE_H, BASE_W, GAME_H, GAME_W, setViewMetrics, textResolution } from './theme';
 
 /** Scenes that should not be restarted on resize (they only exist for a moment, or manage themselves). */
 const SKIP = new Set(['Boot', 'Preload']);
@@ -131,7 +131,8 @@ function syncTextResolution(scene: Phaser.Scene): void {
  * Makes the scene's main camera map logical units to physical pixels. Every scene calls this at the start of `create()`
  * (cameras are rebuilt on scene restart); `installViewport` calls it again for all running scenes on every resize.
  */
-export function applyViewCamera(scene: Phaser.Scene): void {
+export function applyViewCamera(scene: Phaser.Scene, stamp = true): void {
+  if (stamp) builtFor.set(scene, sigOf());
   const cam = scene.cameras.main;
   const { pw, ph, k } = cur;
   cam.setSize(pw, ph);
@@ -168,28 +169,75 @@ export function syncViewMetrics(_game?: Phaser.Game): void {
   setViewMetrics(cur.lw, cur.lh, cssPerUnit, readInsets(), cur.k);
 }
 
+/** What the window currently offers, in CSS px (visual viewport when not pinch-zoomed: it follows the Android address bar). */
+function windowSize(): { w: number; h: number } {
+  const vv = window.visualViewport;
+  let w = window.innerWidth;
+  let h = window.innerHeight;
+  if (vv && vv.width > 0 && vv.height > 0 && Math.abs(vv.scale - 1) < 0.01) {
+    w = vv.width;
+    h = vv.height;
+  }
+  return { w: Math.round(w), h: Math.round(h) };
+}
+
+let lastWin = { w: 0, h: 0 };
+let lastDpr = 0;
+
+/**
+ * Pins the host element to the live window size in px (CSS has the same via 100vw x 100dvh, but Android reports the
+ * dynamic viewport late or in odd orders), then reads back what the browser actually laid out (fullscreen UA rules win).
+ */
+function syncHost(host: HTMLElement): { w: number; h: number } {
+  const win = windowSize();
+  lastWin = win;
+  lastDpr = window.devicePixelRatio;
+  if (win.w > 0 && win.h > 0) {
+    if (host.style.width !== `${win.w}px`) host.style.width = `${win.w}px`;
+    if (host.style.height !== `${win.h}px`) host.style.height = `${win.h}px`;
+  }
+  return { w: host.clientWidth || win.w || BASE_W, h: host.clientHeight || win.h || BASE_H };
+}
+
 /**
  * Sizes the canvas to the host element: canvas CSS size = host size, backing store = CSS size x capped DPR.
  * Returns true when the logical size or zoom changed.
  */
 function fitBacking(game: Phaser.Game): boolean {
   const host = hostOf(game.canvas);
-  const cw = host.clientWidth || window.innerWidth;
-  const ch = host.clientHeight || window.innerHeight;
+  const { w: cw, h: ch } = syncHost(host);
   const b = computeBacking(cw, ch, window.devicePixelRatio);
   const st = game.canvas.style;
   st.width = `${cw}px`;
   st.height = `${ch}px`;
   st.flex = 'none';
+  st.margin = '0';
   const changed = b.lw !== cur.lw || b.lh !== cur.lh || Math.abs(b.k - cur.k) > 1e-4;
   const sizeChanged = game.scale.width !== b.pw || game.scale.height !== b.ph;
   cur = b;
   cssSize = { w: cw, h: ch };
   if (sizeChanged) game.scale.resize(b.pw, b.ph);
   else game.scale.refresh(); // CSS size may have changed: recompute canvasBounds / displayScale for input
+  // Scale.resize / refresh may restyle the canvas: the CSS size must stay the host size
+  if (st.width !== `${cw}px`) st.width = `${cw}px`;
+  if (st.height !== `${ch}px`) st.height = `${ch}px`;
   syncViewMetrics(game);
   return changed;
 }
+
+/** Cheap "is the canvas out of date?" test (no layout writes): window, DPR, host and canvas CSS size vs what was applied. */
+function drifted(game: Phaser.Game): boolean {
+  const win = windowSize();
+  if (win.w !== lastWin.w || win.h !== lastWin.h || window.devicePixelRatio !== lastDpr) return true;
+  const host = hostOf(game.canvas);
+  if (Math.abs(host.clientWidth - cssSize.w) > 0.5 || Math.abs(host.clientHeight - cssSize.h) > 0.5) return true;
+  const c = game.canvas;
+  return Math.abs(c.clientWidth - cssSize.w) > 0.5 || Math.abs(c.clientHeight - cssSize.h) > 0.5;
+}
+
+/** Layout signature scenes were built for. Every scene stamps it in `applyViewCamera` (start of create()). */
+const sigOf = (): string => `${GAME_W}x${GAME_H}|${cur.lw}x${cur.lh}@${cur.k.toFixed(4)}/${Math.round(cssSize.h)}`;
+const builtFor = new WeakMap<Phaser.Scene, string>();
 
 /**
  * Keeps the backing store sized to the window and re-lays out the running scenes whenever the logical size changes
@@ -199,37 +247,61 @@ function fitBacking(game: Phaser.Game): boolean {
 export function installViewport(game: Phaser.Game): void {
   patchTextFactory();
   fitBacking(game);
-  if (import.meta.env.DEV) (window as unknown as { __viewInfo: () => unknown }).__viewInfo = () => ({ ...cur, css: { ...cssSize }, dpr: window.devicePixelRatio, canvas: [game.canvas.width, game.canvas.height] });
+  if (import.meta.env.DEV) (window as unknown as { __viewInfo: () => unknown }).__viewInfo = () => ({ ...cur, css: { ...cssSize }, dpr: window.devicePixelRatio, canvas: [game.canvas.width, game.canvas.height], sig: sigOf(), stamps: game.scene.getScenes(false).map((x) => [x.sys.settings.key, builtFor.get(x)]), timer, theme: [GAME_W, GAME_H] });
   let timer = 0;
-  let lastW = cur.lw;
-  let lastH = cur.lh;
-  let lastK = cur.k;
-  let lastCss = cssSize.h;
+  const vlog = (m: string): void => {
+    if (!import.meta.env.DEV) return;
+    const w = window as unknown as { __vlog?: string[] };
+    (w.__vlog ??= []).push(`${Math.round(performance.now())} ${m}`);
+    if (w.__vlog.length > 60) w.__vlog.shift();
+  };
+  /** no stale-layout checks until this time (a rebuild was just requested and the scene is still being recreated) */
+  let settleUntil = 0;
+  let lastSig = sigOf();
+  let portraitMq: MediaQueryList | null = null;
+  try {
+    portraitMq = window.matchMedia('(orientation: portrait) and (pointer: coarse) and (max-width: 900px)');
+  } catch {
+    /* old browsers */
+  }
 
   /**
    * Portrait is derived from the live media query every time (never remembered), so a missed or duplicated
    * orientation / resize / fullscreen event can't leave the rotate overlay or the 'portrait' pause reason stuck.
-   * Runs immediately on every event (not debounced) so the sim freezes the moment the overlay appears.
+   * Runs on every event AND every frame, so the sim freezes the moment the overlay appears and thaws the moment it goes.
    */
   const syncPortrait = (): boolean => {
-    const blocked = portraitBlocked();
-    document.documentElement.classList.toggle('rotate-needed', blocked);
+    const blocked = portraitMq ? portraitMq.matches : portraitBlocked();
+    const root = document.documentElement;
+    if (root.classList.contains('rotate-needed') !== blocked) root.classList.toggle('rotate-needed', blocked);
     pauseReasons.set('portrait', blocked);
     return blocked;
   };
 
+  /** Scenes (running ones only) whose layout was built for a different size than the live one. */
+  const staleScenes = (onlyRunning: boolean): Phaser.Scene[] => {
+    const sig = sigOf();
+    const out: Phaser.Scene[] = [];
+    for (const s of game.scene.getScenes(false)) {
+      if (SKIP.has(s.sys.settings.key)) continue;
+      if (onlyRunning ? !s.sys.isActive() : !(s.sys.isActive() || s.sys.isPaused())) continue;
+      const stamped = builtFor.get(s);
+      if (stamped === undefined ? sig !== lastSig : stamped !== sig) out.push(s);
+    }
+    return out;
+  };
+
   const relayout = (): void => {
     timer = 0;
-    if (syncPortrait()) return; // no re-layout behind the overlay; the layout is unchanged when the phone comes back
-    if (cur.lw === lastW && cur.lh === lastH && Math.abs(cur.k - lastK) < 1e-4 && Math.abs(cssSize.h - lastCss) < 0.5) return;
-    lastW = cur.lw;
-    lastH = cur.lh;
-    lastK = cur.k;
-    lastCss = cssSize.h;
+    vlog(`relayout sig=${sigOf()} portrait=${portraitBlocked()}`);
+    if (syncPortrait()) return; // no re-layout behind the overlay; the frame check rebuilds as soon as landscape is back
     syncViewMetrics(game);
-    for (const s of game.scene.getScenes(false)) {
-      const key = s.sys.settings.key;
-      if (SKIP.has(key)) continue;
+    const stale = staleScenes(false);
+    lastSig = sigOf();
+    vlog(`stale=${stale.map((x) => x.sys.settings.key + ':' + x.sys.settings.status).join()}`);
+    if (stale.length === 0) return;
+    settleUntil = performance.now() + 450;
+    for (const s of stale) {
       if (isResizable(s)) {
         s.onViewResize();
       } else if (s.sys.isActive() || s.sys.isPaused()) {
@@ -239,29 +311,39 @@ export function installViewport(game: Phaser.Game): void {
     }
   };
 
-  const schedule = (): void => {
+  const schedule = (delay = 140): void => {
     if (timer) window.clearTimeout(timer);
-    timer = window.setTimeout(relayout, 140);
+    timer = window.setTimeout(relayout, delay);
   };
 
-  /** Window / host changed: resize the backing store right away (no stretched frames), re-layout shortly after. */
-  let queued = false;
-  const applySize = (): void => {
-    if (!queued) return; // rAF and the timeout fallback race: whichever comes first does the work
-    queued = false;
+  /**
+   * Window / host changed: resize the backing store and the cameras right away (no stretched frames, no frame that
+   * draws a stale-sized canvas), re-layout the scenes shortly after.
+   */
+  const applyNow = (): void => {
     fitBacking(game);
-    for (const s of game.scene.getScenes(false)) if (s.sys.isActive() || s.sys.isPaused()) applyViewCamera(s);
+    for (const s of game.scene.getScenes(false)) if (s.sys.isActive() || s.sys.isPaused()) applyViewCamera(s, false);
     syncPortrait();
     schedule();
   };
   const onSize = (): void => {
     syncPortrait();
-    if (queued) return;
-    queued = true;
-    requestAnimationFrame(applySize);
-    // rAF is throttled / dropped while the page is hidden or mid fullscreen-transition: never rely on it alone
-    window.setTimeout(applySize, 100);
+    applyNow();
   };
+
+  /** Runs every frame (prestep) and from a slow timer while the loop sleeps: catches every missed event. */
+  const frameCheck = (): void => {
+    if (document.hidden) return;
+    if (GAME_W !== cur.lw || GAME_H !== cur.lh) syncViewMetrics(game); // theme metrics must always mirror the live backing
+    if (drifted(game)) applyNow();
+    else syncPortrait();
+    if (!timer && performance.now() > settleUntil && staleScenes(true).length > 0) {
+      vlog('frame-check stale -> schedule');
+      schedule(60);
+    }
+  };
+  game.events.on(Phaser.Core.Events.PRE_STEP, frameCheck);
+  window.setInterval(frameCheck, 500);
 
   // app backgrounded: freeze the run and leave the player on the pause menu when they return
   const onVisibility = (): void => {
@@ -282,8 +364,11 @@ export function installViewport(game: Phaser.Game): void {
   document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement) unlockOrientation(); // left fullscreen by the system (back gesture): release the lock too
     onSize();
+    // Android applies the new window size a beat after the event: re-measure a few times
+    for (const d of [120, 400, 1000]) window.setTimeout(frameCheck, d);
   });
   window.visualViewport?.addEventListener('resize', onSize);
+  window.visualViewport?.addEventListener('scroll', frameCheck);
   try {
     new ResizeObserver(onSize).observe(hostOf(game.canvas));
   } catch {
@@ -311,16 +396,6 @@ export function installViewport(game: Phaser.Game): void {
   } catch {
     /* old browsers */
   }
-  // safety net for browsers that report a rotation / fullscreen switch late or not at all (Android resizes the window
-  // after the orientation event): re-check the live window a few times a second, which is cheap and idempotent
-  window.setInterval(() => {
-    if (document.hidden) return;
-    const host = hostOf(game.canvas);
-    const cw = host.clientWidth || window.innerWidth;
-    const ch = host.clientHeight || window.innerHeight;
-    if (Math.abs(cw - cssSize.w) > 0.5 || Math.abs(ch - cssSize.h) > 0.5) onSize();
-    else syncPortrait();
-  }, 500);
   syncPortrait();
   schedule();
 }

@@ -32,32 +32,48 @@ export interface DefeatInfo {
   onQuit(): void;
 }
 
+interface Shell {
+  root: Phaser.GameObjects.Container;
+  dim: Phaser.GameObjects.Rectangle;
+  panel: Phaser.GameObjects.Container;
+  w: number;
+  h: number;
+  onOrphanTap?: () => void;
+}
+
 /** Pause menu, victory (animated stars) and defeat panels. */
 export class Overlays {
   private pause?: Phaser.GameObjects.Container;
   private result?: Phaser.GameObjects.Container;
+  private tap?: Phaser.GameObjects.Container;
   private k = 1;
+  /** every dim / panel pair currently alive, with the size the panel is laid out for */
+  private shells: Shell[] = [];
+  private lastW = GAME_W;
+  private lastH = GAME_H;
 
   constructor(private readonly scene: Phaser.Scene) {}
 
   get active(): boolean {
-    return !!this.pause || !!this.result;
+    return !!this.pause || !!this.result || !!this.tap;
+  }
+
+  /** the fail-safe "Tap to resume" card is up */
+  get tapOpen(): boolean {
+    return !!this.tap;
   }
 
   get pauseOpen(): boolean {
     return !!this.pause;
   }
 
-  private shell(depth: number, w: number, h: number, title: string, titleColor: string): { root: Phaser.GameObjects.Container; panel: Phaser.GameObjects.Container } {
+  private shell(depth: number, w: number, h: number, title: string, titleColor: string, onOrphanTap?: () => void): { root: Phaser.GameObjects.Container; panel: Phaser.GameObjects.Container } {
     const s = this.scene;
     const root = s.add.container(0, 0).setDepth(depth);
     const dim = s.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x0d0816, 0.62).setInteractive();
     markHud(dim);
     root.add(dim);
-    // fit the panel (and its ribbon) into the live canvas; grow it a little on small screens
-    const k = Math.max(0.6, Math.min(UI_SCALE, 1.25, (GAME_H - 24) / (h + 60), (GAME_W - 24) / (w + 20)));
-    this.k = k;
-    const panel = s.add.container(GAME_W / 2, GAME_H / 2).setScale(k);
+    const panel = s.add.container(GAME_W / 2, GAME_H / 2);
     const g = s.add.graphics();
     drawPanel(g, -w / 2, -h / 2, w, h, { r: 22, fill: 0x3d3150, bw: 5 });
     const ribbon = s.add.graphics();
@@ -67,11 +83,90 @@ export class Overlays {
     const t = s.add.text(0, -h / 2 - 1, title, textStyle(46, titleColor, { strokeThickness: 8 })).setOrigin(0.5);
     panel.add([g, ribbon, t]);
     root.add(panel);
+    const sh: Shell = { root, dim, panel, w, h, onOrphanTap };
+    this.shells.push(sh);
+    this.fit(sh);
     root.setAlpha(0);
-    panel.setScale(0.6 * k);
+    panel.setScale(0.6 * this.k);
     s.tweens.add({ targets: root, alpha: 1, duration: 160 });
-    s.tweens.add({ targets: panel, scale: k, duration: 360, ease: 'Back.easeOut' });
+    s.tweens.add({ targets: panel, scale: this.k, duration: 360, ease: 'Back.easeOut' });
+    // a tap on the bare dim (not on the panel / its buttons) while the panel is not actually on screen: self-heal
+    dim.on('pointerdown', () => {
+      if (!this.panelVisible(sh)) {
+        this.fit(sh);
+        sh.onOrphanTap?.();
+      }
+    });
     return { root, panel };
+  }
+
+  /** Sizes the dim to the live canvas and centres / scales the panel so it is fully visible. */
+  private fit(sh: Shell): void {
+    sh.dim.setPosition(GAME_W / 2, GAME_H / 2).setSize(GAME_W, GAME_H);
+    // setSize on a Rectangle game object doesn't resize its hit area / geometry: refresh both
+    const geom = sh.dim as unknown as { setDisplaySize(w: number, h: number): void };
+    geom.setDisplaySize(GAME_W, GAME_H);
+    if (sh.dim.input) sh.dim.input.hitArea = new Phaser.Geom.Rectangle(0, 0, GAME_W, GAME_H);
+    const k = Math.max(0.5, Math.min(UI_SCALE, 1.25, (GAME_H - 24) / (sh.h + 60), (GAME_W - 24) / (sh.w + 20)));
+    this.k = k;
+    sh.panel.setPosition(GAME_W / 2, GAME_H / 2);
+    sh.panel.setScale(k);
+  }
+
+  /** The panel exists, is shown and lies inside the canvas. */
+  private panelVisible(sh: Shell): boolean {
+    if (!sh.root.active || !sh.panel.active || !sh.panel.visible || !sh.root.visible || sh.root.alpha < 0.05) return false;
+    const hw = (sh.w / 2) * sh.panel.scaleX;
+    const hh = (sh.h / 2) * sh.panel.scaleY;
+    return sh.panel.x - hw >= -2 && sh.panel.x + hw <= GAME_W + 2 && sh.panel.y - hh >= -2 && sh.panel.y + hh <= GAME_H + 2;
+  }
+
+  /**
+   * Called every frame by the scene: re-lays-out every dim / panel when the logical size changed, and removes any
+   * dim that has lost its panel (an interactive full-screen blocker without a visible panel locks the player out).
+   */
+  validate(): void {
+    const resized = GAME_W !== this.lastW || GAME_H !== this.lastH;
+    this.lastW = GAME_W;
+    this.lastH = GAME_H;
+    this.shells = this.shells.filter((sh) => {
+      if (!sh.root.active) return false;
+      if (!sh.panel.active) {
+        sh.root.destroy(); // orphaned dim
+        if (this.pause === sh.root) this.pause = undefined;
+        if (this.result === sh.root) this.result = undefined;
+        if (this.tap === sh.root) this.tap = undefined;
+        return false;
+      }
+      if (resized || sh.dim.width !== GAME_W || sh.dim.height !== GAME_H) {
+        this.scene.tweens.killTweensOf(sh.panel);
+        this.scene.tweens.killTweensOf(sh.root);
+        sh.root.setAlpha(1);
+        this.fit(sh);
+      } else if (sh.root.alpha > 0.99 && !this.panelVisible(sh)) {
+        this.fit(sh);
+      }
+      return true;
+    });
+  }
+
+  /** Small fail-safe card: the game is paused for a reason nobody can see; any tap resumes. */
+  showTapResume(onResume: () => void): void {
+    if (this.tap) return;
+    const { root, panel } = this.shell(DEPTH.overlay + 8, 360, 150, 'PAUSED', COLORS.text, () => onResume());
+    this.tap = root;
+    const label = this.scene.add.text(0, 20, 'Tap to resume', textStyle(34, COLORS.textGold)).setOrigin(0.5);
+    panel.add(label);
+    // any tap on the dim (anywhere on the screen) resumes
+    this.shells[this.shells.length - 1]?.dim.on('pointerdown', () => onResume());
+  }
+
+  hideTapResume(): void {
+    const t = this.tap;
+    if (!t) return;
+    this.tap = undefined;
+    this.shells = this.shells.filter((sh) => sh.root !== t);
+    t.destroy();
   }
 
   showPause(a: PauseActions): void {
@@ -84,7 +179,7 @@ export class Overlays {
     if (a.onFullscreen) items.push({ label: a.fullscreenLabel?.() ?? 'Fullscreen', fill: 0x3f8aa8, fn: a.onFullscreen });
     items.push({ label: 'Quit to Map', fill: 0xb0504a, fn: a.onQuit });
     const n = items.length;
-    const { root, panel } = this.shell(DEPTH.overlay, 380, 120 + n * 70, 'PAUSED', COLORS.text);
+    const { root, panel } = this.shell(DEPTH.overlay, 380, 120 + n * 70, 'PAUSED', COLORS.text, () => a.onResume());
     this.pause = root;
     items.forEach((it, i) => {
       const y = -((n - 1) * 70) / 2 + i * 70 + 24;
@@ -97,6 +192,9 @@ export class Overlays {
     const p = this.pause;
     if (!p) return;
     this.pause = undefined;
+    // fading out: stop it blocking input right away and drop it from the live set
+    this.shells = this.shells.filter((sh) => sh.root !== p);
+    p.list.forEach((o) => (o as Phaser.GameObjects.GameObject).input && (o as Phaser.GameObjects.GameObject).disableInteractive());
     this.scene.tweens.add({ targets: p, alpha: 0, duration: 120, onComplete: () => p.destroy() });
   }
 
@@ -194,7 +292,11 @@ export class Overlays {
   destroy(): void {
     this.pause?.destroy();
     this.result?.destroy();
+    this.tap?.destroy();
+    for (const sh of this.shells) sh.root.destroy();
+    this.shells = [];
     this.pause = undefined;
     this.result = undefined;
+    this.tap = undefined;
   }
 }

@@ -38,9 +38,12 @@
       #game {
         position: fixed;
         inset: 0;
-        width: 100%;
-        height: 100vh;
-        height: 100dvh;
+        margin: 0;
+        padding: 0;
+        width: 100vw;
+        height: 100vh; /* fallback */
+        height: 100dvh; /* tracks the Android address bar; viewport.ts additionally pins px sizes from the live viewport */
+        overflow: hidden;
         background: #120c1c;
         display: flex;
         align-items: center;

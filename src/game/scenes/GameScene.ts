@@ -72,6 +72,8 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
   private result?: ResultState;
   /** the canvas was resized while this scene was paused behind the Settings overlay */
   private staleLayout = false;
+  /** when the sim was first seen frozen with nothing on screen explaining why (fail-safe, see reconcilePause) */
+  private orphanSince = -1;
   private onResumeEvt = (): void => {
     // back from the Settings overlay
     pauseReasons.remove('settings');
@@ -99,6 +101,7 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
     this.ended = false;
     this.result = undefined;
     this.staleLayout = false;
+    this.orphanSince = -1;
     this.animTime = rs?.animTime ?? 0;
     this.shownHintWave = -1;
     this.dismissedHints = rs?.dismissedHints ?? new Set();
@@ -439,9 +442,44 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
     }
   }
 
+  /**
+   * Fail-safe against lock-outs. Reasons that mirror live browser state are re-derived every frame (a missed event
+   * can't leave them stuck), and when the sim is frozen with no pause menu / rotate card / Settings explaining it, a
+   * small "Tap to resume" card is shown instead of an inert screen.
+   */
+  private reconcilePause(time: number): void {
+    if (pauseReasons.has('hidden') && !document.hidden) pauseReasons.remove('hidden');
+    if (pauseReasons.has('settings') && !this.scene.manager.isActive('Settings')) pauseReasons.remove('settings');
+    if (pauseReasons.has('portrait') && !document.documentElement.classList.contains('rotate-needed')) pauseReasons.remove('portrait');
+    const explained = pauseReasons.has('portrait') || pauseReasons.has('settings') || this.overlays.pauseOpen || this.overlays.tapOpen || this.ended;
+    if (!pauseReasons.any) {
+      this.orphanSince = -1;
+      if (this.overlays.tapOpen) this.overlays.hideTapResume();
+      return;
+    }
+    if (this.overlays.tapOpen && this.overlays.pauseOpen) this.overlays.hideTapResume();
+    if (explained) {
+      this.orphanSince = -1;
+      return;
+    }
+    if (pauseReasons.has('user')) {
+      this.syncPauseMenu(); // the menu should exist: rebuild it
+      if (this.overlays.pauseOpen) return;
+    }
+    if (this.orphanSince < 0) this.orphanSince = time;
+    else if (time - this.orphanSince > 600) {
+      this.overlays.showTapResume(() => {
+        for (const r of ['user', 'hidden', 'settings'] as const) pauseReasons.remove(r);
+        this.overlays.hideTapResume();
+      });
+    }
+  }
+
   // ----------------------------------------------------------------------------------- frame
 
   update(time: number, delta: number): void {
+    this.overlays.validate();
+    this.reconcilePause(time);
     const dt = Math.min(delta, 100) / 1000;
     const stepping = !pauseReasons.any;
     if (stepping) {
