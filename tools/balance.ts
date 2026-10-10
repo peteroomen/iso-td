@@ -157,7 +157,7 @@ function markdown(levelIds: string[], botNames: string[], results: Map<string, A
     out.push(`| ${n} | ${c.starsPerLevel}/level | ${c.abilities} | ${c.early} | ${build} |`);
   }
   out.push('');
-  out.push('Star upgrades by level (competent / expert):', '');
+  out.push('Star upgrades by level (competent / expert; A archers, W wizards, B barracks, O orbital, R reinforcements, X bombs):', '');
   out.push('| level | competent (2*) | expert (3*) |', '|---|---|---|');
   for (const id of levelIds) {
     const n = Number(id.replace(/\D/g, ''));
