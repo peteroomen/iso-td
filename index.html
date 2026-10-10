@@ -55,6 +55,8 @@
       /* "rotate your device" card: touch devices held upright (see installViewport) */
       #rotate {
         display: none;
+        visibility: hidden;
+        pointer-events: none; /* never captures touches unless the card is actually showing (portrait only) */
         position: fixed;
         inset: 0;
         z-index: 10;
@@ -71,6 +73,8 @@
       }
       .rotate-needed #rotate {
         display: flex;
+        visibility: visible;
+        pointer-events: auto;
       }
       #rotate .phone {
         width: 54px;

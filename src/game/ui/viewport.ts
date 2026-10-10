@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { pauseReasons } from './pauseReasons';
 import { BASE_H, BASE_W, setViewMetrics, textResolution } from './theme';
 
 /** Scenes that should not be restarted on resize (they only exist for a moment, or manage themselves). */
@@ -204,21 +205,22 @@ export function installViewport(game: Phaser.Game): void {
   let lastH = cur.lh;
   let lastK = cur.k;
   let lastCss = cssSize.h;
-  let wasBlocked = false;
+
+  /**
+   * Portrait is derived from the live media query every time (never remembered), so a missed or duplicated
+   * orientation / resize / fullscreen event can't leave the rotate overlay or the 'portrait' pause reason stuck.
+   * Runs immediately on every event (not debounced) so the sim freezes the moment the overlay appears.
+   */
+  const syncPortrait = (): boolean => {
+    const blocked = portraitBlocked();
+    document.documentElement.classList.toggle('rotate-needed', blocked);
+    pauseReasons.set('portrait', blocked);
+    return blocked;
+  };
 
   const relayout = (): void => {
     timer = 0;
-    const blocked = portraitBlocked();
-    document.documentElement.classList.toggle('rotate-needed', blocked);
-    if (blocked) {
-      if (!wasBlocked) {
-        wasBlocked = true;
-        // stop the sim behind the overlay
-        for (const sc of game.scene.getScenes(true)) (sc as unknown as { onPortraitBlock?: () => void }).onPortraitBlock?.();
-      }
-      return;
-    }
-    wasBlocked = false;
+    if (syncPortrait()) return; // no re-layout behind the overlay; the layout is unchanged when the phone comes back
     if (cur.lw === lastW && cur.lh === lastH && Math.abs(cur.k - lastK) < 1e-4 && Math.abs(cssSize.h - lastCss) < 0.5) return;
     lastW = cur.lw;
     lastH = cur.lh;
@@ -243,20 +245,44 @@ export function installViewport(game: Phaser.Game): void {
   };
 
   /** Window / host changed: resize the backing store right away (no stretched frames), re-layout shortly after. */
-  let raf = 0;
-  const onSize = (): void => {
-    if (raf) return;
-    raf = requestAnimationFrame(() => {
-      raf = 0;
-      fitBacking(game);
-      for (const s of game.scene.getScenes(false)) if (s.sys.isActive() || s.sys.isPaused()) applyViewCamera(s);
-      schedule();
-    });
+  let queued = false;
+  const applySize = (): void => {
+    if (!queued) return; // rAF and the timeout fallback race: whichever comes first does the work
+    queued = false;
+    fitBacking(game);
+    for (const s of game.scene.getScenes(false)) if (s.sys.isActive() || s.sys.isPaused()) applyViewCamera(s);
+    syncPortrait();
+    schedule();
   };
+  const onSize = (): void => {
+    syncPortrait();
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(applySize);
+    // rAF is throttled / dropped while the page is hidden or mid fullscreen-transition: never rely on it alone
+    window.setTimeout(applySize, 100);
+  };
+
+  // app backgrounded: freeze the run and leave the player on the pause menu when they return
+  const onVisibility = (): void => {
+    if (document.hidden) {
+      pauseReasons.add('hidden');
+      for (const sc of game.scene.getScenes(true)) (sc as unknown as { onAppHidden?: () => void }).onAppHidden?.();
+    } else {
+      pauseReasons.remove('hidden');
+      onSize(); // the window may have been resized / rotated while away
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pageshow', onVisibility);
+  onVisibility();
 
   window.addEventListener('resize', onSize);
   window.addEventListener('orientationchange', onSize);
-  document.addEventListener('fullscreenchange', onSize);
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) unlockOrientation(); // left fullscreen by the system (back gesture): release the lock too
+    onSize();
+  });
   window.visualViewport?.addEventListener('resize', onSize);
   try {
     new ResizeObserver(onSize).observe(hostOf(game.canvas));
@@ -285,18 +311,33 @@ export function installViewport(game: Phaser.Game): void {
   } catch {
     /* old browsers */
   }
+  // safety net for browsers that report a rotation / fullscreen switch late or not at all (Android resizes the window
+  // after the orientation event): re-check the live window a few times a second, which is cheap and idempotent
+  window.setInterval(() => {
+    if (document.hidden) return;
+    const host = hostOf(game.canvas);
+    const cw = host.clientWidth || window.innerWidth;
+    const ch = host.clientHeight || window.innerHeight;
+    if (Math.abs(cw - cssSize.w) > 0.5 || Math.abs(ch - cssSize.h) > 0.5) onSize();
+    else syncPortrait();
+  }, 500);
+  syncPortrait();
   schedule();
+}
+
+function unlockOrientation(): void {
+  try {
+    screen.orientation?.unlock?.();
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Enter fullscreen (and try to lock landscape on phones); leave it if already fullscreen. */
 export function toggleFullscreen(scale: Phaser.Scale.ScaleManager): void {
   if (scale.isFullscreen) {
     scale.stopFullscreen();
-    try {
-      screen.orientation?.unlock?.();
-    } catch {
-      /* ignore */
-    }
+    unlockOrientation();
     return;
   }
   if (!scale.fullscreen.available) return;

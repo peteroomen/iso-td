@@ -18,6 +18,7 @@ import { generateTextures } from '../render/textures';
 import { Audio } from '../services/audio';
 import { getSave, updateSave } from '../services/save';
 import { COLORS, GAME_H, GAME_W, SAFE, UI_SCALE } from '../ui/theme';
+import { pauseReasons } from '../ui/pauseReasons';
 import { applyViewCamera, fullscreenAvailable, toggleFullscreen, type ViewResizable } from '../ui/viewport';
 
 const MAX_STEPS_PER_FRAME = 8;
@@ -30,7 +31,6 @@ interface ResumeState {
   acc: number;
   animTime: number;
   dismissedHints: Set<number>;
-  pauseOpen: boolean;
   ended: boolean;
   result?: ResultState;
   /** the run was started by this scene before the resize (skips the level-name banner) */
@@ -62,7 +62,7 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
 
   private acc = 0;
   private speed = 1;
-  private paused = false;
+  private unsubPause?: () => void;
   private ended = false;
   private animTime = 0;
   private shownHintWave = -1;
@@ -73,6 +73,8 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
   /** the canvas was resized while this scene was paused behind the Settings overlay */
   private staleLayout = false;
   private onResumeEvt = (): void => {
+    // back from the Settings overlay
+    pauseReasons.remove('settings');
     if (this.staleLayout) this.relayout();
   };
 
@@ -89,9 +91,11 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
     applyViewCamera(this);
     const rs = this.resumeFrom;
     this.resumeFrom = undefined;
+    // a fresh run starts un-paused; a rebuild keeps every pause reason (user / portrait / hidden) as it was
+    if (!rs) pauseReasons.resetRun();
+    pauseReasons.set('settings', this.scene.manager.isActive('Settings'));
     this.acc = rs?.acc ?? 0;
     this.speed = rs?.speed ?? 1;
-    this.paused = false;
     this.ended = false;
     this.result = undefined;
     this.staleLayout = false;
@@ -164,6 +168,11 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
     if (this.hud) this.hud.setSpeed(this.speed);
     if (!rs) this.hud.banner(level.name, { sub: `Level ${n}`, hold: 1.4 });
     if (rs) this.restoreAfterResize(rs);
+    this.unsubPause?.();
+    this.unsubPause = pauseReasons.subscribe(() => {
+      if (this.sys.isActive()) this.syncPauseMenu();
+    });
+    this.syncPauseMenu();
   }
 
   // ----------------------------------------------------------------------------------- resize / orientation
@@ -178,9 +187,9 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
     this.relayout();
   }
 
-  /** Phone turned upright: freeze the run behind the "rotate" overlay. */
-  onPortraitBlock(): void {
-    if (!this.ended && this.sys.isActive() && !this.overlays.active) this.openPause();
+  /** App went to the background: the player returns to the pause menu rather than into a running game. */
+  onAppHidden(): void {
+    if (!this.ended) pauseReasons.add('user');
   }
 
   private relayout(): void {
@@ -191,7 +200,6 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
       acc: this.acc,
       animTime: this.animTime,
       dismissedHints: this.dismissedHints,
-      pauseOpen: this.overlays.pauseOpen,
       ended: this.ended,
       result: this.result,
       hold: true,
@@ -205,8 +213,6 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
       this.ended = true;
       this.intro.disable();
       this.showResult(rs.result, 60);
-    } else if (rs.pauseOpen) {
-      this.openPause();
     }
   }
 
@@ -230,7 +236,7 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
       kb.on(ev, fn);
     };
     on('keydown-ESC', () => this.onEscape());
-    on('keydown-P', () => (this.overlays.pauseOpen ? this.closePause() : this.openPause()));
+    on('keydown-P', () => (pauseReasons.has('user') ? this.closePause() : this.openPause()));
     on('keydown-SPACE', () => this.toggleSpeed());
     on('keydown-ONE', () => this.hotkeyAbility('orbital'));
     on('keydown-TWO', () => this.hotkeyAbility('reinforce'));
@@ -246,7 +252,7 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
 
   private onEscape(): void {
     if (this.ended) return;
-    if (this.overlays.pauseOpen) {
+    if (pauseReasons.has('user')) {
       this.closePause();
       return;
     }
@@ -270,24 +276,34 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
 
   // ----------------------------------------------------------------------------------- pause / flow
 
+  /** Player pause (button / Esc / P / backgrounded). The menu itself is derived from the reason, see syncPauseMenu. */
   private openPause(): void {
-    if (this.overlays.active || this.ended) return;
-    this.paused = true;
-    this.interaction.cancelAll();
-    this.hud.tooltip.hide();
-    this.overlays.showPause({
-      onResume: () => this.closePause(),
-      onRestart: () => this.restart(),
-      onSettings: () => this.openSettings(),
-      onQuit: () => this.quit(),
-      onFullscreen: fullscreenAvailable(this.scale) ? () => toggleFullscreen(this.scale) : undefined,
-      fullscreenLabel: () => (this.scale.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'),
-    });
+    if (this.ended) return;
+    pauseReasons.add('user');
   }
 
+  /** Resume only drops the player's own reason: the sim keeps waiting while the rotate overlay / Settings still hold it. */
   private closePause(): void {
-    this.overlays.hidePause();
-    this.paused = false;
+    pauseReasons.remove('user');
+  }
+
+  /** The pause menu is visible exactly while the 'user' reason is held (and the run is not over). */
+  private syncPauseMenu(): void {
+    const want = pauseReasons.has('user') && !this.ended;
+    if (want && !this.overlays.active) {
+      this.interaction.cancelAll();
+      this.hud.tooltip.hide();
+      this.overlays.showPause({
+        onResume: () => this.closePause(),
+        onRestart: () => this.restart(),
+        onSettings: () => this.openSettings(),
+        onQuit: () => this.quit(),
+        onFullscreen: fullscreenAvailable(this.scale) ? () => toggleFullscreen(this.scale) : undefined,
+        fullscreenLabel: () => (this.scale.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'),
+      });
+    } else if (!want && this.overlays.pauseOpen) {
+      this.overlays.hidePause();
+    }
   }
 
   private openSettings(): void {
@@ -295,12 +311,14 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
       this.hud.toast('Settings unavailable', GAME_W / 2, GAME_H / 2 + 220);
       return;
     }
+    pauseReasons.add('settings');
     this.scene.pause();
     this.scene.launch('Settings', { returnTo: 'Game' });
     this.scene.bringToTop('Settings');
   }
 
   private restart(): void {
+    pauseReasons.resetRun();
     this.scene.restart({ levelId: this.levelId });
   }
 
@@ -309,6 +327,7 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
   }
 
   private gotoLevelSelect(data?: object): void {
+    pauseReasons.resetRun();
     if (this.scene.get('LevelSelect')) this.scene.start('LevelSelect', data);
     else this.hud.toast('Level select unavailable', GAME_W / 2, GAME_H / 2 + 220);
   }
@@ -317,6 +336,8 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
     this.input.setDefaultCursor('default');
     this.input.keyboard?.removeAllListeners();
     this.events.off(Phaser.Scenes.Events.RESUME, this.onResumeEvt);
+    this.unsubPause?.();
+    this.unsubPause = undefined;
     this.interaction?.destroy();
     this.overlays?.destroy();
     this.intro?.destroy();
@@ -422,7 +443,7 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
 
   update(time: number, delta: number): void {
     const dt = Math.min(delta, 100) / 1000;
-    const stepping = !this.paused && !this.overlays.pauseOpen;
+    const stepping = !pauseReasons.any;
     if (stepping) {
       this.acc += dt * this.speed;
       let n = 0;
