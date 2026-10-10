@@ -219,3 +219,19 @@ Entities have stable numeric ids so the renderer can map them to sprites. Render
 (archer/wizard/barrack levels; barrack has two door orientations `_1`/`_2`; arrow, wizard_bullet, bow_animation_1..4,
 archer.png = archer unit, stick = wizard staff, sword, shield), `units/knight_level_1..3.png`, `ufo/ufo_1..7.png`.
 Boss sprite: `ufo/mothership.png` (320×271, generated to match the pack style; hangar opening at bottom-center is where escorts launch).
+
+## 12. Tower specializations (planned, confirmed with the user)
+
+From **level 7** onward (also on replays) a **Lv3** tower can buy **one of two** specializations for **~300 g** (exact
+costs tuned by the balance tool). The choice is permanent for that tower; different towers of the same kind may choose
+differently. Passive triggers only fire when enemies are in range. Each spec gets a code-drawn emblem on the tower plus
+its own effects.
+
+| Tower | Option A | Option B |
+|---|---|---|
+| Archer | **Eagle Eye**: +40% range, +30% damage, every 4th arrow ignores armor | **Hunting Nets**: every 9 s nets the densest cluster in range — everything within ~1 t is rooted 2.5 s; nets also pull fliers down (knights can block them while netted); boss is slowed 50% instead |
+| Wizard | **Chain Lightning**: bolts jump 3 times (70% / 50% / 35%) — base Lv3 loses Arc Bolt and becomes a pure stat tier | **Fire Mages**: hits ignite for true damage (ignores magic resist), ~6 dps for 4 s, refreshes, no stacking; burning enemies show an orange HP bar |
+| Bomb | **Bigger Bombs**: +50% blast radius, +40% damage, cluster bomblets 3 → 5 | **Homing Missiles**: every 6 s, 2 missiles at the furthest-forward enemies, fliers included |
+| Barracks | **Bow Training**: knights shoot (6–9 dmg, 2.5 t) when not in melee, fliers included | **Extra Recruits**: +1 knight (4), +25% knight HP, 30% faster respawn |
+
+Balance goal: the two options of each tower within ~10% overall value, each clearly better on some levels/enemy mixes.
