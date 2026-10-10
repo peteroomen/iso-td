@@ -202,11 +202,14 @@ export class RadialMenu {
     this.root = undefined;
     this.open_ = false;
     this.hud.tooltip.hide();
+    // the scene may already be shutting down (resize restart): the objects are then destroyed and must not be touched
+    const alive = !!root.scene;
     for (const b of this.btns) {
-      b.c.disableInteractive();
+      if (alive && b.c.scene) b.c.disableInteractive();
       if (b.hovered) b.item.onHover?.(false);
     }
     this.btns = [];
+    if (!alive) return;
     this.scene.tweens.killTweensOf(root);
     if (instant) {
       root.destroy();
