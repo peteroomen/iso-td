@@ -44,6 +44,8 @@ const TOWER_BLURB: Record<TowerKind, string> = {
   barracks: 'Knights block ground UFOs and fight them. Cannot stop fliers.',
 };
 
+const TOWER_ROLE: Record<TowerKind, string> = { archer: 'Fast', wizard: 'Magic', barracks: 'Blocks' };
+
 const fmt = (n: number) => (Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : n.toFixed(1));
 
 export interface InteractionDeps {
@@ -162,6 +164,18 @@ export class InteractionController {
 
   // ------------------------------------------------------------------ menus
 
+  /** Briefly shows a (new / upgraded) tower's range once its menu is gone. */
+  private flashRange(towerId: number): void {
+    const t = this.d.sim.getTower(towerId);
+    if (!t) return;
+    const r = { gx: t.x, gy: t.y, r: t.range, color: t.kind === 'barracks' ? 0x7dff8a : 0xffffff };
+    const mk = this.d.markers;
+    mk.range = r;
+    this.d.scene.time.delayedCall(1400, () => {
+      if (mk.range === r && this.selectedTower === null && this.menuSpot === null && this.mode.kind === 'idle') mk.range = null;
+    });
+  }
+
   private closeMenu(): void {
     this.menu.close();
     this.menuSpot = null;
@@ -208,10 +222,14 @@ export class InteractionController {
         const st = sim.statsFor(kind, 1);
         markers.range = over ? { gx: spot.x, gy: spot.y, r: st.range, color: kind === 'barracks' ? 0x7dff8a : 0xffffff } : null;
       },
+      role: TOWER_ROLE[kind],
       onSelect: () => {
         const r = sim.build(spotId, kind);
-        if (r.ok) this.closeMenu();
-        else this.fail(r.reason, a.x, a.y - 110);
+        if (r.ok) {
+          this.closeMenu();
+          const nt = sim.towerAtSpot(spotId);
+          if (nt) this.flashRange(nt.id);
+        } else this.fail(r.reason, a.x, a.y - 110);
       },
     }));
     markers.hoverSpot = spotId;
@@ -250,10 +268,13 @@ export class InteractionController {
         const next = sim.statsFor(cur.kind, cur.level + 1);
         markers.range2 = over ? { gx: cur.x, gy: cur.y, r: next.range, color: 0xffe27a } : null;
       },
+      role: 'Upgrade',
       onSelect: () => {
         const r = sim.upgrade(towerId);
-        if (r.ok) this.closeMenu();
-        else this.fail(r.reason, a.x, a.y - 110);
+        if (r.ok) {
+          this.closeMenu();
+          this.flashRange(towerId);
+        } else this.fail(r.reason, a.x, a.y - 110);
       },
     });
     if (t.kind === 'barracks') {
@@ -262,6 +283,7 @@ export class InteractionController {
         iconH: 40,
         color: 0x3a63c9,
         state: () => 'ok',
+        role: 'Rally',
         tip: () => ({ title: 'Rally point', note: 'Move your knights: then click on the road inside the green circle.' }),
         onSelect: () => {
           this.menu.close();
@@ -279,6 +301,8 @@ export class InteractionController {
         rows: [{ text: 'Refund', right: `+${sim.sellValueOf(towerId)}`, rightColor: COLORS.textGold }],
         note: 'Returns 60% of the gold you invested.',
       }),
+      role: 'Sell',
+      confirmText: () => `Confirm ${sim.sellValueOf(towerId)}g?`,
       onSelect: () => {
         const r = sim.sell(towerId);
         if (r.ok) this.closeMenu();

@@ -19,12 +19,30 @@ export interface RadialItem {
   cost?: () => number | null;
   state: () => ItemState;
   tip: () => TipSpec;
+  /** One-word role shown under the icon on touch screens (where there is no hover tooltip). */
+  role?: string;
+  /** Destructive items: the first tap only arms the button and shows this text, a second tap runs `onSelect`. */
+  confirmText?: () => string;
   onSelect: () => void;
   onHover?: (over: boolean) => void;
 }
 
 const BTN_R = 31;
 const RING_R = 70;
+/** Touch: holding an icon this long shows its stats (and range) instead of choosing it. */
+const LONG_PRESS_MS = 350;
+/** Presses landing this soon after the ring opened are the opening tap's own leftovers. */
+const OPEN_GUARD_MS = 150;
+/** An armed (confirm) button disarms itself after this long. */
+const ARM_MS = 4000;
+
+const coarsePointer = (): boolean => {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches;
+  } catch {
+    return false;
+  }
+};
 
 interface Btn {
   item: RadialItem;
@@ -35,6 +53,10 @@ interface Btn {
   costBox: Phaser.GameObjects.Container;
   costText: Phaser.GameObjects.Text;
   coin: Phaser.GameObjects.Image;
+  label: Phaser.GameObjects.Text;
+  longTimer?: number;
+  longPressed: boolean;
+  downStamp: number;
   hovered: boolean;
   pressed: boolean;
   lastState: string;
@@ -46,7 +68,10 @@ export class RadialMenu {
   private root?: Phaser.GameObjects.Container;
   private btns: Btn[] = [];
   private anchor = { x: 0, y: 0 };
-  private selected = -1;
+  private armed = -1;
+  private armTimer?: Phaser.Time.TimerEvent;
+  private openedAt = 0;
+  private coarse = false;
   open_ = false;
   private u = 1;
 
@@ -75,7 +100,9 @@ export class RadialMenu {
     const root = s.add.container(x, y).setDepth(DEPTH.menu);
     this.root = root;
     this.open_ = true;
-    this.selected = -1;
+    this.armed = -1;
+    this.openedAt = performance.now();
+    this.coarse = coarsePointer();
 
     const disc = s.add.graphics();
     disc.fillStyle(0x1b1226, 0.5).fillCircle(0, 0, RING_R + BTN_R + 12);
@@ -101,7 +128,8 @@ export class RadialMenu {
       const coin = s.add.image(-14, 0, TEX.coin).setScale(0.3);
       const costText = s.add.text(2, 0, '', textStyle(18, COLORS.textGold)).setOrigin(0, 0.5);
       costBox.add([cg, coin, costText]);
-      c.add([dg, icon, lock, costBox]);
+      const label = s.add.text(0, BTN_R + 30, '', { ...textStyle(15, '#ffffff'), stroke: '#1b1226', strokeThickness: 4 }).setOrigin(0.5);
+      c.add([dg, icon, lock, costBox, label]);
       if (item.badge) {
         const bt = s.add.text(BTN_R * 0.62, -BTN_R * 0.7, item.badge, textStyle(14)).setOrigin(0.5);
         c.add(bt);
@@ -109,33 +137,79 @@ export class RadialMenu {
       c.setSize(BTN_R * 2, BTN_R * 2).setInteractive({ useHandCursor: true, hitArea: new Phaser.Geom.Circle(BTN_R, BTN_R, BTN_R + 4), hitAreaCallback: Phaser.Geom.Circle.Contains });
       markHud(c);
       (c as { __keep?: boolean }).__keep = true;
-      const btn: Btn = { item, c, disc: dg, icon, lock, costBox, costText, coin, hovered: false, pressed: false, lastState: '', lastCost: undefined };
+      const btn: Btn = { item, c, disc: dg, icon, lock, costBox, costText, coin, label, longPressed: false, downStamp: 0, hovered: false, pressed: false, lastState: '', lastCost: undefined };
       c.setScale(0);
       s.tweens.add({ targets: c, scale: 1, delay: 40 + i * 55, duration: 260, ease: 'Back.easeOut' });
-      c.on('pointerover', () => this.hover(i, true));
-      c.on('pointerout', () => this.hover(i, false));
-      c.on('pointerdown', () => {
+      c.on('pointerover', (p: Phaser.Input.Pointer) => {
+        if (!p.wasTouch) this.hover(i, true);
+      });
+      c.on('pointerout', (p: Phaser.Input.Pointer) => {
+        if (!p.wasTouch) this.hover(i, false);
+        else this.cancelPress(i);
+      });
+      c.on('pointerdown', (p: Phaser.Input.Pointer) => {
+        if (performance.now() - this.openedAt < OPEN_GUARD_MS) return;
         btn.pressed = true;
+        btn.longPressed = false;
+        btn.downStamp = p.event ? (p.event as Event).timeStamp : performance.now();
         s.tweens.add({ targets: c, scale: 0.92, duration: 60 });
+        if (p.wasTouch) {
+          btn.longTimer = window.setTimeout(() => {
+            if (!btn.pressed) return;
+            btn.longPressed = true;
+            this.hover(i, true);
+          }, LONG_PRESS_MS);
+        }
       });
       c.on('pointerup', (p: Phaser.Input.Pointer) => {
         if (!btn.pressed) return;
-        btn.pressed = false;
-        s.tweens.add({ targets: c, scale: 1.1, duration: 90, ease: 'Back.easeOut' });
-        // touch: first tap previews (tooltip + range), second tap confirms
-        if (p.wasTouch && this.selected !== i) {
-          this.selected = i;
-          this.hover(i, true);
-          return;
-        }
-        const st = item.state();
-        if (st === 'ok') Audio.sfx('ui_click');
-        item.onSelect();
+        // judge the hold by the input events' own timestamps: a busy frame must not turn a quick tap into a long-press
+        const held = p.wasTouch && p.event ? (p.event as Event).timeStamp - btn.downStamp : 0;
+        const wasLong = btn.longPressed && held >= LONG_PRESS_MS;
+        this.cancelPress(i, true);
+        if (wasLong) return; // a long-press only inspects
+        this.choose(i);
       });
       root.add(c);
       this.refreshBtn(btn, 0, true);
       return btn;
     });
+  }
+
+  /** Aborts a press (finger slid off / released); a running long-press preview ends. */
+  private cancelPress(i: number, released = false): void {
+    const b = this.btns[i];
+    if (!b) return;
+    window.clearTimeout(b.longTimer);
+    b.longTimer = undefined;
+    const wasLong = b.longPressed;
+    const wasPressed = b.pressed;
+    b.pressed = false;
+    b.longPressed = false;
+    if (wasPressed) this.scene.tweens.add({ targets: b.c, scale: released && !wasLong ? 1.1 : 1, duration: 90, ease: 'Back.easeOut' });
+    if (wasLong) this.hover(i, false);
+  }
+
+  private disarm(): void {
+    this.armed = -1;
+    this.armTimer?.remove();
+    this.armTimer = undefined;
+  }
+
+  private choose(i: number): void {
+    const b = this.btns[i];
+    if (!b) return;
+    const item = b.item;
+    if (item.confirmText && this.armed !== i) {
+      this.disarm();
+      this.armed = i;
+      this.armTimer = this.scene.time.delayedCall(ARM_MS, () => this.disarm());
+      Audio.sfx('ui_click');
+      return;
+    }
+    this.disarm();
+    if (item.state() === 'ok') Audio.sfx('ui_click');
+    item.onSelect();
   }
 
   private hover(i: number, over: boolean): void {
@@ -161,10 +235,12 @@ export class RadialMenu {
   private refreshBtn(b: Btn, _time: number, force = false): void {
     const st = b.item.state();
     const cost = b.item.cost ? b.item.cost() : null;
-    const key = `${st}|${b.hovered}|${cost}`;
+    const idx = this.btns.indexOf(b);
+    const armed = idx === this.armed;
+    const key = `${st}|${b.hovered}|${cost}|${armed}`;
     if (!force && key === b.lastState) return;
     b.lastState = key;
-    const base = b.item.color ?? 0x4b3b6b;
+    const base = armed ? 0xc0392b : (b.item.color ?? 0x4b3b6b);
     const fill = st === 'ok' ? (b.hovered ? lighten(base, 30) : base) : darken(base, 38);
     const g = b.disc;
     g.clear();
@@ -188,6 +264,8 @@ export class RadialMenu {
       b.coin.x = -w / 2 + 8;
       b.costText.x = -w / 2 + 20;
     }
+    if (armed && b.item.confirmText) b.label.setText(b.item.confirmText()).setColor('#ffd0c8');
+    else b.label.setText(this.coarse ? (b.item.role ?? '') : '').setColor('#ffffff');
     if (b.hovered) this.showTip(b);
   }
 
@@ -208,6 +286,8 @@ export class RadialMenu {
       if (alive && b.c.scene) b.c.disableInteractive();
       if (b.hovered) b.item.onHover?.(false);
     }
+    for (const b of this.btns) window.clearTimeout(b.longTimer);
+    this.disarm();
     this.btns = [];
     if (!alive) return;
     this.scene.tweens.killTweensOf(root);
