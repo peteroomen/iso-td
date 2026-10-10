@@ -50,11 +50,11 @@ function untilShellLanding(sim: Sim) {
 describe('bomb tower data', () => {
   it('has the designed numbers', () => {
     const lv = TOWERS.bomb.levels;
-    expect(lv.map((l) => l.cost)).toEqual([125, 200, 300]);
-    expect(lv.map((l) => [l.damageMin, l.damageMax])).toEqual([[8, 15], [18, 32], [35, 55]]);
-    expect(lv.map((l) => l.cooldown)).toEqual([2.5, 2.4, 2.3]);
+    expect(lv.map((l) => l.cost)).toEqual([100, 160, 240]);
+    expect(lv.map((l) => [l.damageMin, l.damageMax])).toEqual([[12, 22], [26, 48], [54, 84]]);
+    expect(lv.map((l) => l.cooldown)).toEqual([2.0, 1.9, 1.8]);
     expect(lv.map((l) => l.range)).toEqual([3.0, 3.2, 3.4]);
-    expect(lv.map((l) => l.splashRadius)).toEqual([0.8, 0.9, 1.0]);
+    expect(lv.map((l) => l.splashRadius)).toEqual([1.0, 1.1, 1.2]);
     expect(lv.map((l) => l.bomblets)).toEqual([0, 0, 3]);
     expect(TOWERS.bomb).toMatchObject({ damageType: 'physical', groundOnly: true });
     expect(TOWERS.archer.groundOnly).toBe(false);
@@ -62,28 +62,28 @@ describe('bomb tower data', () => {
 
   it('exposes splash radius and groundOnly in the stats views', () => {
     const s1 = towerStats('bomb', 1, emptyUpgrades());
-    expect(s1).toMatchObject({ groundOnly: true, splashRadius: 0.8, bomblets: 0, range: 3.0 });
-    expect(s1.dps).toBeCloseTo(11.5 / 2.5);
+    expect(s1).toMatchObject({ groundOnly: true, splashRadius: 1.0, bomblets: 0, range: 3.0 });
+    expect(s1.dps).toBeCloseTo(17 / 2.0);
     const s3 = towerStats('bomb', 3, emptyUpgrades());
-    expect(s3).toMatchObject({ splashRadius: 1.0, bomblets: 3, bombletDamageFactor: 0.3, bombletRadius: 0.5 });
+    expect(s3).toMatchObject({ splashRadius: 1.2, bomblets: 3, bombletDamageFactor: 0.3, bombletRadius: 0.5 });
     expect(s3.special).toContain('Cluster Bomb');
     expect(towerStats('archer', 3, emptyUpgrades())).toMatchObject({ groundOnly: false, splashRadius: 0, bomblets: 0 });
-    expect(makeSim().statsFor('bomb', 2)).toMatchObject({ groundOnly: true, splashRadius: 0.9 });
+    expect(makeSim().statsFor('bomb', 2)).toMatchObject({ groundOnly: true, splashRadius: 1.1 });
   });
 
-  it('costs 125 / +200 / +300 and sells for 60%', () => {
-    expect(towerCost('bomb', 1, emptyUpgrades())).toBe(125);
-    expect(upgradeCost('bomb', 1, emptyUpgrades())).toBe(200);
-    expect(upgradeCost('bomb', 2, emptyUpgrades())).toBe(300);
+  it('costs 100 / +160 / +240 and sells for 60%', () => {
+    expect(towerCost('bomb', 1, emptyUpgrades())).toBe(100);
+    expect(upgradeCost('bomb', 1, emptyUpgrades())).toBe(160);
+    expect(upgradeCost('bomb', 2, emptyUpgrades())).toBe(240);
     expect(upgradeCost('bomb', 3, emptyUpgrades())).toBeNull();
     // wizard discount does not touch bombs
-    expect(towerCost('bomb', 1, up({ wizards: 1 }))).toBe(125);
+    expect(towerCost('bomb', 1, up({ wizards: 1 }))).toBe(100);
     const sim = makeSim(straightLevel({ startGold: 1000 }));
     sim.build(0, 'bomb');
     sim.upgrade(sim.state.towers[0].id);
     sim.upgrade(sim.state.towers[0].id);
-    expect(sim.state.gold).toBe(1000 - 625);
-    expect(sim.sellValueOf(sim.state.towers[0].id)).toBe(375);
+    expect(sim.state.gold).toBe(1000 - 500);
+    expect(sim.sellValueOf(sim.state.towers[0].id)).toBe(300);
   });
 });
 
@@ -103,7 +103,7 @@ describe('splash falloff', () => {
     sim.step(); // the shell is in the air
     const shell = untilShellLanding(sim);
     const r = shell.radius;
-    expect(r).toBeCloseTo(0.8);
+    expect(r).toBeCloseTo(1.0);
     const offsets = [0, 0.4 * r, 0.7 * r, r - 0.01, r + 0.05];
     sim.state.enemies.forEach((e, i) => {
       freeze(e);
@@ -225,7 +225,7 @@ describe('lobbed shells', () => {
     const d = Math.hypot(shell.tx - shell.fromX, shell.ty - shell.fromY);
     expect(shell.flightTime).toBeCloseTo(BOMB.flightBase + BOMB.flightPerTile * d);
     expect(shell.flightTime).toBeGreaterThanOrEqual(0.9);
-    expect(shell.radius).toBeCloseTo(0.8);
+    expect(shell.radius).toBeCloseTo(1.0);
     expect(shell.arc).toBe(BOMB.shellArc);
     expect(shell.progress).toBeGreaterThan(0);
     expect(shell.progress).toBeLessThan(0.2);
@@ -356,11 +356,11 @@ describe('bomb caps and star track', () => {
     // in the sim
     const sim = makeSim(straightLevel(), { upgrades: up({ bombs: 2 }) });
     sim.build(SPOT, 'bomb');
-    expect(sim.statsFor('bomb', 1).splashRadius).toBeCloseTo(0.96);
+    expect(sim.statsFor('bomb', 1).splashRadius).toBeCloseTo(1.2);
     const { sim: s2 } = setup(['plated'], { upgrades: up({ bombs: 1 }) });
     place(s2.state.enemies[0], 4.0, 2.5);
     freeze(s2.state.enemies[0]);
     s2.step();
-    expect(s2.state.projectiles.find((p) => p.kind === 'shell')!.radius).toBeCloseTo(0.96);
+    expect(s2.state.projectiles.find((p) => p.kind === 'shell')!.radius).toBeCloseTo(1.2);
   });
 });

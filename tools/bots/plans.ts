@@ -12,23 +12,23 @@ import { b, up, type LevelPlan } from './types';
 export const PLANS: Record<string, LevelPlan> = {
   level01: {
     competent: [
-      b(5, 2, 'archer'), b(4, 5, 'archer'), b(3, 6, 'barracks'), b(8, 3, 'archer'), b(7, 5, 'archer'), b(5, 8, 'archer'), b(8, 8, 'barracks'),
-      b(2, 2, 'archer'),
+      b(4, 5, 'archer'), b(7, 5, 'archer'), b(5, 2, 'bomb'), b(8, 3, 'wizard'), b(3, 6, 'bomb'), b(2, 2, 'barracks'),
+      b(5, 8, 'bomb'), b(8, 8, 'archer'),
     ],
   },
   level02: {
     competent: [
-      b(5, 4, 'archer'), b(6, 6, 'archer'), b(7, 3, 'wizard'), b(9, 6, 'archer'), up(5, 4), up(6, 6), b(2, 3, 'wizard'),
-      b(8, 10, 'archer'), up(7, 3), up(9, 6), b(9, 3, 'barracks'), b(2, 6, 'archer'), up(2, 3), up(8, 10),
-      up(9, 3), up(2, 6),
+      b(5, 4, 'archer'), b(6, 6, 'archer'), b(7, 3, 'wizard'), b(9, 6, 'bomb'), up(5, 4), up(6, 6), b(2, 3, 'archer'),
+      b(8, 10, 'wizard'), up(7, 3), up(9, 6), b(9, 3, 'archer'), b(2, 6, 'barracks'), up(2, 3), up(8, 10),
+      b(5, 10, 'archer'), b(11, 7, 'wizard'), up(9, 3), up(2, 6), up(5, 10), up(11, 7),
     ],
   },
   level03: {
     competent: [
-      b(6, 5, 'archer'), b(4, 4, 'archer'), b(8, 6, 'wizard'), b(10, 4, 'wizard'), up(6, 5), up(4, 4), b(10, 6, 'barracks'),
-      b(1, 4, 'wizard'), up(8, 6), up(10, 4), b(11, 4, 'archer'), b(1, 6, 'wizard'), up(10, 6), up(1, 4),
-      b(2, 2, 'archer'), b(2, 8, 'wizard'), up(11, 4), up(1, 6), up(2, 2), up(2, 8), up(6, 5),
-      up(4, 4), up(11, 4), up(2, 2),
+      b(6, 5, 'archer'), b(4, 4, 'archer'), b(8, 6, 'wizard'), b(10, 4, 'wizard'), up(6, 5), up(4, 4),
+      b(10, 6, 'bomb'), b(1, 4, 'wizard'), up(8, 6), up(10, 4), b(11, 4, 'barracks'), b(1, 6, 'archer'), up(10, 6),
+      up(1, 4), b(2, 2, 'wizard'), b(2, 8, 'bomb'), up(11, 4), up(1, 6), b(5, 2, 'wizard'), b(7, 8, 'archer'),
+      up(2, 2), up(2, 8), up(5, 2), up(7, 8), up(6, 5), up(4, 4), up(1, 6), up(7, 8),
     ],
     expert: [
       b(10, 4, 'archer'), b(6, 5, 'archer'), b(4, 4, 'wizard'), up(6, 5), b(1, 6, 'wizard'), b(8, 6, 'archer'),
@@ -38,11 +38,11 @@ export const PLANS: Record<string, LevelPlan> = {
   },
   level04: {
     competent: [
-      b(7, 8, 'archer'), b(4, 4, 'archer'), b(9, 8, 'wizard'), b(7, 4, 'wizard'), up(7, 8), up(4, 4),
-      b(4, 7, 'archer'), b(4, 2, 'barracks'), up(9, 8), up(7, 4), b(7, 11, 'archer'), b(1, 5, 'wizard'), up(4, 7),
-      up(4, 2), b(11, 7, 'archer'), b(4, 10, 'wizard'), up(7, 11), up(1, 5), b(9, 4, 'archer'), b(1, 2, 'archer'),
-      up(11, 7), up(4, 10), up(9, 4), up(1, 2), up(7, 8), up(4, 4), up(9, 8), up(7, 4), up(4, 7), up(7, 11), up(1, 5),
-      up(11, 7), up(4, 10), up(9, 4), up(1, 2),
+      b(7, 8, 'archer'), b(4, 4, 'archer'), b(9, 8, 'wizard'), b(7, 4, 'wizard'), up(7, 8), up(4, 4), b(4, 7, 'bomb'),
+      b(4, 2, 'archer'), up(9, 8), up(7, 4), b(7, 11, 'wizard'), b(1, 5, 'archer'), up(4, 7), up(4, 2),
+      b(11, 7, 'barracks'), b(4, 10, 'archer'), up(7, 11), up(1, 5), b(9, 4, 'wizard'), b(1, 2, 'archer'), up(11, 7),
+      up(4, 10), up(9, 4), up(1, 2), up(7, 8), up(4, 4), up(9, 8), up(7, 4), up(4, 2), up(7, 11), up(1, 5), up(4, 10),
+      up(9, 4), up(1, 2),
     ],
     expert: [
       b(4, 2, 'wizard'), up(4, 2), b(9, 8, 'barracks'), b(9, 4, 'archer'), b(7, 8, 'archer'), up(7, 8), up(7, 8),
@@ -52,43 +52,40 @@ export const PLANS: Record<string, LevelPlan> = {
   },
   level05: {
     competent: [
-      b(5, 5, 'archer'), b(7, 5, 'archer'), b(5, 7, 'wizard'), b(7, 7, 'wizard'), up(5, 5), up(7, 5),
-      b(4, 4, 'archer'), b(8, 8, 'barracks'), up(5, 7), up(7, 7), b(8, 2, 'wizard'), b(2, 4, 'archer'), up(4, 4),
-      up(8, 8), b(10, 8, 'wizard'), b(4, 10, 'archer'), up(8, 2), up(2, 4), b(4, 2, 'wizard'), b(10, 4, 'archer'),
-      up(10, 8), up(4, 10), b(8, 10, 'archer'), b(2, 9, 'wizard'), up(4, 2), up(10, 4), up(8, 10), up(2, 9), up(5, 5),
-      up(7, 5), up(5, 7), up(7, 7), up(4, 4), up(8, 8), up(8, 2), up(2, 4), up(10, 8), up(4, 10), up(4, 2), up(10, 4),
-      up(8, 10), up(2, 9),
+      b(5, 5, 'archer'), b(7, 5, 'archer'), b(5, 7, 'wizard'), b(7, 7, 'bomb'), up(5, 5), up(7, 5), b(4, 4, 'wizard'),
+      b(8, 8, 'archer'), up(5, 7), up(7, 7), b(8, 2, 'wizard'), b(2, 4, 'barracks'), up(4, 4), up(8, 8),
+      b(10, 8, 'archer'), b(4, 10, 'wizard'), up(8, 2), up(2, 4), b(4, 2, 'bomb'), b(10, 4, 'archer'), up(10, 8),
+      up(4, 10), b(8, 10, 'wizard'), b(2, 9, 'archer'), up(4, 2), up(10, 4), up(8, 10), up(2, 9), up(5, 5), up(7, 5),
+      up(5, 7), up(4, 4), up(8, 8), up(8, 2), up(2, 4), up(10, 8), up(4, 10), up(10, 4), up(8, 10), up(2, 9),
     ],
     expert: [
-      b(5, 7, 'archer'), b(7, 5, 'archer'), b(4, 4, 'wizard'), up(7, 5), b(8, 10, 'wizard'), b(8, 8, 'archer'), b(8, 2, 'barracks'),
-      b(7, 7, 'wizard'), up(5, 7), b(5, 5, 'wizard'), b(4, 10, 'wizard'), b(10, 4, 'barracks'), b(10, 8, 'archer'), up(8, 2),
-      up(5, 7), b(4, 2, 'archer'), up(4, 2), b(2, 4, 'archer'), up(7, 5), up(8, 10), up(4, 10),
-      up(8, 10), b(2, 9, 'archer'), up(4, 2), up(4, 4), up(2, 4), up(10, 8),
+      b(4, 4, 'archer'), b(8, 8, 'wizard'), b(8, 2, 'archer'), b(7, 5, 'archer'), b(7, 7, 'wizard'), b(5, 7, 'archer'), b(4, 10, 'archer'),
+      b(10, 8, 'wizard'), up(7, 5), b(5, 5, 'bomb'), up(7, 5), b(4, 2, 'bomb'), up(5, 7), up(8, 8), b(2, 4, 'bomb'), b(8, 10, 'archer'),
+      up(8, 8), b(2, 9, 'wizard'), b(10, 4, 'wizard'), up(8, 10), up(8, 2), up(8, 10), up(4, 10),
     ],
   },
   level06: {
     competent: [
       b(8, 5, 'archer'), b(5, 9, 'archer'), b(7, 11, 'wizard'), b(10, 5, 'wizard'), up(8, 5), up(5, 9),
-      b(10, 11, 'barracks'), b(6, 7, 'archer'), up(7, 11), up(10, 5), b(5, 1, 'wizard'), b(8, 3, 'archer'), up(10, 11),
-      up(6, 7), b(1, 6, 'wizard'), b(8, 13, 'archer'), up(5, 1), up(8, 3), b(3, 8, 'wizard'), b(10, 8, 'archer'),
+      b(10, 11, 'bomb'), b(6, 7, 'archer'), up(7, 11), up(10, 5), b(5, 1, 'wizard'), b(8, 3, 'barracks'), up(10, 11),
+      up(6, 7), b(1, 6, 'archer'), b(8, 13, 'wizard'), up(5, 1), up(8, 3), b(3, 8, 'bomb'), b(10, 8, 'archer'),
       up(1, 6), up(8, 13), b(12, 8, 'wizard'), b(3, 11, 'archer'), up(3, 8), up(10, 8), up(12, 8), up(3, 11), up(8, 5),
       up(5, 9), up(7, 11), up(10, 5), up(10, 11), up(6, 7), up(5, 1), up(8, 3), up(1, 6), up(8, 13), up(3, 8),
       up(10, 8), up(12, 8), up(3, 11),
     ],
     expert: [
-      b(8, 5, 'archer'), b(10, 11, 'wizard'), b(5, 9, 'archer'), up(5, 9), b(6, 7, 'barracks'), b(10, 5, 'barracks'),
-      up(5, 9), up(8, 5), b(12, 8, 'barracks'), b(1, 6, 'barracks'), b(8, 3, 'wizard'), b(8, 13, 'wizard'),
-      b(10, 8, 'archer'), up(8, 5), b(5, 1, 'barracks'), up(1, 6), up(10, 11), up(12, 8), up(5, 1), b(7, 11, 'wizard'),
-      b(3, 8, 'barracks'), up(8, 3), up(8, 13), up(1, 6), b(3, 11, 'barracks'), up(10, 5), up(6, 7), up(8, 13),
+      b(8, 5, 'archer'), b(5, 9, 'archer'), up(5, 9), up(5, 9), b(6, 7, 'wizard'), b(10, 5, 'barracks'), b(10, 11, 'archer'), b(3, 11, 'archer'),
+      b(3, 8, 'wizard'), up(6, 7), up(3, 8), b(8, 13, 'barracks'), b(1, 6, 'wizard'), up(8, 5), b(10, 8, 'bomb'), up(1, 6), up(10, 11), up(3, 8),
+      up(10, 8), up(10, 5), up(3, 11), b(8, 3, 'archer'), b(7, 11, 'archer'), up(10, 5), up(1, 6), b(12, 8, 'bomb'), up(8, 3), b(5, 1, 'barracks'),
     ],
   },
   level07: {
     competent: [
-      b(7, 5, 'archer'), b(3, 8, 'archer'), b(11, 6, 'wizard'), b(3, 5, 'wizard'), up(7, 5), up(3, 8),
-      b(7, 8, 'barracks'), b(11, 2, 'wizard'), up(11, 6), up(3, 5), b(3, 2, 'archer'), b(7, 10, 'wizard'), up(7, 8),
-      up(11, 2), b(3, 11, 'archer'), b(10, 11, 'wizard'), up(3, 2), up(7, 10), b(7, 1, 'archer'), up(3, 11),
-      up(10, 11), up(7, 1), up(7, 5), up(3, 8), up(11, 6), up(3, 5), up(7, 8), up(11, 2), up(3, 2), up(7, 10),
-      up(3, 11), up(10, 11), up(7, 1),
+      b(7, 5, 'archer'), b(3, 8, 'archer'), b(11, 6, 'wizard'), b(3, 5, 'wizard'), up(7, 5), up(3, 8), b(7, 8, 'bomb'),
+      b(11, 2, 'barracks'), up(11, 6), up(3, 5), b(3, 2, 'wizard'), b(7, 10, 'archer'), up(7, 8), up(11, 2),
+      b(3, 11, 'wizard'), b(10, 11, 'archer'), up(3, 2), up(7, 10), b(7, 1, 'bomb'), up(3, 11), up(10, 11), up(7, 1),
+      up(7, 5), up(3, 8), up(11, 6), up(3, 5), up(7, 8), up(11, 2), up(3, 2), up(7, 10), up(3, 11), up(10, 11),
+      up(7, 1),
     ],
     expert: [
       b(7, 5, 'wizard'), b(10, 11, 'archer'), b(3, 5, 'wizard'), b(3, 8, 'archer'), b(7, 8, 'archer'), b(11, 6, 'archer'), up(11, 6),
@@ -100,9 +97,9 @@ export const PLANS: Record<string, LevelPlan> = {
   level08: {
     competent: [
       b(7, 9, 'archer'), b(7, 7, 'archer'), b(5, 7, 'wizard'), b(5, 9, 'wizard'), up(7, 9), up(7, 7),
-      b(4, 5, 'archer'), b(7, 11, 'barracks'), up(5, 7), up(5, 9), b(5, 11, 'wizard'), b(8, 5, 'archer'), up(4, 5),
-      up(7, 11), b(2, 4, 'wizard'), b(11, 8, 'archer'), up(5, 11), up(8, 5), b(10, 10, 'archer'), b(1, 2, 'wizard'),
-      up(2, 4), up(11, 8), b(10, 5, 'archer'), b(2, 7, 'wizard'), up(10, 10), up(1, 2), up(10, 5), up(2, 7), up(7, 9),
+      b(4, 5, 'archer'), b(7, 11, 'wizard'), up(5, 7), up(5, 9), b(5, 11, 'archer'), b(8, 5, 'barracks'), up(4, 5),
+      up(7, 11), b(2, 4, 'archer'), b(11, 8, 'wizard'), up(5, 11), up(8, 5), b(10, 10, 'archer'), b(1, 2, 'wizard'),
+      up(2, 4), up(11, 8), b(10, 5, 'archer'), b(2, 7, 'bomb'), up(10, 10), up(1, 2), up(10, 5), up(2, 7), up(7, 9),
       up(7, 7), up(5, 7), up(5, 9), up(4, 5), up(7, 11), up(5, 11), up(8, 5), up(2, 4), up(11, 8), up(10, 10),
       up(1, 2), up(10, 5), up(2, 7),
     ],
@@ -118,7 +115,7 @@ export const PLANS: Record<string, LevelPlan> = {
   level09: {
     competent: [
       b(9, 2, 'archer'), b(10, 6, 'archer'), b(3, 2, 'wizard'), b(6, 4, 'wizard'), up(9, 2), up(10, 6),
-      b(5, 8, 'barracks'), b(13, 3, 'archer'), up(3, 2), up(6, 4), b(0, 7, 'wizard'), up(5, 8), up(13, 3), up(0, 7),
+      b(5, 8, 'barracks'), b(13, 3, 'wizard'), up(3, 2), up(6, 4), b(0, 7, 'archer'), up(5, 8), up(13, 3), up(0, 7),
       up(9, 2), up(10, 6), up(3, 2), up(6, 4), up(5, 8), up(13, 3), up(0, 7),
     ],
     expert: [
@@ -130,9 +127,9 @@ export const PLANS: Record<string, LevelPlan> = {
   level10: {
     competent: [
       b(9, 8, 'archer'), b(10, 2, 'archer'), b(3, 5, 'wizard'), b(10, 9, 'wizard'), up(9, 8), up(10, 2),
-      b(3, 8, 'barracks'), b(3, 2, 'wizard'), up(3, 5), up(10, 9), b(7, 2, 'archer'), b(5, 3, 'wizard'), up(3, 8),
-      up(3, 2), b(8, 5, 'archer'), b(6, 6, 'wizard'), up(7, 2), up(5, 3), b(6, 9, 'archer'), b(11, 5, 'wizard'),
-      up(8, 5), up(6, 6), b(12, 5, 'archer'), b(3, 11, 'wizard'), up(6, 9), up(11, 5), b(13, 3, 'barracks'),
+      b(3, 8, 'wizard'), b(3, 2, 'wizard'), up(3, 5), up(10, 9), b(7, 2, 'barracks'), b(5, 3, 'archer'), up(3, 8),
+      up(3, 2), b(8, 5, 'wizard'), b(6, 6, 'wizard'), up(7, 2), up(5, 3), b(6, 9, 'archer'), b(11, 5, 'wizard'),
+      up(8, 5), up(6, 6), b(12, 5, 'archer'), b(3, 11, 'bomb'), up(6, 9), up(11, 5), b(13, 3, 'wizard'),
       b(8, 11, 'archer'), up(12, 5), up(3, 11), b(11, 11, 'wizard'), up(13, 3), up(8, 11), up(11, 11), up(9, 8),
       up(10, 2), up(3, 5), up(10, 9), up(3, 8), up(3, 2), up(7, 2), up(5, 3), up(8, 5), up(6, 6), up(6, 9), up(11, 5),
       up(12, 5), up(3, 11), up(13, 3), up(8, 11), up(11, 11),

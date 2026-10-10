@@ -176,9 +176,20 @@ describe('balance sanity', () => {
       const w = runBot(l, BOTS['wizard-only'], PLANS[l.id], 1).lives;
       expect(a, `${l.id} archer-only ${a} vs competent ${comp}`).toBeLessThan(comp);
       expect(w, `${l.id} wizard-only ${w} vs competent ${comp}`).toBeLessThan(comp);
+      const bm = runBot(l, BOTS['bomb-only'], PLANS[l.id], 1).lives;
+      expect(bm, `${l.id} bomb-only ${bm} vs competent ${comp}`).toBeLessThan(comp);
       expect(Math.min(a, w), `${l.id} best mono build`).toBeLessThanOrEqual(5);
     }
   }, 120_000);
+
+  it('the competent plans build bomb towers on (almost) every level, and the bomb cap schedule gates level 3 until level 6', () => {
+    const withBomb = LEVELS.filter((l) => PLANS[l.id].competent.some((a) => a.do === 'build' && a.kind === 'bomb'));
+    expect(withBomb.length).toBeGreaterThanOrEqual(8);
+    for (const l of LEVELS) {
+      const n = Number(l.id.slice(-2));
+      expect(l.towerCap.bomb, l.id).toBe(n === 1 ? 1 : n < 6 ? 2 : 3);
+    }
+  });
 
   it('the competent bot does not sit on a pile of gold at the end and is still buying late in the level', () => {
     for (const l of LEVELS) {

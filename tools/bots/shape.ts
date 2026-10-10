@@ -6,8 +6,8 @@
  *
  * Goals scored per level (seeds that are NOT the reporting seeds):
  *   - competent bot wins every run and averages about `--target` lives;
- *   - from level 4 on, archer-only and wizard-only average clearly fewer lives than competent, and at least one of
- *     them loses (or nearly loses);
+ *   - from level 4 on, archer-only, wizard-only and bomb-only average clearly fewer lives than competent, and at least one of
+ *     archer/wizard loses (or nearly loses);
  *   - competent finishes with little gold left and is not maxed before the last third of the level.
  *
  *   npx tsx tools/bots/shape.ts --level 7 [--iters 120] [--target 13.5] [--seeds 21,22,...] [--save p.json] [--start p.json (continue from)] [--load p.json (evaluate only)] [--write]
@@ -57,6 +57,7 @@ interface Eval {
   maxedFrac: number;
   a: number;
   w: number;
+  bm: number;
   score: number;
 }
 
@@ -79,17 +80,21 @@ export function evaluate(l: LevelDef, n: number, seeds: number[], target: number
   score += Math.pow(Math.max(0, 0.72 - maxedFrac) * 20, 2);
   let a = 0;
   let w = 0;
+  let bm = 0;
   if (n >= 4 && mono && Math.abs(c - target) < 4) {
     a = avg(runs(l, 'archer-only', seeds).map((r) => r.lives));
     w = avg(runs(l, 'wizard-only', seeds).map((r) => r.lives));
     score += Math.pow(Math.max(0, a - (c - 4)), 2) + Math.pow(Math.max(0, w - (c - 4)), 2);
     score += 2 * Math.pow(Math.max(0, Math.min(a, w) - 4), 2);
+    bm = avg(runs(l, 'bomb-only', seeds).map((r) => r.lives));
+    score += Math.pow(Math.max(0, bm - (c - 4)), 2);
   } else if (n >= 4 && mono) {
     score += 150; // not worth simulating the variants: the main bot is far off
     a = NaN;
     w = NaN;
+    bm = NaN;
   }
-  return { c, cMin: Math.min(...rc.map((r) => r.lives)), wins, gold, maxedFrac, a, w, score };
+  return { c, cMin: Math.min(...rc.map((r) => r.lives)), wins, gold, maxedFrac, a, w, bm, score };
 }
 
 function main(): void {
@@ -119,7 +124,7 @@ function main(): void {
   if (startPath) cur = JSON.parse(readFileSync(startPath, 'utf8')) as Params;
   let best = score(cur);
   const show = (p: Params, e: Eval) =>
-    `K=${p.k.toFixed(2)} ${CLASSES.map((c) => `${c}=${p.m[c].toFixed(2)}`).join(' ')} | comp ${e.c.toFixed(1)} (min ${e.cMin}, ${e.wins}/${seeds.length}) gold ${Math.round(e.gold)} maxed@${(e.maxedFrac * 100).toFixed(0)}% arch ${e.a.toFixed(1)} wiz ${e.w.toFixed(1)} score ${e.score.toFixed(1)}`;
+    `K=${p.k.toFixed(2)} ${CLASSES.map((c) => `${c}=${p.m[c].toFixed(2)}`).join(' ')} | comp ${e.c.toFixed(1)} (min ${e.cMin}, ${e.wins}/${seeds.length}) gold ${Math.round(e.gold)} maxed@${(e.maxedFrac * 100).toFixed(0)}% arch ${e.a.toFixed(1)} wiz ${e.w.toFixed(1)} bomb ${e.bm.toFixed(1)} score ${e.score.toFixed(1)}`;
   console.error(`L${n} start: ${show(cur, best)}`);
   for (let it = 0; it < (loadPath ? 0 : iters); it++) {
     const cand: Params = { k: cur.k, m: { ...cur.m } };
@@ -141,7 +146,7 @@ function main(): void {
   if (arg('save', '')) writeFileSync(arg('save', ''), JSON.stringify(cur));
   const final = apply(level, cur);
   const check = evaluate(final, n, [1, 2, 3, 4, 5], target);
-  console.log(`   report seeds 1-5: comp ${check.c.toFixed(1)} (min ${check.cMin}) gold ${Math.round(check.gold)} maxed@${(check.maxedFrac * 100).toFixed(0)}% arch ${check.a.toFixed(1)} wiz ${check.w.toFixed(1)}`);
+  console.log(`   report seeds 1-5: comp ${check.c.toFixed(1)} (min ${check.cMin}) gold ${Math.round(check.gold)} maxed@${(check.maxedFrac * 100).toFixed(0)}% arch ${check.a.toFixed(1)} wiz ${check.w.toFixed(1)} bomb ${check.bm.toFixed(1)}`);
   if (process.argv.includes('--write')) {
     bake(new URL(`../../src/core/data/levels/level${String(n).padStart(2, '0')}.ts`, import.meta.url), final.waves);
     console.log('written');

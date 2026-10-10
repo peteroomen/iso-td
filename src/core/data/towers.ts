@@ -88,9 +88,9 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
     projectileSpeed: 0,
     groundOnly: true,
     levels: [
-      { ...NONE, cost: 125, damageMin: 8, damageMax: 15, cooldown: 2.5, range: 3.0, splashRadius: 0.8 },
-      { ...NONE, cost: 200, damageMin: 18, damageMax: 32, cooldown: 2.4, range: 3.2, splashRadius: 0.9 },
-      { ...NONE, cost: 300, damageMin: 35, damageMax: 55, cooldown: 2.3, range: 3.4, splashRadius: 1.0, bomblets: 3, bombletFactor: 0.3 },
+      { ...NONE, cost: 100, damageMin: 12, damageMax: 22, cooldown: 2.0, range: 3.0, splashRadius: 1.0 },
+      { ...NONE, cost: 160, damageMin: 26, damageMax: 48, cooldown: 1.9, range: 3.2, splashRadius: 1.1 },
+      { ...NONE, cost: 240, damageMin: 54, damageMax: 84, cooldown: 1.8, range: 3.4, splashRadius: 1.2, bomblets: 3, bombletFactor: 0.3 },
     ],
   },
 };

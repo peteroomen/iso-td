@@ -16,11 +16,14 @@ const ORDER: readonly UpgradeTrack[] = [
   'barracks', // 2: -30% respawn
   'wizards', // 2: +15% damage
   'archers', // 3: armor piercing
+  'bombs', // 1: +20% blast radius
   'reinforcements', // 2: 3 militia
+  'bombs', // 2: +15% bomb damage
   'orbital', // 3: burning ground
   'barracks', // 3: idle regen
   'wizards', // 3: slow
   'reinforcements', // 3: 20 s duration
+  'bombs', // 3: 5 bomblets
 ];
 
 export function upgradesForStars(budget: number): UpgradeState {
@@ -37,5 +40,5 @@ export function upgradesForStars(budget: number): UpgradeState {
 
 /** Stars a bot owns when starting level `levelNumber` (1-based) having earned `perLevel` stars on each earlier level. */
 export function starBudget(levelNumber: number, perLevel: number): number {
-  return Math.min(30, Math.max(0, levelNumber - 1) * perLevel);
+  return Math.min(30, Math.max(0, levelNumber - 1) * perLevel) /* 30 = stars earnable in the campaign; the tree costs 36 */;
 }
