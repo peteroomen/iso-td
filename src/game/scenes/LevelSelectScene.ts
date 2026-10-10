@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { applyViewCamera } from '../ui/viewport';
 import { getLevel, hasFlag, isLevelUnlocked, starsAvailable, starsEarned, withFlag, type Biome, type SaveData } from '../../core';
 import { Audio } from '../services/audio';
 import { getSave, updateSave } from '../services/save';
@@ -130,6 +131,7 @@ export class LevelSelectScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyViewCamera(this);
     ensureUi(this);
     // beating the last level for the first time plays the ending before the map comes back
     const order = levelOrder();

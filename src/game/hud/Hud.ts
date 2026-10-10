@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { Sim } from '../../core';
 import { Audio } from '../services/audio';
+import { ptrX, ptrY } from '../ui/viewport';
 import { COLORS, GAME_H, GAME_W, FONT, SAFE, UI_SCALE, textStyle } from '../ui/theme';
 import { TEX } from '../render/textures';
 import { Tooltip } from './Tooltip';
@@ -146,8 +147,8 @@ export class Hud {
     // keep the whole pill on screen, however long the message is
     const tk = Math.min(UI_SCALE, 1.5);
     const half = (t.width / 2 + 20) * tk;
-    const tx = Phaser.Math.Clamp(x ?? p.x, half + SAFE.l, GAME_W - half - SAFE.r);
-    const ty = Phaser.Math.Clamp(y ?? p.y - 36, barBottom() + 20, GAME_H - 40 - SAFE.b);
+    const tx = Phaser.Math.Clamp(x ?? ptrX(p), half + SAFE.l, GAME_W - half - SAFE.r);
+    const ty = Phaser.Math.Clamp(y ?? ptrY(p) - 36, barBottom() + 20, GAME_H - 40 - SAFE.b);
     c.setPosition(tx, ty);
     const g = this.scene.add.graphics();
     drawPanel(g, -t.width / 2 - 12, -t.height / 2 - 4, t.width + 24, t.height + 8, { r: 10, fill: 0x2c2240, bw: 3, alpha: 0.95 });

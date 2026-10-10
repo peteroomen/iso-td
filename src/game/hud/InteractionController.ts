@@ -6,6 +6,7 @@ import type { SimRenderer } from '../render/SimRenderer';
 import { TEX } from '../render/textures';
 import { Audio } from '../services/audio';
 import { COLORS } from '../ui/theme';
+import { ptrX, ptrY } from '../ui/viewport';
 import type { AbilityBar } from './AbilityBar';
 import type { Hud } from './Hud';
 import { RadialMenu, type RadialItem } from './RadialMenu';
@@ -363,11 +364,11 @@ export class InteractionController {
     let hoverSpot: number | null = null;
     let hoverTower: number | null = null;
     if (!hudOver) {
-      const lp = view.toLocal(p.x, p.y);
+      const lp = view.toLocal(ptrX(p), ptrY(p));
       const tid = simView.towerAt(lp.x, lp.y);
       if (tid !== null) hoverTower = tid;
       else {
-        const g = view.toGrid(p.x, p.y);
+        const g = view.toGrid(ptrX(p), ptrY(p));
         hoverSpot = this.spotAt(g.x, g.y);
         if (hoverSpot !== null && this.d.sim.towerAtSpot(hoverSpot)) hoverSpot = null;
       }
@@ -391,7 +392,7 @@ export class InteractionController {
 
   private updateReticle(p: Phaser.Input.Pointer): void {
     const { sim, view, markers } = this.d;
-    const g = view.toGrid(p.x, p.y);
+    const g = view.toGrid(ptrX(p), ptrY(p));
     if (this.mode.kind === 'ability') {
       if (this.mode.id === 'orbital') {
         const ab = sim.state.abilities.orbital;
@@ -443,23 +444,23 @@ export class InteractionController {
 
   private tap(p: Phaser.Input.Pointer): void {
     const { sim, view, simView } = this.d;
-    const g = view.toGrid(p.x, p.y);
+    const g = view.toGrid(ptrX(p), ptrY(p));
 
     if (this.mode.kind === 'ability') {
       const id = this.mode.id;
       if (id === 'orbital') {
         const r = sim.castOrbital(g);
         if (r.ok) this.setMode({ kind: 'idle' });
-        else this.fail(r.reason, p.x, p.y - 40);
+        else this.fail(r.reason, ptrX(p), ptrY(p) - 40);
       } else {
         const snap = this.snapToRoad(g.x, g.y, sim.state.abilities.reinforce.pathRange);
         if (!snap) {
-          this.fail('not_on_road', p.x, p.y - 40);
+          this.fail('not_on_road', ptrX(p), ptrY(p) - 40);
           return;
         }
         const r = sim.castReinforcements(snap);
         if (r.ok) this.setMode({ kind: 'idle' });
-        else this.fail(r.reason, p.x, p.y - 40);
+        else this.fail(r.reason, ptrX(p), ptrY(p) - 40);
       }
       return;
     }
@@ -467,7 +468,7 @@ export class InteractionController {
       const towerId = this.mode.towerId;
       const snap = this.snapToRoad(g.x, g.y, RALLY_PATH_TOLERANCE);
       if (!snap) {
-        this.fail('not_on_road', p.x, p.y - 40);
+        this.fail('not_on_road', ptrX(p), ptrY(p) - 40);
         return;
       }
       const r = sim.setRally(towerId, snap);
@@ -475,12 +476,12 @@ export class InteractionController {
         Audio.sfx('ui_click');
         this.setMode({ kind: 'idle' });
         this.closeMenu();
-      } else this.fail(r.reason, p.x, p.y - 40);
+      } else this.fail(r.reason, ptrX(p), ptrY(p) - 40);
       return;
     }
 
     // idle: select tower / spot / nothing
-    const lp = view.toLocal(p.x, p.y);
+    const lp = view.toLocal(ptrX(p), ptrY(p));
     const tid = simView.towerAt(lp.x, lp.y);
     if (tid !== null) {
       if (this.selectedTower === tid && this.menu.isOpen) this.closeMenu();

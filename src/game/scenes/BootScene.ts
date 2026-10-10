@@ -1,10 +1,15 @@
 import Phaser from 'phaser';
+import { applyViewCamera } from '../ui/viewport';
 import { ensureUiTextures } from '../ui/icons';
 
 /** Loads the few assets the loading screen needs, registers generated UI textures and waits for the web font. */
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('Boot');
+  }
+
+  init(): void {
+    applyViewCamera(this);
   }
 
   preload(): void {

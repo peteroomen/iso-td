@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { applyViewCamera } from '../ui/viewport';
 import { loadSprites } from '../assets';
 import { initAudio, loadAudio } from '../services/audio';
 import { COLORS, GAME_H, GAME_W, textStyle } from '../ui/theme';
@@ -30,6 +31,10 @@ export class PreloadScene extends Phaser.Scene {
 
   constructor() {
     super('Preload');
+  }
+
+  init(): void {
+    applyViewCamera(this);
   }
 
   preload(): void {

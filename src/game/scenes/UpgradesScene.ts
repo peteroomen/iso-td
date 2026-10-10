@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { applyViewCamera } from '../ui/viewport';
 import {
   MAX_TIER,
   TIER_COSTS,
@@ -92,6 +93,7 @@ export class UpgradesScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyViewCamera(this);
     ensureUi(this);
     this.columns = [];
     this.modalOpen = false;

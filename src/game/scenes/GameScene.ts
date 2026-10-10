@@ -17,7 +17,7 @@ import { generateTextures } from '../render/textures';
 import { Audio } from '../services/audio';
 import { getSave, updateSave } from '../services/save';
 import { COLORS, GAME_H, GAME_W, SAFE, UI_SCALE } from '../ui/theme';
-import { fullscreenAvailable, toggleFullscreen, type ViewResizable } from '../ui/viewport';
+import { applyViewCamera, fullscreenAvailable, toggleFullscreen, type ViewResizable } from '../ui/viewport';
 
 const MAX_STEPS_PER_FRAME = 8;
 
@@ -85,6 +85,7 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
   }
 
   create(): void {
+    applyViewCamera(this);
     const rs = this.resumeFrom;
     this.resumeFrom = undefined;
     this.acc = rs?.acc ?? 0;

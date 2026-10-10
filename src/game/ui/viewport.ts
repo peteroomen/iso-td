@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { setViewMetrics } from './theme';
+import { BASE_H, BASE_W, setViewMetrics, textResolution } from './theme';
 
 /** Scenes that should not be restarted on resize (they only exist for a moment, or manage themselves). */
 const SKIP = new Set(['Boot', 'Preload']);
@@ -39,24 +39,171 @@ function portraitBlocked(): boolean {
   }
 }
 
-/** Reads the live canvas size into the theme (GAME_W / GAME_H / UI_SCALE / SAFE). */
-export function syncViewMetrics(game: Phaser.Game): void {
-  const sc = game.scale;
-  const cssPerUnit = sc.height > 0 ? sc.displaySize.height / sc.height : 1;
-  setViewMetrics(sc.width, sc.height, cssPerUnit, readInsets());
+// ------------------------------------------------------------------------------------------------ backing store
+//
+// Hi-DPI strategy. Phaser 3 has no `resolution` option, so the game runs in Scale.NONE at the PHYSICAL size of the
+// window (CSS size x min(devicePixelRatio, cap), canvas CSS size = window size). Game code keeps its logical space
+// (height 720 on wide screens, width 1280 on narrow ones; see viewW / viewH): every scene's main camera is zoomed by
+// k = physical px per logical unit with origin (0,0) (`applyViewCamera`), so logical (x, y) lands on physical pixel
+// (k x, k y). Pointer coordinates (physical) are converted back with `ptrX / ptrY`. Text resolution follows k.
+
+/** Backing store budget (physical pixels). Lower on low-end devices. Override with ?maxpx=... / ?maxdpr=... for testing. */
+function pixelBudget(): number {
+  const q = new URLSearchParams(location.search);
+  const o = Number(q.get('maxpx'));
+  if (o > 0) return o;
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  const lowEnd = (nav.deviceMemory ?? 8) <= 2 || (nav.hardwareConcurrency ?? 8) <= 2;
+  return lowEnd ? 1.9e6 : 3.7e6;
+}
+
+function maxDpr(): number {
+  const o = Number(new URLSearchParams(location.search).get('maxdpr'));
+  return o > 0 ? o : 3;
+}
+
+export interface Backing {
+  /** physical canvas size (backing store) */
+  pw: number;
+  ph: number;
+  /** logical size seen by game code */
+  lw: number;
+  lh: number;
+  /** physical px per logical unit */
+  k: number;
+}
+
+/** Pure sizing rule: CSS size + devicePixelRatio -> backing store size, logical size and zoom. */
+export function computeBacking(cssW: number, cssH: number, dpr: number, budget = pixelBudget(), dprCap = maxDpr()): Backing {
+  cssW = Math.max(1, cssW);
+  cssH = Math.max(1, cssH);
+  let s = Math.min(Math.max(1, dpr || 1), dprCap);
+  s = Math.min(s, Math.sqrt(budget / (cssW * cssH)));
+  let pw = Math.max(1, Math.round(cssW * s));
+  let ph = Math.max(1, Math.round(cssH * s));
+  const wide = pw / ph >= BASE_W / BASE_H; // logical canvas: >= 1280x720, grows on one axis to match the aspect
+  let k = wide ? ph / BASE_H : pw / BASE_W;
+  if (k < 1) {
+    // never render below the logical resolution (tiny windows / huge screens over budget): the browser downsamples
+    pw = Math.round(pw / k);
+    ph = Math.round(ph / k);
+    k = 1;
+  }
+  const lw = wide ? Math.round(pw / k) : BASE_W;
+  const lh = wide ? BASE_H : Math.round(ph / k);
+  return { pw, ph, lw, lh, k };
+}
+
+let cur: Backing = { pw: BASE_W, ph: BASE_H, lw: BASE_W, lh: BASE_H, k: 1 };
+let cssSize = { w: BASE_W, h: BASE_H };
+
+const hostOf = (canvas?: HTMLCanvasElement): HTMLElement => canvas?.parentElement ?? document.getElementById('game') ?? document.body;
+
+/** Backing for the current window / host element (used before the game exists, to size the config). */
+export function initialBacking(): Backing {
+  const host = hostOf();
+  const w = host.clientWidth || window.innerWidth || BASE_W;
+  const h = host.clientHeight || window.innerHeight || BASE_H;
+  return computeBacking(w, h, window.devicePixelRatio);
+}
+
+/** Pointer position in logical units (pointer.x / y are physical backing-store pixels). */
+export const ptrX = (p: { x: number }): number => p.x / cur.k;
+export const ptrY = (p: { y: number }): number => p.y / cur.k;
+
+/** Re-rasterises every Text in the scene (and nested containers) at the current text resolution. */
+function syncTextResolution(scene: Phaser.Scene): void {
+  const r = textResolution();
+  const walk = (list: Phaser.GameObjects.GameObject[]): void => {
+    for (const o of list) {
+      if (o instanceof Phaser.GameObjects.Text) {
+        if (o.style.resolution !== r) o.setResolution(r);
+      } else if (o instanceof Phaser.GameObjects.Container) {
+        walk(o.list);
+      }
+    }
+  };
+  walk(scene.children.list);
 }
 
 /**
- * Keeps the theme's live size in sync with the (EXPAND-scaled) canvas and re-lays out the running scenes
- * whenever it changes (window resize, rotation, fullscreen). Resizes are debounced and ignored while the
- * "rotate your device" overlay is up.
+ * Makes the scene's main camera map logical units to physical pixels. Every scene calls this at the start of `create()`
+ * (cameras are rebuilt on scene restart); `installViewport` calls it again for all running scenes on every resize.
+ */
+export function applyViewCamera(scene: Phaser.Scene): void {
+  const cam = scene.cameras.main;
+  const { pw, ph, k } = cur;
+  cam.setSize(pw, ph);
+  cam.setZoom(k);
+  // zoom pivots on the viewport centre; scrolling by (size/k - size)/2 puts logical (0,0) on physical pixel (0,0)
+  cam.setScroll((pw / k - pw) / 2, (ph / k - ph) / 2);
+  cam.setRoundPixels(false); // would floor the (fractional) scroll
+  syncTextResolution(scene);
+}
+
+let patched = false;
+/** Text created through add.text / make.text without an explicit resolution gets the live one. */
+function patchTextFactory(): void {
+  if (patched) return;
+  patched = true;
+  type TextFn = (this: unknown, x: number, y: number, text: unknown, style?: Record<string, unknown>) => unknown;
+  for (const proto of [Phaser.GameObjects.GameObjectFactory.prototype, Phaser.GameObjects.GameObjectCreator.prototype] as unknown as Record<string, TextFn>[]) {
+    const orig = proto.text;
+    proto.text = function (this: unknown, ...a: unknown[]) {
+      // GameObjectCreator.text takes a single config object, the factory takes (x, y, text, style)
+      if (a.length === 1 && typeof a[0] === 'object') {
+        const cfg = a[0] as unknown as { style?: Record<string, unknown> };
+        cfg.style = { resolution: textResolution(), ...(cfg.style ?? {}) };
+        return (orig as (this: unknown, c: unknown) => unknown).call(this, cfg);
+      }
+      return orig.call(this, a[0] as number, a[1] as number, a[2], { resolution: textResolution(), ...((a[3] as Record<string, unknown> | undefined) ?? {}) });
+    } as TextFn;
+  }
+}
+
+/** Reads the live canvas size into the theme (GAME_W / GAME_H / PX_PER_UNIT / UI_SCALE / SAFE). */
+export function syncViewMetrics(_game?: Phaser.Game): void {
+  const cssPerUnit = cur.lh > 0 ? cssSize.h / cur.lh : 1;
+  setViewMetrics(cur.lw, cur.lh, cssPerUnit, readInsets(), cur.k);
+}
+
+/**
+ * Sizes the canvas to the host element: canvas CSS size = host size, backing store = CSS size x capped DPR.
+ * Returns true when the logical size or zoom changed.
+ */
+function fitBacking(game: Phaser.Game): boolean {
+  const host = hostOf(game.canvas);
+  const cw = host.clientWidth || window.innerWidth;
+  const ch = host.clientHeight || window.innerHeight;
+  const b = computeBacking(cw, ch, window.devicePixelRatio);
+  const st = game.canvas.style;
+  st.width = `${cw}px`;
+  st.height = `${ch}px`;
+  st.flex = 'none';
+  const changed = b.lw !== cur.lw || b.lh !== cur.lh || Math.abs(b.k - cur.k) > 1e-4;
+  const sizeChanged = game.scale.width !== b.pw || game.scale.height !== b.ph;
+  cur = b;
+  cssSize = { w: cw, h: ch };
+  if (sizeChanged) game.scale.resize(b.pw, b.ph);
+  else game.scale.refresh(); // CSS size may have changed: recompute canvasBounds / displayScale for input
+  syncViewMetrics(game);
+  return changed;
+}
+
+/**
+ * Keeps the backing store sized to the window and re-lays out the running scenes whenever the logical size changes
+ * (window resize, rotation, fullscreen, devicePixelRatio change). Cameras are updated immediately; re-layout is
+ * debounced and ignored while the "rotate your device" overlay is up.
  */
 export function installViewport(game: Phaser.Game): void {
-  syncViewMetrics(game);
+  patchTextFactory();
+  fitBacking(game);
+  if (import.meta.env.DEV) (window as unknown as { __viewInfo: () => unknown }).__viewInfo = () => ({ ...cur, css: { ...cssSize }, dpr: window.devicePixelRatio, canvas: [game.canvas.width, game.canvas.height] });
   let timer = 0;
-  let lastW = game.scale.width;
-  let lastH = game.scale.height;
-  let lastCss = game.scale.displaySize.height;
+  let lastW = cur.lw;
+  let lastH = cur.lh;
+  let lastK = cur.k;
+  let lastCss = cssSize.h;
   let wasBlocked = false;
 
   const relayout = (): void => {
@@ -72,12 +219,11 @@ export function installViewport(game: Phaser.Game): void {
       return;
     }
     wasBlocked = false;
-    const sc = game.scale;
-    const css = sc.displaySize.height;
-    if (sc.width === lastW && sc.height === lastH && Math.abs(css - lastCss) < 0.5) return;
-    lastW = sc.width;
-    lastH = sc.height;
-    lastCss = css;
+    if (cur.lw === lastW && cur.lh === lastH && Math.abs(cur.k - lastK) < 1e-4 && Math.abs(cssSize.h - lastCss) < 0.5) return;
+    lastW = cur.lw;
+    lastH = cur.lh;
+    lastK = cur.k;
+    lastCss = cssSize.h;
     syncViewMetrics(game);
     for (const s of game.scene.getScenes(false)) {
       const key = s.sys.settings.key;
@@ -95,11 +241,47 @@ export function installViewport(game: Phaser.Game): void {
     if (timer) window.clearTimeout(timer);
     timer = window.setTimeout(relayout, 140);
   };
-  game.scale.on(Phaser.Scale.Events.RESIZE, schedule);
-  window.addEventListener('orientationchange', schedule);
-  window.addEventListener('resize', schedule);
+
+  /** Window / host changed: resize the backing store right away (no stretched frames), re-layout shortly after. */
+  let raf = 0;
+  const onSize = (): void => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      fitBacking(game);
+      for (const s of game.scene.getScenes(false)) if (s.sys.isActive() || s.sys.isPaused()) applyViewCamera(s);
+      schedule();
+    });
+  };
+
+  window.addEventListener('resize', onSize);
+  window.addEventListener('orientationchange', onSize);
+  document.addEventListener('fullscreenchange', onSize);
+  window.visualViewport?.addEventListener('resize', onSize);
   try {
-    window.matchMedia('(orientation: portrait)').addEventListener('change', schedule);
+    new ResizeObserver(onSize).observe(hostOf(game.canvas));
+  } catch {
+    /* old browsers: window resize is enough */
+  }
+  // browser zoom / moving the window to another monitor changes devicePixelRatio without (always) a resize event
+  const watchDpr = (): void => {
+    try {
+      const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+      mq.addEventListener(
+        'change',
+        () => {
+          onSize();
+          watchDpr();
+        },
+        { once: true },
+      );
+    } catch {
+      /* ignore */
+    }
+  };
+  watchDpr();
+  try {
+    window.matchMedia('(orientation: portrait)').addEventListener('change', onSize);
   } catch {
     /* old browsers */
   }

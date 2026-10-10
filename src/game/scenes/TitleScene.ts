@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { applyViewCamera } from '../ui/viewport';
 import { hasFlag, starsEarned } from '../../core';
 import { Audio } from '../services/audio';
 import { getSave } from '../services/save';
@@ -65,6 +66,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyViewCamera(this);
     ensureUi(this);
     this.fliers = [];
     this.turrets = [];

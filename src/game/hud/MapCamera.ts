@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { CSS_PER_UNIT, SAFE, UI_SCALE } from '../ui/theme';
+import { CSS_PER_UNIT, GAME_H, GAME_W, SAFE, UI_SCALE } from '../ui/theme';
+import { ptrX, ptrY } from '../ui/viewport';
 import { IsoView } from '../render/iso';
 import { Hud } from './Hud';
 import { DEPTH, UiButton, isHud } from './widgets';
@@ -77,7 +78,7 @@ export class MapCamera {
     const u = UI_SCALE;
     const bw = 84;
     this.resetBtn = new UiButton(scene, 0, 0, { w: bw, h: 46, label: 'Fit', fontSize: 22, fill: 0x4c6fd0, radius: 12, onClick: () => this.reset() }).setBaseScale(u);
-    this.resetBtn.setPosition(scene.scale.width - SAFE.r - 14 - 42 * u, scene.scale.height - SAFE.b - 14 - 23 * u).setDepth(DEPTH.bar).setVisible(false);
+    this.resetBtn.setPosition(GAME_W - SAFE.r - 14 - 42 * u, GAME_H - SAFE.b - 14 - 23 * u).setDepth(DEPTH.bar).setVisible(false);
     scene.add.existing(this.resetBtn);
   }
 
@@ -123,7 +124,7 @@ export class MapCamera {
   private onDown(p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]): void {
     if (this.touches.size === 0) this.gestured = false;
     const hud = over.some(isHud) || this.d.isBlocked();
-    this.touches.set(p.id, { id: p.id, x: p.x, y: p.y, sx: p.x, sy: p.y, hud, panning: false, panOffX: this.d.view.offX, panOffY: this.d.view.offY, button: MapCamera.buttonOf(p) });
+    this.touches.set(p.id, { id: p.id, x: ptrX(p), y: ptrY(p), sx: ptrX(p), sy: ptrY(p), hud, panning: false, panOffX: this.d.view.offX, panOffY: this.d.view.offY, button: MapCamera.buttonOf(p) });
     this.resetting = false;
     this.targetZoom = this.d.view.zoom;
     this.maybeStartPinch();
@@ -147,8 +148,8 @@ export class MapCamera {
   private onMoveEvt(p: Phaser.Input.Pointer): void {
     const t = this.touches.get(p.id);
     if (!t) return;
-    t.x = p.x;
-    t.y = p.y;
+    t.x = ptrX(p);
+    t.y = ptrY(p);
     const v = this.d.view;
     if (t.hud || this.d.isBlocked()) return;
     if (this.pinch) {
@@ -172,7 +173,7 @@ export class MapCamera {
     if (!p.isDown) return;
     if (!t.panning) {
       const thr = t.button === 'left' ? DRAG_CSS_PX / CSS_PER_UNIT : 3;
-      if (Math.hypot(p.x - t.sx, p.y - t.sy) < thr) return;
+      if (Math.hypot(ptrX(p) - t.sx, ptrY(p) - t.sy) < thr) return;
       t.panning = true;
       this.gestured = true;
       t.panOffX = v.offX;
@@ -180,12 +181,12 @@ export class MapCamera {
       this.d.onMove();
     }
     this.resetting = false;
-    v.offX = t.panOffX + (p.x - t.sx);
-    v.offY = t.panOffY + (p.y - t.sy);
+    v.offX = t.panOffX + (ptrX(p) - t.sx);
+    v.offY = t.panOffY + (ptrY(p) - t.sy);
     v.clampPan();
     // the pan may be clamped: re-base so the content follows the finger again as soon as it can
-    t.panOffX = v.offX - (p.x - t.sx);
-    t.panOffY = v.offY - (p.y - t.sy);
+    t.panOffX = v.offX - (ptrX(p) - t.sx);
+    t.panOffY = v.offY - (ptrY(p) - t.sy);
   }
 
   private onUp(p: Phaser.Input.Pointer): void {
@@ -202,13 +203,13 @@ export class MapCamera {
       }
       // snap back into the allowed range (pinch is allowed to overshoot slightly)
       this.targetZoom = Phaser.Math.Clamp(this.d.view.zoom, this.d.view.minZoom, this.d.view.maxZoom);
-      this.focus = { x: p.x, y: p.y };
+      this.focus = { x: ptrX(p), y: ptrY(p) };
     }
   }
 
   private onWheel(p: Phaser.Input.Pointer, over: unknown[], _dx: number, dy: number): void {
     if (this.d.isBlocked() || (over as Phaser.GameObjects.GameObject[]).some(isHud)) return;
-    this.zoomBy(Math.exp(-dy * 0.0014), p.x, p.y);
+    this.zoomBy(Math.exp(-dy * 0.0014), ptrX(p), ptrY(p));
   }
 
   // ------------------------------------------------------------------------------------------ frame

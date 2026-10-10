@@ -3,7 +3,7 @@ import { withSettings } from '../../core';
 import { Audio } from '../services/audio';
 import { clearSave, getSave, updateSave } from '../services/save';
 import { COLORS, GAME_H, GAME_W, textStyle } from '../ui/theme';
-import { toggleFullscreen } from '../ui/viewport';
+import { applyViewCamera, toggleFullscreen } from '../ui/viewport';
 import { Button, IconButton, Panel, Slider, confirmModal, drawOutlinedRect, ensureUi } from '../ui/widgets';
 
 export interface SettingsData {
@@ -32,6 +32,7 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyViewCamera(this);
     ensureUi(this);
     this.input.setTopOnly(true);
     this.backdrop = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x120c1c, 1).setAlpha(0).setInteractive().setDepth(DEPTH);

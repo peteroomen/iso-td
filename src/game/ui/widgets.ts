@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_H, GAME_W, textStyle } from './theme';
+import { ptrX, ptrY } from './viewport';
 import { Audio } from '../services/audio';
 import { ensureUiTextures } from './icons';
 
@@ -613,7 +614,7 @@ export class Slider extends Phaser.GameObjects.Container {
 
   private setFromPointer(p: Phaser.Input.Pointer): void {
     const m = this.getWorldTransformMatrix();
-    const local = m.applyInverse(p.x, p.y);
+    const local = m.applyInverse(ptrX(p), ptrY(p));
     const v = Phaser.Math.Clamp((local.x + this.trackWidth / 2) / this.trackWidth, 0, 1);
     this.val = Math.round(v * 100) / 100;
     this.refresh();
