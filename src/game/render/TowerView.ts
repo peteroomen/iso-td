@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import type { TowerState } from '../../core';
+import type { SpecId, TowerState } from '../../core';
 import { depthOf, isoX, isoY } from './iso';
-import { Layers } from './Fx';
+import { Fx, Layers } from './Fx';
+import { FXTEX, SPEC_TEX } from './specVisuals';
 import { TEX } from './textures';
 
 /**
@@ -98,6 +99,19 @@ export class TowerView {
   private flipped = false;
   private door = 1;
   private popTween?: Phaser.Tweens.Tween;
+  // ---- specialization visuals
+  private spec: SpecId | null = null;
+  private badge?: Phaser.GameObjects.Image;
+  private deco: Phaser.GameObjects.Image[] = [];
+  private sparks: Phaser.GameObjects.Image[] = [];
+  private specGlow?: Phaser.GameObjects.Image;
+  private lamp?: Phaser.GameObjects.Image;
+  private pennant?: Phaser.GameObjects.Image;
+  private specT = Math.random() * 10;
+  private lickAcc = 0;
+  private sparkAcc = 0;
+  private glintT = 0;
+  private podKick = 0;
   readonly gx: number;
   readonly gy: number;
   readonly kind: TowerState['kind'];
@@ -106,6 +120,7 @@ export class TowerView {
     private readonly scene: Phaser.Scene,
     L: Layers,
     st: TowerState,
+    private readonly fx?: Fx,
   ) {
     this.gx = st.x;
     this.gy = st.y;
@@ -158,6 +173,8 @@ export class TowerView {
 
   update(st: TowerState, dt: number): void {
     if (st.level !== this.level) this.applyLevel(st);
+    if (st.spec !== this.spec) this.applySpec(st);
+    if (this.spec) this.updateSpec(st, dt);
     this.bowT += dt;
     this.flashT += dt;
     this.recoilT += dt;
@@ -201,6 +218,145 @@ export class TowerView {
     }
   }
 
+  // ------------------------------------------------------------------ specialization visuals
+
+  /** World-local px of the staff gem / barrel etc. relative to the container origin. */
+  private gemOffset(): { x: number; y: number } {
+    const f = footOf(this.kind, this.level);
+    return f.gem ? { x: f.gem[0] - f.x, y: f.gem[1] - f.y } : { x: 0, y: -f.shootH };
+  }
+
+  /** (Re)builds the emblem badge and the permanent look of the tower's specialization. */
+  private applySpec(st: TowerState): void {
+    this.badge?.destroy();
+    this.specGlow?.destroy();
+    this.lamp?.destroy();
+    this.pennant?.destroy();
+    for (const d of [...this.deco, ...this.sparks]) d.destroy();
+    this.deco = [];
+    this.sparks = [];
+    this.badge = this.specGlow = this.lamp = this.pennant = undefined;
+    this.spec = st.spec;
+    this.unit?.clearTint();
+    this.body.clearTint();
+    if (!st.spec) return;
+    const f = footOf(st.kind, st.level);
+    const c = this.container;
+    const add = <T extends Phaser.GameObjects.GameObject>(o: T): T => {
+      c.add(o);
+      return o;
+    };
+    // round plaque floating over the roof
+    this.badgeY = -f.shootH - (st.kind === 'archer' ? 42 : 30);
+    this.badge = add(this.scene.add.image(0, this.badgeY, SPEC_TEX[st.spec]).setScale(0.7));
+    switch (st.spec) {
+      case 'eagle_eye':
+        this.unit?.setTint(0xffd45a);
+        this.body.setTint(0xfff1c8);
+        this.sparks.push(add(this.scene.add.image(0, 0, TEX.spark).setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff0a0).setScale(0)));
+        break;
+      case 'chain_lightning': {
+        const g = this.gemOffset();
+        for (let i = 0; i < 3; i++) this.sparks.push(add(this.scene.add.image(g.x, g.y, TEX.spark).setBlendMode(Phaser.BlendModes.ADD).setTint(0x9fe0ff).setScale(0)));
+        break;
+      }
+      case 'fire_mages': {
+        const g = this.gemOffset();
+        this.specGlow = add(this.scene.add.image(g.x, g.y, TEX.glow).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff7a2a).setScale(0.7));
+        break;
+      }
+      case 'bigger_bombs':
+        this.deco.push(add(this.scene.add.image(-60, 20, TEX.shell).setScale(1.5)), add(this.scene.add.image(-42, 28, TEX.shell).setScale(1.5)));
+        this.deco.push(add(this.scene.add.image(-52, 8, TEX.shell).setScale(1.5)));
+        break;
+      case 'homing_missiles':
+        this.pod = add(this.scene.add.image(-60, -34, FXTEX.pod).setScale(1.15));
+        this.lamp = add(this.scene.add.image(-71, -39, TEX.glow).setBlendMode(Phaser.BlendModes.ADD).setTint(0x7dff8a).setScale(0.35));
+        break;
+      case 'extra_recruits':
+        this.pennant = add(this.scene.add.image(26, -f.shootH + 6, FXTEX.pennant).setOrigin(0.07, 0.95).setScale(0.95));
+        break;
+      default:
+        break;
+    }
+    // the plaque stays on top
+    c.bringToTop(this.badge);
+  }
+
+  private pod?: Phaser.GameObjects.Image;
+  private badgeY = 0;
+
+  private updateSpec(st: TowerState, dt: number): void {
+    this.specT += dt;
+    const t = this.specT;
+    const c = this.container;
+    if (this.badge) {
+      this.badge.y = this.badgeY + Math.sin(t * 2.2) * 1.8;
+    }
+    switch (this.spec) {
+      case 'eagle_eye': {
+        // a travelling glint across the gold trim
+        this.glintT += dt;
+        const g = this.sparks[0];
+        if (g && this.unit) {
+          const k = (this.glintT % 3.2) / 3.2;
+          const on = k < 0.18 ? Math.sin((k / 0.18) * Math.PI) : 0;
+          g.setPosition(this.unit.x + (this.flipped ? -1 : 1) * (-10 + k * 70), this.unit.y - 30 - k * 8).setScale(on * 0.9).setRotation(k * 6);
+        }
+        break;
+      }
+      case 'chain_lightning': {
+        this.sparkAcc += dt;
+        if (this.sparkAcc > 0.11) {
+          this.sparkAcc = 0;
+          const g = this.gemOffset();
+          const sp = this.sparks[Math.floor(Math.random() * this.sparks.length)];
+          const a = Math.random() * Math.PI * 2;
+          const r = 8 + Math.random() * 14;
+          sp.setPosition(g.x + Math.cos(a) * r, g.y + Math.sin(a) * r * 0.9).setScale(0.5 + Math.random() * 0.5).setRotation(Math.random() * 3).setAlpha(1);
+        }
+        for (const sp of this.sparks) sp.setScale(Math.max(0, sp.scale - dt * 4)).setAlpha(sp.scale > 0 ? 1 : 0);
+        break;
+      }
+      case 'fire_mages': {
+        const g = this.gemOffset();
+        this.specGlow?.setAlpha(0.55 + 0.3 * Math.sin(t * 17) + 0.15 * Math.sin(t * 7.3)).setScale(0.6 + 0.15 * Math.sin(t * 13));
+        this.lickAcc += dt;
+        if (this.lickAcc > 0.1 && this.fx) {
+          this.lickAcc = 0;
+          this.fx.flameAt(c.x + g.x + (Math.random() - 0.5) * 8, c.y + g.y - 4);
+        }
+        break;
+      }
+      case 'homing_missiles': {
+        this.podKick = Math.max(0, this.podKick - dt * 5);
+        if (this.pod) this.pod.setPosition(-60 - 4 * this.podKick, -34 + 3 * this.podKick);
+        if (this.lamp) {
+          const charge = st.specCooldownMax > 0 ? 1 - st.specCooldown / st.specCooldownMax : 1;
+          const ready = charge >= 0.999;
+          this.lamp.setTint(ready ? 0x7dff8a : 0xffb13a).setAlpha(ready ? 0.7 + 0.3 * Math.sin(t * 8) : 0.25 + 0.5 * charge).setScale(0.3 + 0.1 * charge);
+        }
+        break;
+      }
+      case 'extra_recruits': {
+        if (this.pennant) this.pennant.setScale(0.95 + 0.07 * Math.sin(t * 4.5), 0.95).setRotation(Math.sin(t * 3) * 0.04);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  /** Homing Missiles volley: the pod kicks back. */
+  kickPod(): void {
+    this.podKick = 1;
+  }
+
+  /** World-local px of the missile pod's mouth. */
+  podMouth(): { x: number; y: number } {
+    return { x: this.container.x - 60 + 24, y: this.container.y - 34 - 14 };
+  }
+
   pop(kind: 'build' | 'upgrade'): void {
     this.popTween?.stop();
     if (kind === 'build') {
@@ -210,7 +366,11 @@ export class TowerView {
       this.container.setScale(1);
       this.popTween = this.scene.tweens.add({ targets: this.container, scaleX: { from: 0.8, to: 1 }, scaleY: { from: 1.25, to: 1 }, duration: 380, ease: 'Back.easeOut' });
       this.body.setTintFill(0xffffff);
-      this.scene.time.delayedCall(110, () => this.body.active && this.body.clearTint());
+      this.scene.time.delayedCall(110, () => {
+        if (!this.body.active) return;
+        if (this.spec === 'eagle_eye') this.body.setTint(0xfff1c8);
+        else this.body.clearTint();
+      });
     }
   }
 

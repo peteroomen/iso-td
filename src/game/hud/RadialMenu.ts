@@ -14,6 +14,8 @@ export interface RadialItem {
   iconH?: number;
   /** Fill colour of the disc. */
   color?: number;
+  /** An owned (permanent) choice: drawn with a gold ring. */
+  owned?: boolean;
   /** Small text on the disc corner (e.g. "L2"). */
   badge?: string;
   cost?: () => number | null;
@@ -247,6 +249,7 @@ export class RadialMenu {
     g.fillStyle(COLORS.ink, 1).fillCircle(0, 0, BTN_R + 3.5);
     g.fillStyle(st === 'ok' ? fill : 0x3a3347, 1).fillCircle(0, 0, BTN_R);
     g.fillStyle(0xffffff, st === 'ok' ? 0.16 : 0.05).fillEllipse(0, -BTN_R * 0.42, BTN_R * 1.5, BTN_R * 0.8);
+    if (b.item.owned) g.lineStyle(4, 0xffd34e, 1).strokeCircle(0, 0, BTN_R + 4.5);
     if (b.hovered && st === 'ok') g.lineStyle(3, 0xffe27a, 1).strokeCircle(0, 0, BTN_R + 5);
     b.icon.setAlpha(st === 'ok' ? 1 : st === 'poor' ? 0.55 : 0.28);
     if (st === 'ok') b.icon.clearTint();

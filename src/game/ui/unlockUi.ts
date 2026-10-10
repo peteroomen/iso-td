@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { COLORS, textStyle } from './theme';
 import { drawOutlinedRect, ensureUi, sparkBurst } from './widgets';
+import { SPEC_TEX, generateSpecTextures } from '../render/specVisuals';
 import { KINDS, fitImage, towerSprite, type TowerIconKind, type TowerUnlock } from '../scenes/metaData';
 
 /** Glowing tower icon with a level badge: the "something new is available" marker used by the unlock UI. */
@@ -14,8 +15,14 @@ export function unlockIcon(scene: Phaser.Scene, x: number, y: number, u: TowerUn
   plate.lineStyle(3, COLORS.gold, 1);
   plate.strokeRoundedRect(-size / 2 + 3, -size / 2 + 3, size - 6, size - 6, 17);
   root.add([glow, plate]);
-  const kinds: TowerIconKind[] = u.kind === 'all' ? [...KINDS] : [u.kind];
-  if (kinds.length === 1) {
+  const kinds: TowerIconKind[] = u.kind === 'all' ? [...KINDS] : u.kind === 'spec' ? [] : [u.kind];
+  if (u.kind === 'spec') {
+    // four spec emblems, one per tower kind
+    generateSpecTextures(scene);
+    const s = size * 0.46;
+    const pos: [number, number][] = [[-size * 0.22, -size * 0.2], [size * 0.22, -size * 0.2], [-size * 0.22, size * 0.2], [size * 0.22, size * 0.2]];
+    (['eagle_eye', 'fire_mages', 'homing_missiles', 'extra_recruits'] as const).forEach((id, i) => root.add(fitImage(scene.add.image(pos[i][0], pos[i][1], SPEC_TEX[id]), s, s)));
+  } else if (kinds.length === 1) {
     root.add(fitImage(scene.add.image(0, -2, towerSprite(kinds[0], u.level)), size * 0.82, size * 0.82));
   } else {
     // 2 x 2 grid for the four tower kinds

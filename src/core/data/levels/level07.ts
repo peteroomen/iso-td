@@ -52,6 +52,7 @@ export const level07: LevelDef = {
     { groups: [g('dread', 2, 3.1, 0), g('carrier', 1, 3.55, 2), g('prism', 2, 1.4, 5), g('plated', 11, 1.05, 8), g('skimmer', 8, 0.6, 11), g('scout', 8, 0.5, 14)] },
   ],
   hints: [
+    { waveIndex: 0, text: 'NEW: Tower Specializations! Upgrade a tower to Lv3, then tap it and pick one of two permanent powers (300 g): nets, chain lightning, missiles, bows and more.' },
     { waveIndex: 4, text: 'A Dreadnought approaches: 800 HP, armored and magic-resistant, and it crushes knights. Focus every tower on it - an Orbital Strike ignores its armor.' },
   ],
 };

@@ -3,10 +3,13 @@ import { ENEMIES, type EnemyState } from '../../core';
 import { Layers } from './Fx';
 import { BarInfo } from './KnightView';
 import { depthOf, isoX, isoY } from './iso';
+import { FXTEX } from './specVisuals';
 import { BOSS_SCALE, SLOW_TINT, enemyScale, hoverOf } from './style';
 import { TEX } from './textures';
 
 const ADD = Phaser.BlendModes.ADD;
+
+const dtOf = (now: number, last: number): number => (last > 0 ? Math.min(0.1, Math.max(0, (now - last) / 1000)) : 0.016);
 
 /** One UFO: sprite, shadow, status effects (shield bubble, glint, red pulse, slow tint, hit flash). */
 export class EnemyView {
@@ -26,9 +29,15 @@ export class EnemyView {
   stamp = 0;
   private readonly phase = Math.random() * Math.PI * 2;
   private readonly baseScale: number;
-  readonly hover: number;
+  /** Current hover altitude (px): netted fliers sink to ground height. */
+  hover: number;
+  private rope?: Phaser.GameObjects.Image;
+  private ropeA = 0;
+  private burnAcc = 0;
   readonly type: EnemyState['type'];
   private squash = { v: 0 };
+  private lastTime = 0;
+  private lastTime2 = 0;
   /** Rendered top of the sprite (px above the container origin). */
   readonly spriteH: number;
 
@@ -61,6 +70,11 @@ export class EnemyView {
       this.container.add(this.engine);
     }
     this.container.add(this.sprite);
+    if (!st.boss) {
+      this.rope = scene.add.image(0, -this.sprite.displayHeight * 0.45, FXTEX.rope).setAlpha(0).setVisible(false);
+      this.rope.setDisplaySize(this.sprite.displayWidth * 1.15, this.sprite.displayHeight * 1.05);
+      this.container.add(this.rope);
+    }
     if (st.type === 'prism') {
       this.shield = scene.add.image(0, -this.sprite.displayHeight * 0.45, TEX.bubble);
       this.shield.setDisplaySize(w * 1.18, this.sprite.displayHeight * 1.05);
@@ -88,10 +102,20 @@ export class EnemyView {
     const t = time / 1000 + this.phase;
     const px = isoX(st.x, st.y);
     const py = isoY(st.x, st.y);
-    const bobAmp = st.boss ? 3 : st.flier ? 4 : 2.5;
-    const bob = Math.sin(t * (st.boss ? 1.4 : 3.2)) * bobAmp;
+    // netted fliers are pulled down to ground height (smoothly), the cocoon struggles instead of bobbing
+    const targetHover = hoverOf(st);
+    if (this.hover !== targetHover) {
+      const step = Math.min(1, dtOf(time, this.lastTime) * 7);
+      this.hover += (targetHover - this.hover) * step;
+      if (Math.abs(targetHover - this.hover) < 0.3) this.hover = targetHover;
+    }
+    this.lastTime = time;
+    const netted = st.netted && !st.boss;
+    const bobAmp = netted ? 1 : st.boss ? 3 : st.flier ? 4 : 2.5;
+    const bob = Math.sin(t * (st.boss ? 1.4 : netted ? 11 : 3.2)) * bobAmp;
     const alt = this.hover + bob;
-    this.container.setPosition(px, py - alt);
+    const struggle = netted ? Math.sin(t * 17) * 1.6 : 0;
+    this.container.setPosition(px + struggle, py - alt);
     this.container.setDepth(depthOf(st.x, st.y) + 0.5);
     const tilt = Phaser.Math.Clamp((st.dirX - st.dirY) * 0.07 + Math.sin(t * 2.2) * 0.02, -0.12, 0.12);
     this.sprite.setRotation(st.boss ? tilt * 0.4 : tilt);
@@ -103,10 +127,17 @@ export class EnemyView {
     this.container.setAlpha(fade);
 
     const sh = this.hover / 80;
+    // rope cocoon fades in while netted, out afterwards
+    if (this.rope) {
+      this.ropeA += ((netted ? 1 : 0) - this.ropeA) * Math.min(1, dtOf(time, this.lastTime2) * 10);
+      this.lastTime2 = time;
+      this.rope.setVisible(this.ropeA > 0.02).setAlpha(this.ropeA * 0.85);
+      if (netted) this.rope.setRotation(Math.sin(t * 17) * 0.05);
+    }
     const wBase = (st.boss ? 3.4 : 1.0 * this.baseScale) * (1 - Math.min(0.4, sh * 0.45));
     this.shadow.setPosition(px, py + 3);
     this.shadow.setScale(wBase * (st.boss ? 1 : 1) * 0.9, wBase * 0.9);
-    this.shadow.setAlpha(fade * (st.flier ? 0.55 : 0.9) * (st.boss ? 0.8 : 1));
+    this.shadow.setAlpha(fade * (st.flier && !netted ? 0.55 : 0.9) * (st.boss ? 0.8 : 1));
 
     // squash on attack
     if (st.attacking && !this.lastAttacking) {
@@ -118,10 +149,12 @@ export class EnemyView {
     this.sprite.setScale(this.baseScale * (1 + sq * 0.08), this.baseScale * (1 - sq * 0.1));
 
     // tint
-    const tintMode = this.flashUntil > this.scene.time.now ? 2 : st.slowed ? 1 : 0;
+    const burnFlick = st.burning && Math.sin(t * 22) > 0.1;
+    const tintMode = this.flashUntil > this.scene.time.now ? 2 : burnFlick ? 3 : st.slowed ? 1 : 0;
     if (tintMode !== this.tintMode) {
       this.tintMode = tintMode;
       if (tintMode === 2) this.sprite.setTintFill(0xffffff);
+      else if (tintMode === 3) this.sprite.setTint(0xffa860);
       else if (tintMode === 1) this.sprite.setTint(SLOW_TINT);
       else this.sprite.clearTint();
     }
@@ -143,6 +176,21 @@ export class EnemyView {
     }
   }
 
+  /** Burning UFOs shed small flame licks (rate-limited). */
+  tickBurn(st: EnemyState, dt: number, lick: (x: number, y: number) => void): void {
+    if (!st.burning) return;
+    this.burnAcc += dt;
+    if (this.burnAcc < 0.07) return;
+    this.burnAcc = 0;
+    const w = this.sprite.displayWidth * 0.28;
+    lick(this.container.x + (Math.random() - 0.5) * 2 * w, this.container.y - this.spriteH * (0.25 + Math.random() * 0.5));
+  }
+
+  /** Body centre height above the ground (source px), follows the hover. */
+  bodyH(): number {
+    return this.hover + 32;
+  }
+
   /** Fills `out` (reused by the caller, no allocation) with this unit's hp bar. */
   bar(st: EnemyState, out: BarInfo): BarInfo {
     out.x = this.container.x;
@@ -150,6 +198,7 @@ export class EnemyView {
     out.frac = st.hp / st.maxHp;
     out.width = st.type === 'dread' || st.type === 'carrier' ? 34 : 28;
     out.show = !st.boss && st.hp < st.maxHp - 0.01;
+    out.burn = st.burning;
     return out;
   }
 

@@ -1,14 +1,30 @@
 import Phaser from 'phaser';
 import type { EnemyId, Sim, SimEvent } from '../../core';
 import { Audio } from '../services/audio';
+import { SPECS } from '../../core';
 import { COLORS } from '../ui/theme';
 import { EnemyView } from './EnemyView';
 import { Fx, Layers } from './Fx';
 import { IsoView, TH, TW, isoX, isoY } from './iso';
 import { BarInfo, KnightView } from './KnightView';
 import { ProjectileView } from './ProjectileView';
+import { FXTEX, SPEC_COLOR } from './specVisuals';
 import { HOVER_BOSS, HOVER_FLIER, HOVER_GROUND, bodyHeightOf } from './style';
 import { TowerView, towerMuzzleOffset, towerShootHeight } from './TowerView';
+
+/** Height (source px) a knight's arrow leaves at. */
+const KNIGHT_SHOOT_H = 38;
+
+interface NetMesh {
+  img: Phaser.GameObjects.Image;
+  enemyIds: number[];
+  slowed: boolean;
+  age: number;
+  duration: number;
+  fade: number;
+  w: number;
+  h: number;
+}
 
 const killNow = (v: { destroy(): void }): void => v.destroy();
 const killAnimated = (v: { destroyAnimated(): void }): void => v.destroyAnimated();
@@ -28,9 +44,11 @@ export class SimRenderer {
   private readonly k: number;
   /** Frame counter: views touched this frame get stamped, the rest are purged (no per-frame Set allocations). */
   private frame = 0;
-  private readonly bar = { x: 0, y: 0, frac: 1, width: 0, show: false } satisfies BarInfo;
+  private readonly bar: BarInfo = { x: 0, y: 0, frac: 1, width: 0, show: false, burn: false };
   private barsDirty = false;
   private strikesDirty = false;
+  /** Hunting Nets: spread nets lying on the ground while UFOs are caught in them. */
+  private readonly nets: NetMesh[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -56,7 +74,7 @@ export class SimRenderer {
     for (const t of s.towers) {
       let v = this.towers.get(t.id);
       if (!v) {
-        v = new TowerView(this.scene, this.L, t);
+        v = new TowerView(this.scene, this.L, t, this.fx);
         this.towers.set(t.id, v);
       }
       if (t.kind === 'barracks' && t.rallyX !== null && t.rallyY !== null) {
@@ -82,28 +100,33 @@ export class SimRenderer {
       }
       v.stamp = frame;
       v.update(e, time);
+      if (e.burning) v.tickBurn(e, dt, this.lick);
     }
+    this.updateNets(dt);
     for (const p of s.projectiles) {
       let v = this.projectiles.get(p.id);
       if (!v) {
         v = new ProjectileView(this.scene, this.L, p, 0, 0);
         this.projectiles.set(p.id, v);
+        if (v.golden) this.goldenGlint(p);
       }
       const tower = this.sim.getTower(p.towerId);
       if (v.isLob) {
         v.stamp = frame;
-        v.setHeights(p.kind === 'shell' && tower ? towerShootHeight('bomb', tower.level) : 0, 0);
+        v.setHeights((p.kind === 'shell' || p.kind === 'net') && tower ? towerShootHeight(tower.kind, tower.level) : 0, 0);
         v.update(p, 0);
         continue;
       }
       const tgt = this.sim.getEnemy(p.targetId);
-      const th = tower ? towerShootHeight(tower.kind, tower.level) : 70;
+      const th = p.kind === 'knightArrow' ? KNIGHT_SHOOT_H : tower ? towerShootHeight(tower.kind, tower.level) : 70;
       const targetH = tgt ? bodyHeightOf(tgt) : 30;
       // interpolate height from tower top to target body height
       v.stamp = frame;
       v.setHeights(th, targetH);
       v.update(p, targetH);
       if (v.isBolt) this.fx.trail(v.gx, v.gy, v.h);
+      else if (v.golden) this.fx.trail(v.gx, v.gy, v.h, true);
+      else if (v.kind === 'missile') this.fx.rocketTrail(v.gx, v.gy, v.h);
     }
 
     // 2. events (views of dying things still exist here)
@@ -152,8 +175,9 @@ export class SimRenderer {
       const f = Math.max(0, Math.min(1, b.frac));
       g.fillStyle(0x2e222f, 1).fillRoundedRect(x - o, y - o, w + 2 * o, h + 2 * o, 3 * k);
       g.fillStyle(0x5a3a48, 1).fillRect(x, y, w, h);
-      g.fillStyle(f > 0.5 ? 0x6cc24a : f > 0.25 ? 0xf2c230 : 0xe5484d, 1).fillRect(x, y, w * f, h);
+      g.fillStyle(b.burn ? 0xff8a1f : f > 0.5 ? 0x6cc24a : f > 0.25 ? 0xf2c230 : 0xe5484d, 1).fillRect(x, y, w * f, h);
       g.fillStyle(0xffffff, 0.35).fillRect(x, y, w * f, h * 0.38);
+      if (b.burn) g.fillStyle(0xffe27a, 0.45).fillRect(x, y + h * 0.62, w * f, h * 0.38);
     };
     for (const e of s.enemies) {
       const v = this.enemies.get(e.id);
@@ -237,6 +261,13 @@ export class SimRenderer {
 
   // ----------------------------------------------------------------------------------- events
 
+  /** Body-centre height of an enemy: its live view (follows netted fliers sinking) or the type's default. */
+  private heightOfId(id: number, type: EnemyId): number {
+    return this.enemies.get(id)?.bodyH() ?? this.enemyHeight(type);
+  }
+
+  private readonly lick = (x: number, y: number): void => this.fx.flameAt(x, y);
+
   private enemyHeight(type: EnemyId): number {
     if (type === 'mothership') return HOVER_BOSS + 36;
     if (type === 'skimmer') return HOVER_FLIER + 30;
@@ -284,7 +315,7 @@ export class SimRenderer {
       case 'hit': {
         const v = this.enemies.get(e.enemyId);
         v?.flash();
-        const h = this.enemyHeight(e.enemy) - 4;
+        const h = this.heightOfId(e.enemyId, e.enemy) - 4;
         if (e.source === 'orbital') break;
         if (e.source === 'shell' || e.source === 'bomblet') break; // the explosion already shows it
         if (e.source === 'knight' || e.source === 'militia') break;
@@ -297,17 +328,71 @@ export class SimRenderer {
       case 'chain': {
         const tgt = this.sim.getEnemy(e.targetId);
         const h2 = tgt ? bodyHeightOf(tgt) : 50;
-        fx.lightning([
-          { gx: e.fromX, gy: e.fromY, h: towerShootHeight('wizard', 2) },
-          { gx: e.toX, gy: e.toY, h: h2 },
-        ]);
+        const h1 = this.heightAround(e.fromX, e.fromY);
+        // later jumps arrive a beat after the previous one and are dimmer
+        const k = e.jump === 1 ? 1 : e.jump === 2 ? 0.72 : 0.5;
+        const go = () => {
+          fx.lightning([{ gx: e.fromX, gy: e.fromY, h: h1 }, { gx: e.toX, gy: e.toY, h: h2 }], 0x9fe0ff, k);
+          fx.hitSpark(e.toX, e.toY, h2, 'blue', 2 + Math.round(3 * k));
+        };
+        if (e.jump === 1) go();
+        else this.scene.time.delayedCall(70 * (e.jump - 1), go);
+        Audio.sfx('wizard_hit', { volume: 0.3 * k, detune: 300 + e.jump * 150, throttleMs: 150 });
+        break;
+      }
+      case 'specialize': {
+        const v = this.towers.get(e.towerId);
+        v?.pop('upgrade');
+        fx.specBurst(e.x, e.y, e.specId, SPEC_COLOR[e.specId], (v ? towerShootHeight(e.kind, 3) : 60) + 22);
+        fx.floatText(e.x, e.y, SPECS[e.specId].name, '#ffe27a', towerShootHeight(e.kind, 3) + 54, 22);
+        fx.shake(2.5, 0.2);
+        Audio.sfx('upgrade_tower');
+        this.scene.time.delayedCall(140, () => Audio.sfx('star_earned', { volume: 0.4, throttleMs: 200 }));
+        break;
+      }
+      case 'netLaunch': {
+        Audio.sfx('arrow_shoot', { volume: 0.34, detune: 500, throttleMs: 120 });
+        break;
+      }
+      case 'net': {
+        fx.netLand(e.x, e.y, e.radius);
+        this.nets.push(this.makeNet(e));
+        Audio.sfx('sword_clash', { volume: 0.2, detune: 900, throttleMs: 200 });
+        break;
+      }
+      case 'netExpire': {
+        const h = this.enemies.get(e.enemyId)?.bodyH() ?? 40;
+        fx.ropeSnap(e.x, e.y, h);
+        break;
+      }
+      case 'missileLaunch': {
+        const v = this.towers.get(e.towerId);
+        if (v) {
+          v.kickPod();
+          const m = v.podMouth();
+          fx.muzzleBlast(m.x, m.y, 0.7);
+        }
+        Audio.sfx('arrow_shoot', { volume: 0.5, detune: -700, throttleMs: 150 });
+        Audio.sfx('arrow_shoot', { volume: 0.3, detune: -1000, throttleMs: 150 });
+        break;
+      }
+      case 'ignite': {
+        if (!e.refreshed) {
+          const h = this.heightOfId(e.enemyId, 'scout');
+          fx.glowFlash(e.x, e.y, h, 0xff7a2a, 90, 0.25);
+          for (let i = 0; i < 4; i++) fx.flameAt(isoX(e.x, e.y) + (Math.random() - 0.5) * 16, isoY(e.x, e.y) - h + (Math.random() - 0.5) * 10);
+        }
+        break;
+      }
+      case 'knightShoot': {
+        Audio.sfx('arrow_shoot', { volume: 0.2, detune: 350 + Math.random() * 200, throttleMs: 120 });
         break;
       }
       case 'fizzle':
         fx.puff(e.x, e.y, 25);
         break;
       case 'kill': {
-        const h = this.enemyHeight(e.enemy);
+        const h = this.heightOfId(e.enemyId, e.enemy);
         const big = e.enemy === 'carrier' || e.enemy === 'dread';
         const size = e.boss ? 'huge' : big ? 'big' : 'small';
         fx.explosion(e.x, e.y, size, h);
@@ -390,17 +475,79 @@ export class SimRenderer {
     const t = this.sim.getTower(towerId);
     if (v && t) {
       const m = towerMuzzleOffset('bomb', t.level);
-      if (m) this.fx.muzzleBlast(v.container.x + m.x, v.container.y + m.y);
+      if (m) this.fx.muzzleBlast(v.container.x + m.x, v.container.y + m.y, t.spec === 'bigger_bombs' ? 1.75 : 1);
     }
     // a low "thump": the build sound pitched way down (the cannon sounds least wrong of the existing sfx)
     Audio.sfx('build_tower', { volume: 0.32, detune: -1000 + (Math.random() - 0.5) * 160, throttleMs: 80 });
   }
 
   private bombBlast(e: Extract<SimEvent, { type: 'explode' }>): void {
+    if (e.kind === 'missile') {
+      // a small, sharp blast: the bomblet-size effect plus a little fireball
+      this.fx.bombBlast(e.x, e.y, Math.max(0.45, e.radius), false, false);
+      this.fx.explosion(e.x, e.y, 'small', 26);
+      Audio.sfx('ufo_explode_small', { volume: 0.34, detune: -150 + (Math.random() - 0.5) * 200, throttleMs: 70 });
+      return;
+    }
     const shell = e.kind === 'shell';
     this.fx.bombBlast(e.x, e.y, e.radius, shell, shell && this.sim.getTower(e.towerId)?.level === 3);
     if (shell) Audio.sfx('ufo_explode_small', { volume: 0.55, detune: -500 + (Math.random() - 0.5) * 200, throttleMs: 60 });
     else Audio.sfx('ufo_explode_small', { volume: 0.22, detune: 100 + Math.random() * 300, throttleMs: 90 });
+  }
+
+  // ----------------------------------------------------------------------------------- spec effects
+
+  /** Body height of whichever living UFO stands at a grid point (chain lightning starts there), else a ground default. */
+  private heightAround(gx: number, gy: number): number {
+    let best = 52;
+    let bd = 0.09;
+    for (const en of this.sim.state.enemies) {
+      const d = (en.x - gx) * (en.x - gx) + (en.y - gy) * (en.y - gy);
+      if (d < bd) {
+        bd = d;
+        best = this.enemies.get(en.id)?.bodyH() ?? bodyHeightOf(en);
+      }
+    }
+    return best;
+  }
+
+  private goldenGlint(p: { towerId: number; fromX: number; fromY: number }): void {
+    const t = this.sim.getTower(p.towerId);
+    const h = t ? towerShootHeight(t.kind, t.level) : 80;
+    this.fx.hitSpark(p.fromX, p.fromY, h, 'gold', 7);
+    this.fx.glowFlash(p.fromX, p.fromY, h, 0xffe27a, 110, 0.3);
+    Audio.sfx('star_earned', { volume: 0.11, detune: 600, throttleMs: 400 });
+  }
+
+  private makeNet(e: Extract<SimEvent, { type: 'net' }>): NetMesh {
+    const rx = e.radius * TW * 0.7071 * 2;
+    const img = this.scene.add.image(isoX(e.x, e.y), isoY(e.x, e.y), FXTEX.netMesh).setAlpha(0);
+    img.setDisplaySize(rx, rx * (TH / TW));
+    this.L.fxC.addAt(img, 0);
+    return { img, enemyIds: e.enemyIds, slowed: e.enemyIds.length === 0 || e.slowedIds.length > 0, age: 0, duration: e.duration, fade: 0, w: rx, h: rx * (TH / TW) };
+  }
+
+  /** The net stays while any caught UFO is still netted (bosses: it just shows for the slow's duration), then fades. */
+  private updateNets(dt: number): void {
+    for (let i = this.nets.length - 1; i >= 0; i--) {
+      const n = this.nets[i];
+      n.age += dt;
+      let alive = n.age < n.duration + 0.25;
+      if (alive && n.enemyIds.length > 0 && n.age > 0.1 && !n.slowed) {
+        alive = false;
+        for (const id of n.enemyIds) if (this.sim.getEnemy(id)?.netted) alive = true;
+      }
+      if (!alive) n.fade += dt / 0.35;
+      if (n.fade >= 1) {
+        n.img.destroy();
+        this.nets.splice(i, 1);
+        continue;
+      }
+      const born = Math.min(1, n.age / 0.18);
+      const settle = 1 + 0.25 * (1 - born) * (1 - born);
+      const pulse = 0.82 + 0.1 * Math.sin(n.age * 6);
+      n.img.setAlpha(born * pulse * (1 - n.fade) * (n.slowed ? 0.7 : 1)).setDisplaySize(n.w * settle, n.h * settle);
+    }
   }
 
   // ----------------------------------------------------------------------------------- hit-testing

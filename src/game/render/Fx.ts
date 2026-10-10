@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { GAME_H, GAME_W, COLORS, textStyle } from '../ui/theme';
 import { IsoView, TH, TW, isoX, isoY } from './iso';
+import { FXTEX, SPEC_TEX } from './specVisuals';
 import { TEX } from './textures';
+import type { SpecId } from '../../core';
 
 export interface Layers {
   world: Phaser.GameObjects.Container;
@@ -50,6 +52,11 @@ export class Fx {
   private readonly debris: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly ember: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly trailBlue: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly trailGold: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly rocketSmoke: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly rocketFire: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly flame: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly ropeBits: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly flashRect: Phaser.GameObjects.Rectangle;
   private readonly vignette: Phaser.GameObjects.Image;
   private shakeLeft = 0;
@@ -153,6 +160,49 @@ export class Fx {
       blendMode: ADD,
     });
 
+    this.trailGold = mk(TEX.glow, {
+      lifespan: 340,
+      scale: { start: 0.4, end: 0 },
+      alpha: { start: 0.9, end: 0 },
+      tint: 0xffd34e,
+      blendMode: ADD,
+    });
+    this.rocketSmoke = mk(TEX.smoke, {
+      lifespan: { min: 380, max: 620 },
+      speed: { min: 4, max: 20 },
+      scale: { start: 0.22, end: 0.8 },
+      alpha: { start: 0.5, end: 0 },
+      tint: 0xb9b6c6,
+      angle: { min: 0, max: 360 },
+    });
+    this.rocketFire = mk(TEX.glow, {
+      lifespan: 170,
+      scale: { start: 0.42, end: 0 },
+      alpha: { start: 0.95, end: 0 },
+      tint: 0xffa23a,
+      blendMode: ADD,
+    });
+    this.flame = mk(FXTEX.flame, {
+      lifespan: { min: 320, max: 560 },
+      speedY: { min: -70, max: -35 },
+      speedX: { min: -14, max: 14 },
+      scale: { start: 0.65, end: 0.1 },
+      alpha: { start: 0.95, end: 0 },
+      color: [0xfff1a0, 0xffa23a, 0xe0562a],
+      colorEase: 'quad.out',
+      blendMode: ADD,
+    });
+    this.ropeBits = mk(TEX.debris, {
+      lifespan: { min: 300, max: 560 },
+      speed: { min: 30, max: 120 },
+      gravityY: 300,
+      angle: { min: 200, max: 340 },
+      rotate: { min: 0, max: 360 },
+      scale: { start: 0.9, end: 0.3 },
+      alpha: { start: 1, end: 0 },
+      color: [0xefe3b8, 0xc9b87a],
+    });
+
     this.flashRect = scene.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0xffffff, 0).setDepth(60);
     this.vignette = scene.add.image(GAME_W / 2, GAME_H / 2, TEX.vignette).setDisplaySize(GAME_W, GAME_H).setDepth(61).setAlpha(0);
   }
@@ -248,9 +298,56 @@ export class Fx {
     this.sparkWhite.explode(4, p.x, p.y);
   }
 
-  trail(gx: number, gy: number, h: number): void {
+  trail(gx: number, gy: number, h: number, gold = false): void {
     const p = this.pt(gx, gy, h);
-    this.trailBlue.emitParticleAt(p.x, p.y, 1);
+    (gold ? this.trailGold : this.trailBlue).emitParticleAt(p.x, p.y, 1);
+  }
+
+  /** Rocket exhaust at a grid position raised by h (smoke + hot core). */
+  rocketTrail(gx: number, gy: number, h: number): void {
+    const p = this.pt(gx, gy, h);
+    this.rocketSmoke.emitParticleAt(p.x, p.y, 1);
+    this.rocketFire.emitParticleAt(p.x, p.y, 1);
+  }
+
+  /** One small flame lick at a world-local px point. */
+  flameAt(x: number, y: number): void {
+    this.flame.emitParticleAt(x, y, 1);
+  }
+
+  /** Small embers at a world-local px point. */
+  emberPx(x: number, y: number): void {
+    this.ember.emitParticleAt(x, y, 1);
+  }
+
+  /** Rope fibres flying when a net is torn / expires. */
+  ropeSnap(gx: number, gy: number, h: number): void {
+    const p = this.pt(gx, gy, h);
+    this.ropeBits.explode(7, p.x, p.y);
+    this.puff(gx, gy, h);
+  }
+
+  /** The net lands: dust, rope bits and a pale ring. */
+  netLand(gx: number, gy: number, radius: number): void {
+    const p = this.pt(gx, gy, 6);
+    this.dust(gx, gy, 10);
+    this.ropeBits.explode(10, p.x, p.y);
+    this.shockwave(gx, gy, radius * 0.9, 0xf3ead0, 0.35, 5);
+  }
+
+  /** Celebration when a tower buys a specialization: emblem pop, coloured ring, sparks. */
+  specBurst(gx: number, gy: number, spec: SpecId, color: number, h: number): void {
+    const p = this.pt(gx, gy, h);
+    this.shockwave(gx, gy, 0.9, color, 0.55, 8);
+    this.shockwave(gx, gy, 0.5, 0xffffff, 0.4, 5);
+    this.hitSpark(gx, gy, h, 'gold', 18);
+    this.hitSpark(gx, gy, h, 'white', 8);
+    this.glowFlash(gx, gy, h, color, 260, 0.45);
+    const img = this.scene.add.image(p.x, p.y, SPEC_TEX[spec]).setScale(0.1);
+    this.L.fxC.add(img);
+    img.setDepth(1e6);
+    this.scene.tweens.add({ targets: img, scale: 1.5, y: p.y - 26, duration: 360, ease: 'Back.easeOut' });
+    this.scene.tweens.add({ targets: img, alpha: 0, scale: 1.9, y: p.y - 56, delay: 620, duration: 380, ease: 'Quad.easeIn', onComplete: () => img.destroy() });
   }
 
   emberAt(gx: number, gy: number): void {
@@ -365,7 +462,7 @@ export class Fx {
   }
 
   /** Jagged lightning line between world points (given as grid positions raised by h). */
-  lightning(points: { gx: number; gy: number; h: number }[], color = 0x9fe0ff): void {
+  lightning(points: { gx: number; gy: number; h: number }[], color = 0x9fe0ff, intensity = 1): void {
     const g = this.scene.add.graphics();
     this.L.fxC.add(g);
     const pts: { x: number; y: number }[] = [];
@@ -387,9 +484,10 @@ export class Fx {
       g.strokePath();
     };
     g.setBlendMode(ADD);
-    draw(9 * this.k * 0.8, color, 0.35);
-    draw(4 * this.k * 0.8, color, 0.9);
-    draw(1.6 * this.k * 0.8, 0xffffff, 1);
+    const wk = 0.55 + 0.45 * intensity;
+    draw(9 * wk * this.k * 0.8, color, 0.35 * intensity);
+    draw(4 * wk * this.k * 0.8, color, 0.9 * intensity);
+    draw(1.6 * wk * this.k * 0.8, 0xffffff, intensity);
     this.scene.tweens.add({ targets: g, alpha: 0, duration: 260, ease: 'Quad.easeIn', onComplete: () => g.destroy() });
   }
 
@@ -402,17 +500,17 @@ export class Fx {
   }
 
   /** Mortar launch at a world-local px point (the barrel mouth): hot flash + smoke puff drifting up-right. */
-  muzzleBlast(x: number, y: number): void {
-    const flash = this.scene.add.image(x, y, TEX.glow).setBlendMode(ADD).setTint(0xffd27a).setScale(0.3).setAlpha(1);
-    const core = this.scene.add.image(x, y, TEX.glow).setBlendMode(ADD).setTint(0xffffff).setScale(0.15).setAlpha(1);
+  muzzleBlast(x: number, y: number, size = 1): void {
+    const flash = this.scene.add.image(x, y, TEX.glow).setBlendMode(ADD).setTint(0xffd27a).setScale(0.3 * size).setAlpha(1);
+    const core = this.scene.add.image(x, y, TEX.glow).setBlendMode(ADD).setTint(0xffffff).setScale(0.15 * size).setAlpha(1);
     this.L.fxC.add([flash, core]);
     flash.setDepth(1e6);
     core.setDepth(1e6 + 1);
-    this.scene.tweens.add({ targets: flash, scale: 1.5, alpha: 0, duration: 190, ease: 'Quad.easeOut', onComplete: () => flash.destroy() });
-    this.scene.tweens.add({ targets: core, scale: 0.7, alpha: 0, duration: 110, ease: 'Quad.easeOut', onComplete: () => core.destroy() });
-    this.smoke.explode(4, x + 6, y - 6);
-    this.sparkGold.explode(5, x, y);
-    this.sparkWhite.explode(3, x, y);
+    this.scene.tweens.add({ targets: flash, scale: 1.5 * size, alpha: 0, duration: 190 + 40 * (size - 1), ease: 'Quad.easeOut', onComplete: () => flash.destroy() });
+    this.scene.tweens.add({ targets: core, scale: 0.7 * size, alpha: 0, duration: 110, ease: 'Quad.easeOut', onComplete: () => core.destroy() });
+    this.smoke.explode(Math.round(4 * size), x + 6, y - 6);
+    this.sparkGold.explode(Math.round(5 * size), x, y);
+    this.sparkWhite.explode(Math.round(3 * size), x, y);
   }
 
   /**

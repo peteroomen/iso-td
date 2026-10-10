@@ -13,6 +13,7 @@ import { GroundMarkers } from '../render/GroundMarkers';
 import { IsoView } from '../render/iso';
 import { MapRenderer } from '../render/MapRenderer';
 import { SimRenderer } from '../render/SimRenderer';
+import { generateSpecTextures } from '../render/specVisuals';
 import { generateTextures } from '../render/textures';
 import { Audio } from '../services/audio';
 import { getSave, updateSave } from '../services/save';
@@ -101,6 +102,7 @@ export class GameScene extends Phaser.Scene implements ViewResizable {
     const level = getLevel(this.levelId) ?? getLevel('level01')!;
     this.level = level;
     generateTextures(this);
+    generateSpecTextures(this);
     this.sim = rs?.sim ?? new Sim(level, { seed: (Date.now() & 0x7fffffff) >>> 0, upgrades: getSave().upgrades, towerCap: level.towerCap });
     // play area: the whole canvas minus the safe-area insets; the top bar overlaps the (empty) upper corners of the iso diamond
     const top = Math.max(SAFE.t + 6, barBottom() - 14 * UI_SCALE);

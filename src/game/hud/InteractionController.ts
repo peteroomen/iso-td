@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
-import { KNIGHT, MAX_TOWER_LEVEL, RALLY_PATH_TOLERANCE, TOWERS, TOWER_KINDS, type AbilityId, type FailReason, type Sim, type TowerKind, type TowerState } from '../../core';
+import { KNIGHT, MAX_TOWER_LEVEL, RALLY_PATH_TOLERANCE, SPECS, SPECS_BY_TOWER, TOWERS, TOWER_KINDS, type AbilityId, type FailReason, type Sim, type SpecId, type TowerKind, type TowerState } from '../../core';
 import type { GroundMarkers } from '../render/GroundMarkers';
 import type { IsoView } from '../render/iso';
 import type { SimRenderer } from '../render/SimRenderer';
+import { SPEC_COLOR, SPEC_TEX } from '../render/specVisuals';
 import { TEX } from '../render/textures';
 import { Audio } from '../services/audio';
 import { COLORS } from '../ui/theme';
@@ -30,9 +31,9 @@ const REASON: Record<FailReason, string> = {
   no_more_waves: 'No more waves',
   not_running: 'Start the first wave first',
   ended: 'The battle is over',
-  locked: 'Specializations unlock on level 7', // placeholder (core phase)
-  not_max_level: 'Upgrade to level 3 first', // placeholder
-  already_specialized: 'Already specialized', // placeholder
+  locked: 'Specializations unlock on level 7',
+  not_max_level: 'Upgrade to level 3 first',
+  already_specialized: 'Already specialized',
 };
 
 const TOWER_ICON: Record<TowerKind, { key: (lvl: number) => string; h: number }> = {
@@ -50,6 +51,18 @@ const TOWER_BLURB: Record<TowerKind, string> = {
 };
 
 const TOWER_ROLE: Record<TowerKind, string> = { archer: 'Fast', wizard: 'Magic', barracks: 'Blocks', bomb: 'Splash' };
+
+/** One-word labels under the spec buttons (the full names live in the tooltip). */
+const SPEC_ROLE: Record<SpecId, string> = {
+  eagle_eye: 'Eagle Eye',
+  hunting_nets: 'Nets',
+  chain_lightning: 'Chain',
+  fire_mages: 'Fire',
+  bigger_bombs: 'Big Bombs',
+  homing_missiles: 'Missiles',
+  bow_training: 'Bows',
+  extra_recruits: 'Recruits',
+};
 
 const fmt = (n: number) => (Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : n.toFixed(1));
 
@@ -253,6 +266,10 @@ export class InteractionController {
     this.refreshFlags();
     const a = this.anchorFor(t.x, t.y, 50);
     const items: RadialItem[] = [];
+    if (t.level >= MAX_TOWER_LEVEL && t.spec !== null) items.push(this.ownedSpecItem(towerId, t.spec));
+    else if (t.level >= MAX_TOWER_LEVEL && sim.specsUnlocked) for (const id of SPECS_BY_TOWER[t.kind]) items.push(this.specItem(towerId, id, a));
+    else if (t.level >= MAX_TOWER_LEVEL) items.push(this.lockedSpecItem(t.kind));
+    else
     // upgrade
     items.push({
       icon: TEX.upgrade,
@@ -318,11 +335,130 @@ export class InteractionController {
     Audio.sfx('ui_click', { volume: 0.5 });
   }
 
+  // ------------------------------------------------------------------ specializations
+
+  /** Radial button that buys a specialization (tap = buy, like build / upgrade; hover / long-press = description + stat deltas). */
+  private specItem(towerId: number, id: SpecId, a: { x: number; y: number }): RadialItem {
+    const { sim, markers } = this.d;
+    return {
+      icon: SPEC_TEX[id],
+      iconH: 54,
+      color: SPEC_COLOR[id],
+      cost: () => sim.specCostOf(id),
+      state: () => {
+        const r = sim.canSpecialize(towerId, id);
+        return r.ok ? 'ok' : r.reason === 'gold' ? 'poor' : 'ok';
+      },
+      tip: () => this.specTip(towerId, id, false),
+      onHover: (over) => {
+        const cur = sim.getTower(towerId);
+        if (!cur) return;
+        const st = sim.statsFor(cur.kind, cur.level, id);
+        markers.range2 = over && Math.abs(st.range - cur.range) > 0.01 ? { gx: cur.x, gy: cur.y, r: st.range, color: 0xffe27a } : null;
+      },
+      role: SPEC_ROLE[id],
+      onSelect: () => {
+        const r = sim.specialize(towerId, id);
+        if (r.ok) {
+          this.closeMenu();
+          this.flashRange(towerId);
+        } else this.fail(r.reason, a.x, a.y - 110);
+      },
+    };
+  }
+
+  /** The specialization a tower already owns: shown with a gold ring, tapping only repeats its description. */
+  private ownedSpecItem(towerId: number, id: SpecId): RadialItem {
+    return {
+      icon: SPEC_TEX[id],
+      iconH: 54,
+      color: SPEC_COLOR[id],
+      owned: true,
+      state: () => 'ok',
+      tip: () => this.specTip(towerId, id, true),
+      role: SPEC_ROLE[id],
+      onSelect: () => this.d.hud.toast('Specialization is permanent', undefined, undefined, '#ffe27a'),
+    };
+  }
+
+  /** Lv3 tower on a level before 7: a locked placeholder that explains where specializations come from. */
+  private lockedSpecItem(kind: TowerKind): RadialItem {
+    return {
+      icon: TEX.upgrade,
+      iconH: 40,
+      color: 0x3f7f45,
+      state: () => 'locked',
+      role: 'Lv 7+',
+      tip: () => ({
+        title: 'Specialize (from level 7)',
+        titleColor: '#ffb35c',
+        rows: SPECS_BY_TOWER[kind].map((id) => ({ text: SPECS[id].name, icon: SPEC_TEX[id], iconH: 28 })),
+        note: 'Max level reached. From level 7 on, a Lv3 tower can specialize: choose 1 of these 2 permanent powers.',
+        noteColor: '#ffb35c',
+        minWidth: 240,
+      }),
+      onSelect: () => this.fail('locked'),
+    };
+  }
+
+  /** Description and stat deltas (base Lv3 > specialized Lv3, from sim.statsFor) of a specialization. */
+  private specTip(towerId: number, id: SpecId, owned: boolean): TipSpec {
+    const sim = this.d.sim;
+    const kind = SPECS[id].tower;
+    const base = sim.statsFor(kind, MAX_TOWER_LEVEL);
+    const s = sim.statsFor(kind, MAX_TOWER_LEVEL, id);
+    const rows = this.statRows(kind, MAX_TOWER_LEVEL, { kind, level: MAX_TOWER_LEVEL }, id);
+    const pct = (x: number) => `${Math.round(x * 100)}%`;
+    let note = '';
+    switch (id) {
+      case 'eagle_eye':
+        note = `Every ${s.armorIgnoreEvery}th arrow is a golden arrow that ignores ALL armor.`;
+        break;
+      case 'hunting_nets':
+        rows.push({ text: 'Net every', right: `${fmt(s.netCooldown)}s` }, { text: 'Net radius', right: `${fmt(s.netRadius)} tiles` }, { text: 'Rooted for', right: `${fmt(s.netDuration)}s` });
+        note = `Throws a net at the densest group. Caught UFOs cannot move and fliers are pulled to the ground, where knights and bombs can hit them. Bosses are slowed ${pct(1 - s.netBossSlowFactor)} instead.`;
+        break;
+      case 'chain_lightning':
+        rows.push({ text: 'Jumps', right: `${s.chainCount} x ${fmt(s.chainRange)} tiles` }, { text: 'Jump damage', right: s.chainFactors.map(pct).join(' / ') });
+        note = 'Bolts leap to nearby UFOs for a share of the bolt damage.';
+        break;
+      case 'fire_mages':
+        rows.push({ text: 'Burn', right: `${fmt(s.igniteDps)} / s for ${fmt(s.igniteDuration)}s`, rightColor: '#ffb35c' });
+        note = 'Hits set UFOs on fire: true damage that ignores magic resistance. A new hit refreshes the fire, it never stacks.';
+        break;
+      case 'bigger_bombs':
+        rows.push({ text: 'Bomblets', right: base.bomblets !== s.bomblets ? `${base.bomblets}  >  ${s.bomblets}` : String(s.bomblets), rightColor: '#9bf06a' });
+        note = 'Bigger shells and bomblets: more blast radius, more damage, more bomblets.';
+        break;
+      case 'homing_missiles':
+        rows.push({ text: 'Volley every', right: `${fmt(s.missileCooldown)}s` }, { text: 'Missiles', right: `${s.missileCount} x ${fmt(s.missileDamage)} dmg` }, { text: 'Missile splash', right: fmt(s.missileSplash) });
+        note = 'Missiles home in on the UFOs furthest down the road, fliers included. Normal shells keep firing.';
+        break;
+      case 'bow_training':
+        rows.push({ text: 'Arrow damage', right: `${Math.round(s.bowDamageMin)}-${Math.round(s.bowDamageMax)}` }, { text: 'Arrow every', right: `${fmt(s.bowCooldown)}s` }, { text: 'Arrow range', right: `${fmt(s.bowRange)} tiles` });
+        note = 'Knights that are not in melee shoot arrows at UFOs nearby, fliers included.';
+        break;
+      case 'extra_recruits':
+        note = 'A fourth knight, tougher knights and faster respawns.';
+        break;
+    }
+    const cost = sim.specCostOf(id);
+    const tower = sim.getTower(towerId);
+    return {
+      title: SPECS[id].name,
+      titleColor: owned ? '#9bf06a' : COLORS.textGold,
+      rows: [{ text: owned ? 'Specialization (owned)' : `${TOWERS[kind].name} specialization`, icon: SPEC_TEX[id], iconH: 30, color: owned ? '#9bf06a' : '#c8bfe0', size: 15 }, ...rows],
+      note: owned ? `${note} Permanent.` : note,
+      cost: owned ? undefined : { amount: cost, ok: sim.canAfford(cost) && tower?.spec === null },
+      minWidth: 250,
+    };
+  }
+
   // ------------------------------------------------------------------ tooltips
 
-  private statRows(kind: TowerKind, level: number, vs?: { kind: TowerKind; level: number }): TipRow[] {
+  private statRows(kind: TowerKind, level: number, vs?: { kind: TowerKind; level: number }, spec?: SpecId): TipRow[] {
     const sim = this.d.sim;
-    const s = sim.statsFor(kind, level);
+    const s = sim.statsFor(kind, level, spec ?? null);
     const o = vs ? sim.statsFor(vs.kind, vs.level) : null;
     const pair = (a: string, b: string): { right: string; rightColor?: string } => (o && a !== b ? { right: `${a}  >  ${b}`, rightColor: '#9bf06a' } : { right: b });
     const dmg = (x: typeof s) => (Math.round(x.damageMin) === Math.round(x.damageMax) ? fmt(x.damageMin) : `${Math.round(x.damageMin)}-${Math.round(x.damageMax)}`);
@@ -340,7 +476,7 @@ export class InteractionController {
       if (kind === 'bomb') rows.push({ text: 'Splash radius', ...pair(o ? fmt(o.splashRadius) : '', fmt(s.splashRadius)) });
       rows.push({ text: kind === 'bomb' ? 'DPS (per target)' : 'DPS', ...pair(o ? fmt(o.dps) : '', fmt(s.dps)) });
     }
-    if (s.special) rows.push({ text: s.special, color: '#ffe27a', size: 15 });
+    if (s.special && !spec) rows.push({ text: s.special, color: '#ffe27a', size: 15 });
     if (s.groundOnly) rows.push({ text: "Ground only: can't hit fliers", color: '#ff9a8a', size: 15 });
     return rows;
   }

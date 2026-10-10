@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { ProjectileState } from '../../core';
 import { Layers } from './Fx';
 import { TH, TW, depthOf, isoX, isoY } from './iso';
+import { FXTEX } from './specVisuals';
 import { ARROW_SCALE, BOLT_SCALE, BOMBLET_SCALE, SHELL_SCALE } from './style';
 import { TEX } from './textures';
 
@@ -22,6 +23,9 @@ export class ProjectileView {
   h = 0;
   readonly isBolt: boolean;
   readonly isLob: boolean;
+  readonly kind: ProjectileState['kind'];
+  /** Eagle Eye golden arrow. */
+  readonly golden: boolean;
   /** Lob (shell / bomblet) extras: ground shadow, faint landing marker, fuse spark. */
   private readonly shadow?: Phaser.GameObjects.Image;
   private readonly marker?: Phaser.GameObjects.Image;
@@ -37,24 +41,31 @@ export class ProjectileView {
     private fromH: number,
     private toH: number,
   ) {
+    this.kind = st.kind;
     this.isBolt = st.kind === 'bolt';
-    this.isLob = st.kind === 'shell' || st.kind === 'bomblet';
+    this.isLob = st.kind === 'shell' || st.kind === 'bomblet' || st.kind === 'net';
+    this.golden = st.kind === 'arrow' && st.armorIgnore;
     if (this.isLob) {
-      this.baseScale = st.kind === 'shell' ? SHELL_SCALE : BOMBLET_SCALE;
-      this.img = scene.add.image(0, 0, TEX.shell).setScale(this.baseScale);
+      const net = st.kind === 'net';
+      this.baseScale = net ? 1 : st.kind === 'shell' ? SHELL_SCALE : BOMBLET_SCALE;
+      this.img = scene.add.image(0, 0, net ? FXTEX.net : TEX.shell).setScale(this.baseScale);
       this.shadow = scene.add.image(0, 0, TEX.shadow).setAlpha(0);
-      this.marker = scene.add.image(isoX(st.tx, st.ty), isoY(st.tx, st.ty), TEX.ring).setTint(0xffb35c).setAlpha(st.kind === 'shell' ? 0.3 : 0.18);
+      this.marker = scene.add.image(isoX(st.tx, st.ty), isoY(st.tx, st.ty), TEX.ring).setTint(net ? 0xf3ead0 : 0xffb35c).setAlpha(st.kind === 'shell' ? 0.3 : 0.18);
       const rx = st.radius * TW * 0.7071 * 2;
       this.marker.setDisplaySize(rx * 1.1, rx * 1.1 * (TH / TW));
-      this.spark = scene.add.image(0, 0, TEX.glow).setBlendMode(ADD).setTint(0xffc65a).setScale(0.5 * this.baseScale);
+      if (!net) this.spark = scene.add.image(0, 0, TEX.glow).setBlendMode(ADD).setTint(0xffc65a).setScale(0.5 * this.baseScale);
       L.groundFxC.add([this.marker, this.shadow]);
-      L.fxC.add(this.spark);
+      if (this.spark) L.fxC.add(this.spark);
       L.fxC.add(this.img);
       return;
     }
-    this.img = scene.add.image(0, 0, this.isBolt ? 'towers/wizard_bullet' : 'towers/arrow').setScale(this.isBolt ? BOLT_SCALE : ARROW_SCALE);
-    if (this.isBolt) {
-      this.glow = scene.add.image(0, 0, TEX.glow).setBlendMode(ADD).setTint(0x7fc8ff).setScale(0.85);
+    const missile = st.kind === 'missile';
+    const key = this.isBolt ? 'towers/wizard_bullet' : missile ? FXTEX.rocket : 'towers/arrow';
+    const sc = this.isBolt ? BOLT_SCALE : missile ? 1.05 : st.kind === 'knightArrow' ? ARROW_SCALE * 0.62 : this.golden ? ARROW_SCALE * 1.3 : ARROW_SCALE;
+    this.img = scene.add.image(0, 0, key).setScale(sc);
+    if (this.golden) this.img.setTint(0xffd34e);
+    if (this.isBolt || this.golden || missile) {
+      this.glow = scene.add.image(0, 0, TEX.glow).setBlendMode(ADD).setTint(this.golden ? 0xffe27a : missile ? 0xff9a3a : 0x7fc8ff).setScale(this.golden ? 0.8 : missile ? 0.55 : 0.85);
       L.fxC.add(this.glow);
     }
     L.fxC.add(this.img);
@@ -75,15 +86,17 @@ export class ProjectileView {
     const x = isoX(st.x, st.y);
     const gy = isoY(st.x, st.y);
     const apex = Math.sin(Math.PI * p);
-    const sc = this.baseScale * (1 + 0.2 * apex);
-    this.img.setPosition(x, gy - this.h - 6).setScale(sc).setRotation(p * 5);
+    const net = this.kind === 'net';
+    // the net unfolds while it flies
+    const sc = net ? this.baseScale * (0.6 + 0.9 * p) : this.baseScale * (1 + 0.2 * apex);
+    this.img.setPosition(x, gy - this.h - 6).setScale(sc).setRotation(net ? p * 3 : p * 5);
     this.img.setDepth(depthOf(st.x, st.y) + 1000);
     if (this.spark) {
       const fl = 0.8 + 0.4 * Math.sin(st.elapsed * 60);
       this.spark.setPosition(x + Math.cos(p * 5 - 1.1) * 17 * sc, gy - this.h - 6 + Math.sin(p * 5 - 1.1) * 17 * sc).setScale(0.45 * sc * fl).setDepth(depthOf(st.x, st.y) + 1001);
     }
     if (this.shadow) {
-      const k = (st.kind === 'shell' ? 0.45 : 0.28) * (0.55 + 0.6 * p) * (1 - 0.25 * apex);
+      const k = (st.kind === 'shell' ? 0.45 : net ? 0.36 : 0.28) * (0.55 + 0.6 * p) * (1 - 0.25 * apex);
       this.shadow.setPosition(x, gy).setScale(k).setAlpha(0.35 + 0.5 * p);
     }
     if (this.marker) this.marker.setAlpha((st.kind === 'shell' ? 0.22 : 0.14) + 0.18 * p);
@@ -98,7 +111,7 @@ export class ProjectileView {
     const done = Math.hypot(st.x - st.fromX, st.y - st.fromY);
     const t = Math.min(1, done / total);
     const toH = targetH || this.toH;
-    const arc = this.isBolt ? 6 : 24;
+    const arc = this.isBolt ? 6 : this.kind === 'missile' ? 46 : this.kind === 'knightArrow' ? 10 : 24;
     this.h = this.fromH + (toH - this.fromH) * t + Math.sin(Math.PI * t) * arc;
     this.gx = st.x;
     this.gy = st.y;

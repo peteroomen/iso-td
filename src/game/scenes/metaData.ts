@@ -110,8 +110,8 @@ export function fitImage<T extends { width: number; height: number; setScale(s: 
 // ---------------------------------------------------------------------------------------------------------------
 
 export interface TowerUnlock {
-  /** 'all' when every tower kind got the same new cap (e.g. level 2: "All Lv2 towers"). */
-  kind: TowerIconKind | 'all';
+  /** 'all' when every tower kind got the same new cap (e.g. level 2: "All Lv2 towers"); 'spec' = tower specializations. */
+  kind: TowerIconKind | 'all' | 'spec';
   level: number;
   /** Short headline, e.g. "Archer Lv3". */
   title: string;
@@ -123,10 +123,13 @@ const KIND_NAMES: Record<TowerIconKind, string> = { archer: 'Archer', wizard: 'W
 
 const TIER_TEXT: Record<TowerIconKind, Record<number, string>> = {
   archer: { 2: 'Faster, harder-hitting arrows', 3: 'Double Shot: hits 2 targets' },
-  wizard: { 2: 'Heavier magic bolts', 3: 'Arc Bolt: chains to 2 more enemies' },
+  wizard: { 2: 'Heavier magic bolts', 3: 'Archmage power: the strongest bolts' },
   barracks: { 2: 'Tougher knights', 3: '3 knights with heavy armor' },
   bomb: { 2: 'Heavier shells, bigger blast', 3: 'Cluster Bomb: shells burst into bomblets' },
 };
+
+/** Level 7 brings tower specializations (see docs/DESIGN.md section 12). */
+const SPEC_UNLOCK: TowerUnlock = { kind: 'spec', level: 3, title: 'Tower Specializations', text: 'Lv3 towers can specialize (choose 1 of 2)' };
 
 /** All tower kinds in menu order (archer, wizard, barracks, bomb). */
 export const KINDS: readonly TowerIconKind[] = TOWER_KINDS;
@@ -139,6 +142,7 @@ export function levelUnlocks(index: number): TowerUnlock[] {
   const nodes = levelNodes();
   const def = nodes[index]?.def;
   if (!def || index === 0) return [];
+  const spec: TowerUnlock[] = def.specsUnlocked && !nodes.slice(0, index).some((n) => n.def?.specsUnlocked) ? [SPEC_UNLOCK] : [];
   const prev: Record<TowerIconKind, number> = { archer: 1, wizard: 1, barracks: 1, bomb: 1 };
   for (let i = 0; i < index; i++) {
     const d = nodes[i].def;
@@ -146,15 +150,18 @@ export function levelUnlocks(index: number): TowerUnlock[] {
     for (const k of KINDS) prev[k] = Math.max(prev[k], d.towerCap[k]);
   }
   const gains = KINDS.filter((k) => def.towerCap[k] > prev[k]);
-  if (gains.length === 0) return [];
+  if (gains.length === 0) return spec;
   const lv = def.towerCap[gains[0]];
   if (gains.length === KINDS.length && gains.every((k) => def.towerCap[k] === lv)) {
-    return [{ kind: 'all', level: lv, title: `All Lv${lv} towers`, text: 'Archers, Wizards, Barracks and Bombs can reach Lv' + lv }];
+    return [{ kind: 'all', level: lv, title: `All Lv${lv} towers`, text: 'Archers, Wizards, Barracks and Bombs can reach Lv' + lv }, ...spec];
   }
-  return gains.map((k) => {
-    const level = def.towerCap[k];
-    return { kind: k, level, title: `${KIND_NAMES[k]} Lv${level}`, text: TIER_TEXT[k][level] ?? `Upgrade to level ${level}` };
-  });
+  return [
+    ...gains.map((k) => {
+      const level = def.towerCap[k];
+      return { kind: k, level, title: `${KIND_NAMES[k]} Lv${level}`, text: TIER_TEXT[k][level] ?? `Upgrade to level ${level}` };
+    }),
+    ...spec,
+  ];
 }
 
 /** Unlocks to announce for level `id`: only on a level the player has not beaten yet and has not been told about. */

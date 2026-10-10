@@ -37,11 +37,11 @@ export const TEX = {
   check: 'i_check',
 } as const;
 
-const INK = '#2e222f';
+export const INK = '#2e222f';
 
 type Draw = (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
 
-function make(scene: Phaser.Scene, key: string, w: number, h: number, draw: Draw): void {
+export function make(scene: Phaser.Scene, key: string, w: number, h: number, draw: Draw): void {
   if (scene.textures.exists(key)) return;
   const tex = scene.textures.createCanvas(key, w, h);
   if (!tex) return;
@@ -51,14 +51,14 @@ function make(scene: Phaser.Scene, key: string, w: number, h: number, draw: Draw
   tex.refresh();
 }
 
-function radial(ctx: CanvasRenderingContext2D, w: number, h: number, stops: [number, string][]): void {
+export function radial(ctx: CanvasRenderingContext2D, w: number, h: number, stops: [number, string][]): void {
   const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.min(w, h) / 2);
   for (const [o, c] of stops) g.addColorStop(o, c);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 }
 
-function ink(ctx: CanvasRenderingContext2D, fill: string | CanvasGradient, lw = 4): void {
+export function ink(ctx: CanvasRenderingContext2D, fill: string | CanvasGradient, lw = 4): void {
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.lineWidth = lw;
@@ -68,7 +68,7 @@ function ink(ctx: CanvasRenderingContext2D, fill: string | CanvasGradient, lw = 
   ctx.stroke();
 }
 
-function vgrad(ctx: CanvasRenderingContext2D, y0: number, y1: number, a: string, b: string): CanvasGradient {
+export function vgrad(ctx: CanvasRenderingContext2D, y0: number, y1: number, a: string, b: string): CanvasGradient {
   const g = ctx.createLinearGradient(0, y0, 0, y1);
   g.addColorStop(0, a);
   g.addColorStop(1, b);

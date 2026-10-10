@@ -21,12 +21,13 @@ export const HOVER_GROUND = 16;
 export const HOVER_FLIER = 52;
 export const HOVER_BOSS = 46;
 
-export function hoverOf(e: Pick<EnemyState, 'flier' | 'boss'>): number {
-  return e.boss ? HOVER_BOSS : e.flier ? HOVER_FLIER : HOVER_GROUND;
+/** A netted flier is pulled down: it hovers like a ground UFO (`flier && !netted` = high flier). */
+export function hoverOf(e: Pick<EnemyState, 'flier' | 'boss'> & { netted?: boolean }): number {
+  return e.boss ? HOVER_BOSS : e.flier && !e.netted ? HOVER_FLIER : HOVER_GROUND;
 }
 
 /** Height (source px) of the centre of an enemy body above the ground: projectile aim point. */
-export function bodyHeightOf(e: Pick<EnemyState, 'flier' | 'boss' | 'type'>): number {
+export function bodyHeightOf(e: Pick<EnemyState, 'flier' | 'boss' | 'type'> & { netted?: boolean }): number {
   if (e.boss) return HOVER_BOSS + 36;
   return hoverOf(e) + 32;
 }

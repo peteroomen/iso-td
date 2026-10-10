@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { KnightState } from '../../core';
 import { Layers } from './Fx';
 import { depthOf, isoX, isoY } from './iso';
+import { FXTEX } from './specVisuals';
 import { KNIGHT_SCALE, MILITIA_TINT } from './style';
 import { TEX } from './textures';
 
@@ -11,6 +12,8 @@ export interface BarInfo {
   frac: number;
   width: number;
   show: boolean;
+  /** Burning UFO: orange bar. */
+  burn?: boolean;
 }
 
 /** Barracks knight / militia unit. */
@@ -30,6 +33,8 @@ export class KnightView {
   stamp = 0;
   private appear = 1;
   private readonly militia: boolean;
+  /** Bow Training: bow carried at the side (created lazily). */
+  private bowImg?: Phaser.GameObjects.Image;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -114,8 +119,31 @@ export class KnightView {
     if (this.flashUntil > this.scene.time.now) this.sprite.setTintFill(0xffffff);
     else if (this.militia) this.sprite.setTint(MILITIA_TINT);
     else this.sprite.clearTint();
+    this.updateBow(st, dead);
     // militia fade out near the end of their life
     if (this.militia && st.lifeLeft >= 0 && st.lifeLeft < 1.2 && !dead) this.sprite.setAlpha(0.35 + 0.65 * Math.abs(Math.sin(this.scene.time.now * 0.02)));
+  }
+
+  /** Small bow overlay: carried at the side, drawn (pulled back + brighter) while `shooting`. */
+  private updateBow(st: KnightState, dead: boolean): void {
+    if (!st.bow) {
+      this.bowImg?.setVisible(false);
+      return;
+    }
+    if (!this.bowImg) {
+      this.bowImg = this.scene.add.image(0, 0, FXTEX.kbow).setOrigin(0.3, 0.5);
+      this.container.add(this.bowImg);
+    }
+    const b = this.bowImg;
+    const dir = this.flip ? -1 : 1;
+    const draw = st.shooting ? 1 : 0;
+    b.setVisible(!dead).setAlpha(this.sprite.alpha);
+    b.setFlipX(this.flip);
+    b.setScale(0.9 * (1 + 0.12 * draw));
+    b.setPosition(dir * (15 - 3 * draw), -this.sprite.displayHeight * 0.42);
+    b.setRotation(dir * (0.12 - 0.2 * draw));
+    if (draw) b.setTint(0xfff0b0);
+    else b.clearTint();
   }
 
   /** Fills `out` (reused by the caller, no allocation) with this unit's hp bar. */
@@ -125,6 +153,7 @@ export class KnightView {
     out.frac = st.hp / st.maxHp;
     out.width = 24;
     out.show = st.mode !== 'dead' && st.hp < st.maxHp - 0.01;
+    out.burn = false;
     return out;
   }
 

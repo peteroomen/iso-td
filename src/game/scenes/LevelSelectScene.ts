@@ -533,7 +533,7 @@ export class LevelSelectScene extends Phaser.Scene {
         }
 
         if (def) {
-          const label = this.add.text(0, top + 196 + shift, 'TOWERS AVAILABLE', textStyle(20, '#b9a9d6', { strokeThickness: 0 })).setOrigin(0.5);
+          const label = this.add.text(0, top + 196 + shift, def.specsUnlocked ? 'TOWERS AVAILABLE  -  Lv3 towers can specialize' : 'TOWERS AVAILABLE', textStyle(20, '#b9a9d6', { strokeThickness: 0 })).setOrigin(0.5);
           root.add(label);
           const cap = def.towerCap;
           const cards: [TowerIconKind, number, string][] = KINDS.map((k) => [k, cap[k], towerName(k)]);
