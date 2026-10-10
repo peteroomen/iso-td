@@ -36,15 +36,19 @@ const TOWER_ICON: Record<TowerKind, { key: (lvl: number) => string; h: number }>
   archer: { key: (l) => `towers/archer_level_${l}`, h: 52 },
   wizard: { key: (l) => `towers/wizard_level_${l}`, h: 44 },
   barracks: { key: (l) => `towers/barrack_level_${l}_1`, h: 50 },
+  // PLACEHOLDER (core phase): reuses the barracks sprite until the bomb visuals land.
+  bomb: { key: (l) => `towers/barrack_level_${l}_1`, h: 50 },
 };
 
 const TOWER_BLURB: Record<TowerKind, string> = {
   archer: 'Fast and cheap. Shoots ground UFOs and fliers.',
   wizard: 'Magic bolts ignore armor. Shoots ground UFOs and fliers.',
   barracks: 'Knights block ground UFOs and fight them. Cannot stop fliers.',
+  // PLACEHOLDER (core phase)
+  bomb: 'Splash shells hurt ground UFO crowds. Cannot hit fliers.',
 };
 
-const TOWER_ROLE: Record<TowerKind, string> = { archer: 'Fast', wizard: 'Magic', barracks: 'Blocks' };
+const TOWER_ROLE: Record<TowerKind, string> = { archer: 'Fast', wizard: 'Magic', barracks: 'Blocks', bomb: 'Splash' };
 
 const fmt = (n: number) => (Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : n.toFixed(1));
 

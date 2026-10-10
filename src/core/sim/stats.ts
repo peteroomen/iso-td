@@ -1,5 +1,5 @@
 import { MAX_TOWER_LEVEL, SELL_RATIO } from '../data/rules';
-import { KNIGHT, TOWERS } from '../data/towers';
+import { BOMB, KNIGHT, TOWERS } from '../data/towers';
 import { resolveModifiers, type Modifiers } from '../data/upgrades';
 import type { DamageType, TowerKind, UpgradeState } from '../types';
 
@@ -27,8 +27,16 @@ export interface TowerStatsView {
   cooldown: number;
   /** Average damage per second (all shots / all knights). */
   dps: number;
-  /** Attack range (archer/wizard) or rally radius (barracks), tiles. */
+  /** Attack range (archer/wizard/bomb) or rally radius (barracks), tiles. */
   range: number;
+  /** True if the tower cannot target high fliers (bomb): show "Can't hit fliers". */
+  groundOnly: boolean;
+  /** Bomb: shell blast radius in tiles (star bonus included), 0 for other towers. */
+  splashRadius: number;
+  /** Bomb Lv3: bomblets per shell (0 = none), their damage as a fraction of the shell roll, and their blast radius. */
+  bomblets: number;
+  bombletDamageFactor: number;
+  bombletRadius: number;
   shots: number;
   chainCount: number;
   chainRange: number;
@@ -71,7 +79,15 @@ export function resolveTowerStats(kind: TowerKind, level: number, mods: Modifier
     dmgMult = mods.wizardDamageMult;
     slowFactor = mods.wizardSlowFactor;
     slowDuration = mods.wizardSlowDuration;
+  } else if (kind === 'bomb') {
+    dmgMult = mods.bombDamageMult;
   }
+  const isBomb = kind === 'bomb';
+  const splashRadius = isBomb ? def.splashRadius * mods.bombRadiusMult : 0;
+  const hasCluster = isBomb && def.bomblets > 0;
+  const bomblets = hasCluster ? (mods.bombletCountOverride > 0 ? mods.bombletCountOverride : def.bomblets) : 0;
+  const bombletDamageFactor = hasCluster ? (mods.bombletFactorOverride > 0 ? mods.bombletFactorOverride : def.bombletFactor) : 0;
+  const bombletRadius = hasCluster ? BOMB.bombletRadius * mods.bombRadiusMult : 0;
   const damageMin = def.damageMin * dmgMult;
   const damageMax = def.damageMax * dmgMult;
   const avgDamage = (damageMin + damageMax) / 2;
@@ -79,6 +95,7 @@ export function resolveTowerStats(kind: TowerKind, level: number, mods: Modifier
   let special = '';
   if (kind === 'archer' && def.shots > 1) special = 'Double Shot: fires at 2 targets';
   if (kind === 'wizard' && def.chainCount > 0) special = `Arc Bolt: chains to ${def.chainCount} more enemies`;
+  if (hasCluster) special = `Cluster Bomb: ${bomblets} bomblets`;
   if (kind === 'barracks' && def.knights > 2) special = `${def.knights} knights`;
   return {
     kind,
@@ -90,6 +107,11 @@ export function resolveTowerStats(kind: TowerKind, level: number, mods: Modifier
     cooldown: def.cooldown,
     dps: (avgDamage * unitCount) / def.cooldown,
     range,
+    groundOnly: TOWERS[kind].groundOnly,
+    splashRadius,
+    bomblets,
+    bombletDamageFactor,
+    bombletRadius,
     shots: def.shots,
     chainCount: def.chainCount,
     chainRange: def.chainRange,

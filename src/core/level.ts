@@ -62,7 +62,7 @@ export function validateLevel(level: LevelDef): string[] {
   }
   if (!(level.startGold > 0)) err('startGold must be > 0');
   if (!(level.lives > 0)) err('lives must be > 0');
-  for (const k of ['archer', 'wizard', 'barracks'] as const) {
+  for (const k of ['archer', 'wizard', 'barracks', 'bomb'] as const) {
     const c = level.towerCap[k];
     if (!Number.isInteger(c) || c < 1 || c > 3) err(`towerCap.${k} must be 1..3`);
   }

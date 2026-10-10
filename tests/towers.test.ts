@@ -147,7 +147,7 @@ describe('economy', () => {
   });
 
   it('enforces tower level caps with reason "capped", and max level 3', () => {
-    const sim = makeSim(straightLevel({ towerCap: { archer: 1, wizard: 2, barracks: 3 } }));
+    const sim = makeSim(straightLevel({ towerCap: { archer: 1, wizard: 2, barracks: 3, bomb: 2 } }));
     sim.build(0, 'archer');
     sim.build(1, 'wizard');
     sim.build(2, 'barracks');
@@ -163,7 +163,7 @@ describe('economy', () => {
   });
 
   it('towerCap option overrides the level cap', () => {
-    const sim = makeSim(straightLevel(), { towerCap: { archer: 1, wizard: 1, barracks: 1 } });
+    const sim = makeSim(straightLevel(), { towerCap: { archer: 1, wizard: 1, barracks: 1, bomb: 1 } });
     sim.build(0, 'archer');
     expect(sim.upgrade(sim.state.towers[0].id)).toEqual({ ok: false, reason: 'capped' });
   });

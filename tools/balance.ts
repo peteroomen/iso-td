@@ -163,7 +163,7 @@ function markdown(levelIds: string[], botNames: string[], results: Map<string, A
     const n = Number(id.replace(/\D/g, ''));
     const fmt = (per: number) => {
       const u = upgradesForStars(starBudget(n, per));
-      return `${starBudget(n, per)} pts: A${u.archers} W${u.wizards} B${u.barracks} O${u.orbital} R${u.reinforcements}`;
+      return `${starBudget(n, per)} pts: A${u.archers} W${u.wizards} B${u.barracks} O${u.orbital} R${u.reinforcements} X${u.bombs}`;
     };
     out.push(`| ${n} | ${fmt(2)} | ${fmt(3)} |`);
   }
@@ -206,12 +206,12 @@ function markdown(levelIds: string[], botNames: string[], results: Map<string, A
     }
     out.push('');
   }
-  const boss = (['competent', 'expert', 'archer-only', 'wizard-only'] as const).map((n) => [n, results.get(`${LEVELS[9].id}|${n}`)] as const).filter(([, a]) => a && a.bossFrac !== null);
+  const boss = (['competent', 'expert', 'archer-only', 'wizard-only', 'bomb-only'] as const).map((n) => [n, results.get(`${LEVELS[9].id}|${n}`)] as const).filter(([, a]) => a && a.bossFrac !== null);
   if (boss.length) {
     out.push('Mothership (level 10): where on the road the boss was when it died (won runs) or when the run ended (lost runs): ' + boss.map(([n, a]) => `${n} ${Math.round(100 * a!.bossFrac!)}%`).join(', ') + '.', '');
   }
   out.push('## Levels', '');
-  out.push('| level | name | biome | waves | start gold | spots | tower caps (A/W/B) | new enemies | max units in a wave |', '|---|---|---|---|---|---|---|---|---|');
+  out.push('| level | name | biome | waves | start gold | spots | tower caps (A/W/B/X) | new enemies | max units in a wave |', '|---|---|---|---|---|---|---|---|---|');
   const seen = new Set<string>();
   for (const l of LEVELS) {
     const used = [...new Set(l.waves.flatMap((w) => w.groups.map((g) => g.enemy)))];
@@ -219,7 +219,7 @@ function markdown(levelIds: string[], botNames: string[], results: Map<string, A
     used.forEach((u) => seen.add(u));
     if (!levelIds.includes(l.id)) continue;
     const maxUnits = Math.max(...l.waves.map((w) => w.groups.reduce((n, g) => n + g.count, 0)));
-    out.push(`| ${levelNumber(l)} | ${l.name} | ${l.biome} | ${l.waves.length} | ${l.startGold} | ${deriveSpots(l).length} | ${l.towerCap.archer}/${l.towerCap.wizard}/${l.towerCap.barracks} | ${fresh.join(', ') || '-'} | ${maxUnits} |`);
+    out.push(`| ${levelNumber(l)} | ${l.name} | ${l.biome} | ${l.waves.length} | ${l.startGold} | ${deriveSpots(l).length} | ${l.towerCap.archer}/${l.towerCap.wizard}/${l.towerCap.barracks}/${l.towerCap.bomb} | ${fresh.join(', ') || '-'} | ${maxUnits} |`);
   }
   out.push('');
   return out.join('\n');

@@ -36,7 +36,7 @@ export const level04: LevelDef = {
   startGold: 360,
   lives: 20,
   waveGap: 18,
-  towerCap: { archer: 3, wizard: 3, barracks: 2 },
+  towerCap: { archer: 3, wizard: 3, barracks: 2, bomb: 2 },
   waves: [
     { groups: [g('scout', 12, 0.65, 0)] },
     { groups: [g('dart', 12, 0.45, 0), g('scout', 24, 0.65, 5)] },

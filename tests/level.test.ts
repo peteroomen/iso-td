@@ -28,7 +28,7 @@ describe('level validation', () => {
     expect([...used].sort()).toEqual(['dart', 'scout']);
     expect(deriveSpots(level01).length).toBeGreaterThanOrEqual(7);
     expect(deriveSpots(level01).length).toBeLessThanOrEqual(10);
-    expect(level01.towerCap).toEqual({ archer: 1, wizard: 1, barracks: 1 });
+    expect(level01.towerCap).toEqual({ archer: 1, wizard: 1, barracks: 1, bomb: 1 });
     expect(level01.lives).toBe(20);
     expect(level01.hints!.length).toBeGreaterThan(2);
     expect(level01.startGold).toBeGreaterThanOrEqual(250);

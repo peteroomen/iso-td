@@ -9,17 +9,18 @@ import { runBot } from '../tools/bots/runner';
 
 const WAVES = [6, 7, 8, 9, 10, 10, 12, 12, 12, 15];
 const BIOMES = ['spring', 'spring', 'spring', 'desert', 'desert', 'desert', 'winter', 'winter', 'winter', 'mixed'];
+/** archer / wizard / barracks / bomb caps per level (bomb Lv3 unlocks on level 6). */
 const CAPS = [
-  [1, 1, 1],
-  [2, 2, 2],
-  [3, 2, 2],
-  [3, 3, 2],
-  [3, 3, 3],
-  [3, 3, 3],
-  [3, 3, 3],
-  [3, 3, 3],
-  [3, 3, 3],
-  [3, 3, 3],
+  [1, 1, 1, 1],
+  [2, 2, 2, 2],
+  [3, 2, 2, 2],
+  [3, 3, 2, 2],
+  [3, 3, 3, 2],
+  [3, 3, 3, 3],
+  [3, 3, 3, 3],
+  [3, 3, 3, 3],
+  [3, 3, 3, 3],
+  [3, 3, 3, 3],
 ];
 /** First level in which each enemy is introduced (DESIGN section 7). */
 const INTRO: Partial<Record<EnemyId, number>> = { scout: 1, dart: 1, skimmer: 2, plated: 3, prism: 4, carrier: 5, dread: 7, mothership: 10 };
@@ -38,7 +39,7 @@ describe('campaign levels', () => {
     LEVELS.forEach((l, i) => {
       expect(l.biome, l.id).toBe(BIOMES[i]);
       expect(l.waves.length, l.id).toBe(WAVES[i]);
-      expect([l.towerCap.archer, l.towerCap.wizard, l.towerCap.barracks], l.id).toEqual(CAPS[i]);
+      expect([l.towerCap.archer, l.towerCap.wizard, l.towerCap.barracks, l.towerCap.bomb], l.id).toEqual(CAPS[i]);
       expect(l.lives).toBe(20);
       expect(l.startGold, l.id).toBeGreaterThanOrEqual(250);
       expect(l.startGold, l.id).toBeLessThanOrEqual(520);

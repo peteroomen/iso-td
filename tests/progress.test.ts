@@ -173,3 +173,49 @@ describe('save flags and seen enemies', () => {
     expect(p.parseSave('{"flags":[1,"x","x"],"seenEnemies":"bad"}')).toMatchObject({ flags: ['x'], seenEnemies: [] });
   });
 });
+
+describe('bombs star track', () => {
+  it('is the 6th track, costing 1/2/3 like the others (36 stars for the whole tree)', async () => {
+    const { UPGRADE_TRACKS } = await import('../src/core/data/upgrades');
+    expect(UPGRADE_TRACKS.length).toBe(6);
+    expect(UPGRADE_TRACKS[5]).toBe('bombs');
+    let s = withStars(30);
+    for (const t of UPGRADE_TRACKS) for (let i = 0; i < 3; i++) s = buyTier(s, t);
+    // 30 earned stars cannot buy all 36: the last purchases are refused
+    expect(starsSpent(s)).toBeLessThanOrEqual(30);
+    expect(starsSpent(s)).toBe(30);
+    expect(s.upgrades.bombs).toBeLessThan(3);
+    let s2 = withStars(6);
+    s2 = buyTier(buyTier(buyTier(s2, 'bombs'), 'bombs'), 'bombs');
+    expect(s2.upgrades.bombs).toBe(3);
+    expect(starsSpent(s2)).toBe(6);
+    expect(canBuyTier(s2, 'bombs')).toEqual({ ok: false, reason: 'max_level' });
+  });
+
+  it('old saves without the bombs track load with bombs = 0 and keep their other tiers', () => {
+    const old = JSON.stringify({
+      version: 1,
+      levels: { l1: { stars: 3, completed: true }, l2: { stars: 3, completed: true } },
+      upgrades: { archers: 2, wizards: 1, barracks: 0, orbital: 1, reinforcements: 0 },
+      settings: { music: 0.3, sfx: 0.4 },
+      seenEnemies: ['scout'],
+      flags: [],
+    });
+    const s = parseSave(old);
+    expect(s.upgrades).toEqual({ archers: 2, wizards: 1, barracks: 0, orbital: 1, reinforcements: 0, bombs: 0 });
+    expect(starsSpent(s)).toBe(3 + 1 + 1);
+    expect(s.settings).toEqual({ music: 0.3, sfx: 0.4 });
+    expect(parseSave(serializeSave(s))).toEqual(s);
+  });
+
+  it('keeps the spent <= earned rule including bombs', () => {
+    const tampered = parseSave(
+      JSON.stringify({ levels: { l1: { stars: 3, completed: true } }, upgrades: { archers: 1, bombs: 3 } }),
+    );
+    // 1 + 6 = 7 spent > 3 earned => everything reset
+    expect(tampered.upgrades).toEqual(createDefaultSave().upgrades);
+    const ok = parseSave(JSON.stringify({ levels: { a: { stars: 3, completed: true }, b: { stars: 3, completed: true } }, upgrades: { bombs: 3, junk: 1 } }));
+    expect(ok.upgrades.bombs).toBe(3);
+    expect(parseSave(JSON.stringify({ levels: { a: { stars: 3, completed: true } }, upgrades: { bombs: 9 } })).upgrades.bombs).toBe(0);
+  });
+});

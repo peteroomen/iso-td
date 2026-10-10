@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ENEMIES } from '../src/core/data/enemies';
 import { Recorder, makeSim, straightLevel, wave } from './helpers';
 
-const noUp = { archers: 0, wizards: 0, barracks: 0, orbital: 0, reinforcements: 0 };
+const noUp = { archers: 0, wizards: 0, barracks: 0, orbital: 0, reinforcements: 0, bombs: 0 };
 
 describe('orbital strike', () => {
   it('needs a running level, has a reticle delay, deals 60 true damage in radius incl. fliers, then cools down 40 s', () => {

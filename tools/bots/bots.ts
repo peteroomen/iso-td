@@ -11,7 +11,8 @@ export const BOTS: Record<string, BotConfig> = {
   'archer-only': { name: 'archer-only', ...base, onlyKind: 'archer' },
   'wizard-only': { name: 'wizard-only', ...base, onlyKind: 'wizard' },
   'barracks-only': { name: 'barracks-only', ...base, onlyKind: 'barracks' },
+  'bomb-only': { name: 'bomb-only', ...base, onlyKind: 'bomb' },
 };
 
 export const MAIN_BOTS = ['competent', 'expert', 'naive', 'idle'] as const;
-export const VARIANT_BOTS = ['archer-only', 'wizard-only', 'barracks-only'] as const;
+export const VARIANT_BOTS = ['archer-only', 'wizard-only', 'barracks-only', 'bomb-only'] as const;

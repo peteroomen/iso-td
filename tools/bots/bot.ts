@@ -221,6 +221,6 @@ export class Bot {
 }
 
 export function towerSummary(towers: readonly TowerState[]): string {
-  const k = { archer: 'A', wizard: 'W', barracks: 'B' } as const;
+  const k = { archer: 'A', wizard: 'W', barracks: 'B', bomb: 'X' } as const;
   return towers.map((t) => `${k[t.kind]}${t.level}`).join(' ');
 }

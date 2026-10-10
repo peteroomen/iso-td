@@ -434,4 +434,5 @@ const PLATE_COLORS: Record<UpgradeTrack, number> = {
   barracks: 0xa06a45,
   orbital: 0xb04a5a,
   reinforcements: 0x8a62b8,
+  bombs: 0xc9833a, // PLACEHOLDER (core phase)
 };

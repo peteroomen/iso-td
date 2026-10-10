@@ -4,7 +4,7 @@
  */
 
 export type Biome = 'spring' | 'desert' | 'winter';
-export type TowerKind = 'archer' | 'wizard' | 'barracks';
+export type TowerKind = 'archer' | 'wizard' | 'barracks' | 'bomb';
 export type EnemyId = 'scout' | 'dart' | 'skimmer' | 'plated' | 'prism' | 'carrier' | 'dread' | 'mothership';
 export type DamageType = 'physical' | 'magic' | 'true';
 export type AbilityId = 'orbital' | 'reinforce';
@@ -46,6 +46,8 @@ export interface TowerCap {
   archer: number;
   wizard: number;
   barracks: number;
+  /** Bomb tower cap (1..3). Lv3 (Cluster Bomb) unlocks on level 6. */
+  bomb: number;
 }
 
 export interface LevelHint {
@@ -95,9 +97,9 @@ export interface BuildSpot {
 // Star upgrade tree
 // --------------------------------------------------------------------------------------------
 
-export type UpgradeTrack = 'archers' | 'wizards' | 'barracks' | 'orbital' | 'reinforcements';
+export type UpgradeTrack = 'archers' | 'wizards' | 'barracks' | 'orbital' | 'reinforcements' | 'bombs';
 
-/** Purchased tiers per track (0..3). */
+/** Purchased tiers per track (0..3). Old saves without a track (e.g. 'bombs') default to 0. */
 export type UpgradeState = Record<UpgradeTrack, number>;
 
 // --------------------------------------------------------------------------------------------
@@ -143,11 +145,11 @@ export interface TowerState {
   readonly invested: number;
   /** Refund if sold now. */
   readonly sellValue: number;
-  /** Effective range in tiles (archer/wizard attack range, barracks rally range). */
+  /** Effective range in tiles (archer/wizard/bomb attack range, barracks rally range). */
   readonly range: number;
-  /** Seconds until the next shot (archer/wizard). 0 = ready. */
+  /** Seconds until the next shot (archer/wizard/bomb). 0 = ready. */
   readonly cooldown: number;
-  /** Current target (first enemy in range), if any. Archer/wizard only. */
+  /** Current target, if any (archer/wizard: first enemy in range; bomb: ground enemy with the most neighbours in the splash). Not barracks. */
   readonly targetId: number | null;
   readonly targetX: number | null;
   readonly targetY: number | null;
@@ -234,7 +236,15 @@ export interface EnemyState {
   readonly dead: boolean;
 }
 
-export type ProjectileKind = 'arrow' | 'bolt';
+/**
+ * - 'arrow' / 'bolt': homing projectiles (fields flightTime/elapsed/progress/radius/arc are 0).
+ * - 'shell': bomb-tower artillery shell. Lobbed to a FIXED ground point (tx, ty = target position at fire time, no lead),
+ *   flies `flightTime` seconds, then explodes (splash `radius`). x/y move linearly on the ground from (fromX, fromY) to
+ *   (tx, ty); the renderer adds the height arc using `progress` and `arc`.
+ * - 'bomblet': Cluster Bomb sub-munition. Spawned at the shell's impact point (fromX, fromY), hops to a scatter point
+ *   (tx, ty) in `flightTime` (~0.35 s) and explodes there with `radius`. Same fields as a shell.
+ */
+export type ProjectileKind = 'arrow' | 'bolt' | 'shell' | 'bomblet';
 
 export interface ProjectileState {
   readonly id: number;
@@ -264,6 +274,22 @@ export interface ProjectileState {
   /** Unit direction of travel (for rotating the sprite). */
   readonly dirX: number;
   readonly dirY: number;
+  /** Shell/bomblet only (0 otherwise): total seconds from launch to the explosion. */
+  readonly flightTime: number;
+  /** Shell/bomblet only: seconds flown so far. */
+  readonly elapsed: number;
+  /** Shell/bomblet only: elapsed / flightTime, 0..1 (use for the arc: height = 4 * progress * (1 - progress) * arc). */
+  readonly progress: number;
+  /** Shell/bomblet only: splash radius in tiles at the landing point (star-tree radius bonus included). */
+  readonly radius: number;
+  /** Shell/bomblet only: suggested apex height of the visual arc, in tiles (shell 1.6, bomblet 0.5). */
+  readonly arc: number;
+  /** Shell only: number of bomblets released on impact (Lv3 Cluster Bomb; 3, or 5 with the star upgrade; 0 = none). */
+  readonly bombletCount: number;
+  /** Shell only: bomblet damage as a fraction of the shell's rolled damage (0.30, or 0.35 with the star upgrade). */
+  readonly bombletFactor: number;
+  /** Shell only: blast radius of each bomblet (0.5 x star radius bonus). */
+  readonly bombletRadius: number;
 }
 
 export interface StrikeState {
@@ -383,7 +409,7 @@ export interface SimState {
 // Events
 // --------------------------------------------------------------------------------------------
 
-export type HitSource = 'arrow' | 'bolt' | 'chain' | 'orbital' | 'knight' | 'militia';
+export type HitSource = 'arrow' | 'bolt' | 'chain' | 'shell' | 'bomblet' | 'orbital' | 'knight' | 'militia';
 export type SpawnSource = 'wave' | 'carrier' | 'mothership';
 
 export type SimEvent =
@@ -398,6 +424,14 @@ export type SimEvent =
   | { type: 'escortLaunch'; fromId: number; x: number; y: number }
   | { type: 'shoot'; towerId: number; kind: TowerKind; projectileId: number; x: number; y: number; targetId: number; tx: number; ty: number }
   | { type: 'hit'; enemyId: number; enemy: EnemyId; x: number; y: number; amount: number; raw: number; damageType: DamageType; source: HitSource }
+  /**
+   * A bomb shell or bomblet detonated at (x, y) after its flight. `hits` = number of ground enemies damaged (may be 0).
+   * Emitted BEFORE the per-enemy 'hit' / 'kill' events of that explosion. A shell with Cluster Bomb emits its own
+   * 'explode' (kind 'shell') and, ~0.35 s later, one 'explode' (kind 'bomblet') per bomblet.
+   */
+  | { type: 'explode'; towerId: number; kind: 'shell' | 'bomblet'; projectileId: number; x: number; y: number; radius: number; hits: number }
+  /** Cluster Bomb: a Lv3 shell released its bomblets at (x, y). Each is a 'bomblet' projectile in `state.projectiles`. */
+  | { type: 'cluster'; towerId: number; shellId: number; x: number; y: number; bomblets: { projectileId: number; tx: number; ty: number }[] }
   | { type: 'chain'; towerId: number; fromX: number; fromY: number; toX: number; toY: number; targetId: number }
   | { type: 'fizzle'; projectileId: number; x: number; y: number }
   | { type: 'kill'; enemyId: number; enemy: EnemyId; x: number; y: number; gold: number; flier: boolean; boss: boolean }

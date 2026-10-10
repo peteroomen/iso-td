@@ -16,7 +16,7 @@ export function straightLevel(over: Partial<LevelDef> = {}): LevelDef {
     startGold: 1000,
     lives: 20,
     waveGap: 18,
-    towerCap: { archer: 3, wizard: 3, barracks: 3 },
+    towerCap: { archer: 3, wizard: 3, barracks: 3, bomb: 3 },
     waves: [wave({ enemy: 'scout', count: 1 })],
     ...over,
   };

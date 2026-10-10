@@ -38,6 +38,9 @@ export function towerMix(level: LevelDef, n: number): TowerKind[] {
   let armored = 0;
   let resistant = 0;
   let fliers = 0;
+  // head count (not HP) of cheap ground swarm units: scouts, darts and the darts a carrier releases
+  let swarm = 0;
+  let units = 0;
   for (const w of level.waves) {
     for (const g of w.groups) {
       const e = ENEMIES[g.enemy];
@@ -47,23 +50,29 @@ export function towerMix(level: LevelDef, n: number): TowerKind[] {
       armored += t * e.armor;
       resistant += t * e.magicResist;
       if (e.flier) fliers += t;
+      units += g.count;
+      if (g.enemy === 'scout' || g.enemy === 'dart') swarm += g.count;
+      else if (g.enemy === 'carrier') swarm += g.count * 3;
     }
   }
   const armoredShare = total ? armored / total : 0;
   const resistShare = total ? resistant / total : 0;
   const flierShare = total ? fliers / total : 0;
+  const swarmShare = units ? swarm / units : 0;
   const weight: Record<TowerKind, number> = {
     archer: 1.2 + 3 * resistShare,
     wizard: 0.6 + 4 * armoredShare,
     barracks: Math.max(0.15, 0.55 - 1.2 * flierShare),
+    // artillery wants dense ground swarms (fodder, carrier darts) and is useless against fliers
+    bomb: Math.max(0, 0.3 + 1.2 * swarmShare - 2.5 * flierShare),
   };
-  const sum = weight.archer + weight.wizard + weight.barracks;
-  const count: Record<TowerKind, number> = { archer: 0, wizard: 0, barracks: 0 };
+  const sum = weight.archer + weight.wizard + weight.barracks + weight.bomb;
+  const count: Record<TowerKind, number> = { archer: 0, wizard: 0, barracks: 0, bomb: 0 };
   const out: TowerKind[] = [];
   for (let i = 0; i < n; i++) {
     let best: TowerKind = 'archer';
     let bestGap = -Infinity;
-    for (const k of ['archer', 'wizard', 'barracks'] as TowerKind[]) {
+    for (const k of ['archer', 'wizard', 'barracks', 'bomb'] as TowerKind[]) {
       // stride scheduling: how far below its fair share is this kind?
       const gap = (weight[k] / sum) * (i + 1) - count[k];
       if (gap > bestGap + 1e-9) {
@@ -83,7 +92,7 @@ export function autoPlan(level: LevelDef): string[] {
   const spots = deriveSpots(level)
     .map((s) => ({ s, c: coverage(level, s.x, s.y, 3.2) }))
     .sort((a, b) => b.c - a.c);
-  const maxLevel = Math.max(level.towerCap.archer, level.towerCap.wizard, level.towerCap.barracks);
+  const maxLevel = Math.max(level.towerCap.archer, level.towerCap.wizard, level.towerCap.barracks, level.towerCap.bomb);
   // a thorough player ends up covering every spot (the report's "maxed" time needs the whole map built)
   const count = spots.length;
   const mix = towerMix(level, count);

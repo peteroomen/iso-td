@@ -52,7 +52,7 @@ describe('damage in the sim', () => {
   });
 
   it('archer star tier 3 pierces 0.30 armor', () => {
-    const arrow = firstHit('archer', 'plated', { upgrades: { archers: 3, wizards: 0, barracks: 0, orbital: 0, reinforcements: 0 } });
+    const arrow = firstHit('archer', 'plated', { upgrades: { archers: 3, wizards: 0, barracks: 0, orbital: 0, reinforcements: 0, bombs: 0 } });
     // +15% damage (tier 2) is part of raw; effective armor = plated armor - 0.3
     expect(arrow.amount).toBeCloseTo(arrow.raw * (1 - (ENEMIES.plated.armor - 0.3)));
   });

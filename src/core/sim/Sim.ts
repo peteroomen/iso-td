@@ -9,7 +9,7 @@ import {
   MAX_TOWER_LEVEL,
   RALLY_PATH_TOLERANCE,
 } from '../data/rules';
-import { KNIGHT, TOWERS } from '../data/towers';
+import { BOMB, KNIGHT, TOWERS, splashFactor } from '../data/towers';
 import { emptyUpgrades, resolveModifiers, type Modifiers } from '../data/upgrades';
 import { deriveSpots, levelHeight, levelWidth, validateLevel, waveGapOf } from '../level';
 import { starsForLives } from '../progress';
@@ -1032,7 +1032,7 @@ export class Sim {
         t.attackAnim -= dt;
         t.attacking = t.attackAnim > 0;
       }
-      const targets = this.targetsInRange(t.x, t.y, stats.range, stats.shots);
+      const targets = t.kind === 'bomb' ? this.bombTarget(t, stats) : this.targetsInRange(t.x, t.y, stats.range, stats.shots);
       if (targets.length > 0) {
         const first = targets[0];
         t.targetId = first.id;
@@ -1075,7 +1075,96 @@ export class Sim {
     return out;
   }
 
+  /**
+   * Bomb targeting: ground enemies in range only (fliers are ignored, the boss is fair game). While the tower is ready it
+   * picks the enemy whose position has the most ground enemies inside the splash radius (itself included); ties go to
+   * the one furthest along its path. While reloading it just keeps its previous target (or the "first" ground enemy).
+   */
+  private bombTarget(t: TowerRt, stats: TowerStatsView): EnemyRt[] {
+    const r2 = stats.range * stats.range;
+    const cand: EnemyRt[] = [];
+    for (const e of this.s.enemies) {
+      if (e.dead || e.flier) continue;
+      const dx = e.x - t.x;
+      const dy = e.y - t.y;
+      if (dx * dx + dy * dy <= r2) cand.push(e);
+    }
+    if (cand.length === 0) return [];
+    const remaining = (e: EnemyRt) => e.pathLength - e.progress;
+    if (t.cooldown > 0) {
+      const keep = cand.find((e) => e.id === t.targetId);
+      if (keep) return [keep];
+      let first = cand[0];
+      for (const e of cand) if (remaining(e) < remaining(first) || (remaining(e) === remaining(first) && e.id < first.id)) first = e;
+      return [first];
+    }
+    const sr2 = stats.splashRadius * stats.splashRadius;
+    let best: EnemyRt = cand[0];
+    let bestCount = -1;
+    for (const c of cand) {
+      let n = 0;
+      for (const e of this.s.enemies) {
+        if (e.dead || e.flier) continue;
+        const dx = e.x - c.x;
+        const dy = e.y - c.y;
+        if (dx * dx + dy * dy <= sr2) n++;
+      }
+      if (n > bestCount || (n === bestCount && (remaining(c) < remaining(best) || (remaining(c) === remaining(best) && c.id < best.id)))) {
+        best = c;
+        bestCount = n;
+      }
+    }
+    return [best];
+  }
+
+  private fireBomb(t: TowerRt, stats: TowerStatsView, target: EnemyRt): void {
+    const lv = TOWERS.bomb.levels[t.level - 1];
+    const base = this.rng.int(lv.damageMin, lv.damageMax);
+    const dmgMult = stats.damageMin / lv.damageMin;
+    const dx = target.x - t.x;
+    const dy = target.y - t.y;
+    const d = Math.hypot(dx, dy);
+    const flight = BOMB.flightBase + BOMB.flightPerTile * d;
+    const p: ProjectileRt = {
+      id: this.nextId++,
+      kind: 'shell',
+      x: t.x,
+      y: t.y,
+      fromX: t.x,
+      fromY: t.y,
+      targetId: target.id,
+      tx: target.x,
+      ty: target.y,
+      speed: d / flight,
+      damage: base * dmgMult,
+      damageType: 'physical',
+      towerId: t.id,
+      armorPierce: 0,
+      slowFactor: 1,
+      slowDuration: 0,
+      chainCount: 0,
+      chainRange: 0,
+      chainFactor: 0,
+      dirX: d > EPS ? dx / d : 0,
+      dirY: d > EPS ? dy / d : 1,
+      flightTime: flight,
+      elapsed: 0,
+      progress: 0,
+      radius: stats.splashRadius,
+      arc: BOMB.shellArc,
+      bombletCount: stats.bomblets,
+      bombletFactor: stats.bombletDamageFactor,
+      bombletRadius: stats.bombletRadius,
+    };
+    this.s.projectiles.push(p);
+    this.emit({ type: 'shoot', towerId: t.id, kind: 'bomb', projectileId: p.id, x: t.x, y: t.y, targetId: target.id, tx: p.tx, ty: p.ty });
+  }
+
   private fire(t: TowerRt, stats: TowerStatsView, targets: EnemyRt[]): void {
+    if (t.kind === 'bomb') {
+      this.fireBomb(t, stats, targets[0]);
+      return;
+    }
     const def = TOWERS[t.kind];
     const kind = t.kind === 'archer' ? 'arrow' : 'bolt';
     const lv = def.levels[t.level - 1];
@@ -1107,6 +1196,14 @@ export class Sim {
         chainFactor: stats.chainFactor,
         dirX: dx / d,
         dirY: dy / d,
+        flightTime: 0,
+        elapsed: 0,
+        progress: 0,
+        radius: 0,
+        arc: 0,
+        bombletCount: 0,
+        bombletFactor: 0,
+        bombletRadius: 0,
       };
       this.s.projectiles.push(p);
       this.emit({ type: 'shoot', towerId: t.id, kind: t.kind, projectileId: p.id, x: t.x, y: t.y, targetId: target.id, tx: target.x, ty: target.y });
@@ -1117,7 +1214,25 @@ export class Sim {
     const s = this.s;
     if (s.projectiles.length === 0) return;
     const keep: ProjectileRt[] = [];
+    const spawned: ProjectileRt[] = [];
     for (const p of s.projectiles) {
+      if (p.kind === 'shell' || p.kind === 'bomblet') {
+        // lobbed: flies to a fixed point and explodes there, whether or not anything is still underneath
+        p.elapsed += dt;
+        if (p.elapsed + EPS >= p.flightTime) {
+          p.elapsed = p.flightTime;
+          p.progress = 1;
+          p.x = p.tx;
+          p.y = p.ty;
+          this.explode(p, spawned);
+        } else {
+          p.progress = p.elapsed / p.flightTime;
+          p.x = p.fromX + (p.tx - p.fromX) * p.progress;
+          p.y = p.fromY + (p.ty - p.fromY) * p.progress;
+          keep.push(p);
+        }
+        continue;
+      }
       const target = this.enemyById.get(p.targetId);
       const alive = !!target && !target.dead;
       if (alive) {
@@ -1141,7 +1256,64 @@ export class Sim {
       p.y += p.dirY * step;
       keep.push(p);
     }
+    for (const q of spawned) keep.push(q);
     s.projectiles = keep;
+  }
+
+  /** Shell / bomblet detonation: splash damage to ground enemies (falloff), then the Cluster Bomb release. */
+  private explode(p: ProjectileRt, spawned: ProjectileRt[]): void {
+    const kind = p.kind as 'shell' | 'bomblet';
+    const hit: { e: EnemyRt; f: number }[] = [];
+    for (const e of this.s.enemies) {
+      if (e.dead || e.flier) continue;
+      const f = splashFactor(Math.hypot(e.x - p.x, e.y - p.y), p.radius);
+      if (f > 0) hit.push({ e, f });
+    }
+    this.emit({ type: 'explode', towerId: p.towerId, kind, projectileId: p.id, x: p.x, y: p.y, radius: p.radius, hits: hit.length });
+    for (const h of hit) this.damageEnemy(h.e, p.damage * h.f, p.damageType, 0, kind);
+    if (kind === 'shell' && p.bombletCount > 0) {
+      const out: { projectileId: number; tx: number; ty: number }[] = [];
+      for (let i = 0; i < p.bombletCount; i++) {
+        const a = this.rng.range(0, Math.PI * 2);
+        const r = BOMB.bombletScatter * Math.sqrt(this.rng.next());
+        const tx = p.x + Math.cos(a) * r;
+        const ty = p.y + Math.sin(a) * r;
+        const b: ProjectileRt = {
+          id: this.nextId++,
+          kind: 'bomblet',
+          x: p.x,
+          y: p.y,
+          fromX: p.x,
+          fromY: p.y,
+          targetId: -1,
+          tx,
+          ty,
+          speed: r / BOMB.bombletFuse,
+          damage: p.damage * p.bombletFactor,
+          damageType: p.damageType,
+          towerId: p.towerId,
+          armorPierce: 0,
+          slowFactor: 1,
+          slowDuration: 0,
+          chainCount: 0,
+          chainRange: 0,
+          chainFactor: 0,
+          dirX: r > EPS ? Math.cos(a) : 0,
+          dirY: r > EPS ? Math.sin(a) : 1,
+          flightTime: BOMB.bombletFuse,
+          elapsed: 0,
+          progress: 0,
+          radius: p.bombletRadius,
+          arc: BOMB.bombletArc,
+          bombletCount: 0,
+          bombletFactor: 0,
+          bombletRadius: 0,
+        };
+        spawned.push(b);
+        out.push({ projectileId: b.id, tx, ty });
+      }
+      this.emit({ type: 'cluster', towerId: p.towerId, shellId: p.id, x: p.x, y: p.y, bomblets: out });
+    }
   }
 
   private impact(p: ProjectileRt, target: EnemyRt): void {

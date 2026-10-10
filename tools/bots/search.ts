@@ -70,7 +70,7 @@ function evaluate(level: LevelDef, plan: Genome, botName: string, seeds: number[
 function mutate(g: Genome, level: LevelDef, rng: Rng, spots: { col: number; row: number }[]): Genome {
   const out = g.slice();
   const roll = rng.next();
-  const kinds: TowerKind[] = ['archer', 'wizard', 'barracks'];
+  const kinds: TowerKind[] = ['archer', 'wizard', 'barracks', 'bomb'];
   if (roll < 0.3 && out.length > 1) {
     const i = rng.int(0, out.length - 1);
     const j = Math.max(0, Math.min(out.length - 1, i + rng.int(-4, 4)));
@@ -81,14 +81,14 @@ function mutate(g: Genome, level: LevelDef, rng: Rng, spots: { col: number; row:
     if (idx.length) {
       const i = idx[rng.int(0, idx.length - 1)];
       const a = out[i] as Extract<PlanAction, { do: 'build' }>;
-      out[i] = { ...a, kind: kinds[rng.int(0, 2)] };
+      out[i] = { ...a, kind: kinds[rng.int(0, 3)] };
     }
   } else if (roll < 0.7) {
     const used = new Set(out.filter((a) => a.do === 'build').map((a) => key(a.at)));
     const free = spots.filter((s) => !used.has(`${s.col},${s.row}`));
     if (free.length) {
       const s = free[rng.int(0, free.length - 1)];
-      out.splice(rng.int(0, out.length), 0, { do: 'build', at: [s.col, s.row], kind: kinds[rng.int(0, 2)] });
+      out.splice(rng.int(0, out.length), 0, { do: 'build', at: [s.col, s.row], kind: kinds[rng.int(0, 3)] });
     }
   } else if (roll < 0.85) {
     // add an upgrade for a random built spot

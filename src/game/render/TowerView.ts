@@ -44,6 +44,12 @@ const FOOT: Record<TowerState['kind'], FootSpec[]> = {
     { x: 70.5, y: 118, shootH: 60 },
     { x: 70.5, y: 118, shootH: 60 },
   ],
+  // PLACEHOLDER (core phase): same footprint as the barracks until the bomb visuals land.
+  bomb: [
+    { x: 70.5, y: 118, shootH: 60 },
+    { x: 70.5, y: 118, shootH: 60 },
+    { x: 70.5, y: 118, shootH: 60 },
+  ],
 };
 /** Half-height of the base diamond + margin: where the level pips sit below the footprint centre. */
 const PIPS_Y = 46;

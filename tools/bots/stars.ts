@@ -24,7 +24,7 @@ const ORDER: readonly UpgradeTrack[] = [
 ];
 
 export function upgradesForStars(budget: number): UpgradeState {
-  const u: UpgradeState = { archers: 0, wizards: 0, barracks: 0, orbital: 0, reinforcements: 0 };
+  const u: UpgradeState = { archers: 0, wizards: 0, barracks: 0, orbital: 0, reinforcements: 0, bombs: 0 };
   let left = budget;
   for (const track of ORDER) {
     const cost = TIER_COSTS[u[track]];

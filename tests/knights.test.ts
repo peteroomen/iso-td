@@ -116,7 +116,7 @@ describe('barracks & knights', () => {
 
   it('star tier 2 shortens respawn to 7 s', () => {
     const sim = makeSim(straightLevel({ waves: [wave({ enemy: 'dread' }, { enemy: 'scout', delay: 120 })] }), {
-      upgrades: { archers: 0, wizards: 0, barracks: 2, orbital: 0, reinforcements: 0 },
+      upgrades: { archers: 0, wizards: 0, barracks: 2, orbital: 0, reinforcements: 0, bombs: 0 },
     });
     sim.build(1, 'barracks');
     sim.callNextWave();
@@ -129,7 +129,7 @@ describe('barracks & knights', () => {
 
   it('idle knights regenerate 2% max HP per second (x3 with star tier 3), but not while fighting', () => {
     for (const [tier, rate] of [[0, 0.02], [3, 0.06]] as const) {
-      const sim = makeSim(straightLevel(), { upgrades: { archers: 0, wizards: 0, barracks: tier, orbital: 0, reinforcements: 0 } });
+      const sim = makeSim(straightLevel(), { upgrades: { archers: 0, wizards: 0, barracks: tier, orbital: 0, reinforcements: 0, bombs: 0 } });
       sim.build(1, 'barracks');
       sim.runFor(3);
       const k = sim.state.knights[0];

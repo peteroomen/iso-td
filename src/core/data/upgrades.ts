@@ -1,8 +1,8 @@
 import type { UpgradeState, UpgradeTrack } from '../types';
 
-/** Star upgrade tree (docs/DESIGN.md §5): 5 tracks x 3 tiers, costing 1/2/3 stars, bought in order. */
+/** Star upgrade tree (docs/DESIGN.md §5): 6 tracks x 3 tiers, costing 1/2/3 stars, bought in order (36 stars to buy everything; 30 are earnable). */
 
-export const UPGRADE_TRACKS: readonly UpgradeTrack[] = ['archers', 'wizards', 'barracks', 'orbital', 'reinforcements'];
+export const UPGRADE_TRACKS: readonly UpgradeTrack[] = ['archers', 'wizards', 'barracks', 'orbital', 'reinforcements', 'bombs'];
 export const TIER_COSTS: readonly [number, number, number] = [1, 2, 3];
 export const MAX_TIER = 3;
 
@@ -17,6 +17,7 @@ export const TRACK_INFO: Record<UpgradeTrack, TrackInfo> = {
   barracks: { name: 'Barracks', tiers: ['+20% knight HP', '-30% respawn time', 'Idle regeneration x3'] },
   orbital: { name: 'Orbital Strike', tiers: ['-10 s cooldown', '+40% damage and radius', 'Burning ground (3 s, 15 dps)'] },
   reinforcements: { name: 'Reinforcements', tiers: ['+50% militia HP', '3 militia', '20 s duration, -3 s cooldown'] },
+  bombs: { name: 'Bombs', tiers: ['+20% blast radius', '+15% bomb damage', 'Cluster upgrade: 5 bomblets (35% damage each)'] },
 };
 
 /** Tunable values of each tier. */
@@ -26,10 +27,11 @@ export const UPGRADE_TUNING = {
   barracks: { hpMult: 1.2, respawnMult: 0.7, regenMult: 3 },
   orbital: { cooldownReduction: 10, damageMult: 1.4, radiusMult: 1.4 },
   reinforcements: { hpMult: 1.5, extraCount: 1, duration: 20, cooldownReduction: 3 },
+  bombs: { radiusMult: 1.2, damageMult: 1.15, bombletCount: 5, bombletFactor: 0.35 },
 } as const;
 
 export function emptyUpgrades(): UpgradeState {
-  return { archers: 0, wizards: 0, barracks: 0, orbital: 0, reinforcements: 0 };
+  return { archers: 0, wizards: 0, barracks: 0, orbital: 0, reinforcements: 0, bombs: 0 };
 }
 
 /** Everything the sim needs from the star tree, resolved to plain numbers. */
@@ -54,6 +56,13 @@ export interface Modifiers {
   /** Absolute duration override (0 = use base). */
   reinforceDuration: number;
   reinforceCooldownReduction: number;
+  /** Multiplies shell and bomblet blast radius. */
+  bombRadiusMult: number;
+  bombDamageMult: number;
+  /** Absolute bomblet count of a Lv3 Cluster Bomb when > 0 (0 = use the tower table's 3). */
+  bombletCountOverride: number;
+  /** Absolute bomblet damage fraction when > 0 (0 = use the tower table's 0.30). */
+  bombletFactorOverride: number;
 }
 
 export function resolveModifiers(u: UpgradeState): Modifiers {
@@ -77,5 +86,9 @@ export function resolveModifiers(u: UpgradeState): Modifiers {
     reinforceExtraCount: u.reinforcements >= 2 ? T.reinforcements.extraCount : 0,
     reinforceDuration: u.reinforcements >= 3 ? T.reinforcements.duration : 0,
     reinforceCooldownReduction: u.reinforcements >= 3 ? T.reinforcements.cooldownReduction : 0,
+    bombRadiusMult: u.bombs >= 1 ? T.bombs.radiusMult : 1,
+    bombDamageMult: u.bombs >= 2 ? T.bombs.damageMult : 1,
+    bombletCountOverride: u.bombs >= 3 ? T.bombs.bombletCount : 0,
+    bombletFactorOverride: u.bombs >= 3 ? T.bombs.bombletFactor : 0,
   };
 }
