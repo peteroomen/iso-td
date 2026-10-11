@@ -1,21 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { ENEMIES } from '../src/core/data/enemies';
-import { LEVELS } from '../src/core/data/levels';
+import { LEVELS, specUnlockLevel, unlockedSpecsFor } from '../src/core/data/levels';
+import { SPECS, SPEC_IDS } from '../src/core/data/specs';
 import { deriveSpots, levelHeight, levelWidth, validateLevel } from '../src/core/level';
-import type { EnemyId, LevelDef } from '../src/core/types';
+import type { EnemyId, LevelDef, SpecId } from '../src/core/types';
 import { BOTS } from '../tools/bots/bots';
 import { PLANS } from '../tools/bots/plans';
 import { runBot } from '../tools/bots/runner';
 
 const WAVES = [6, 7, 8, 9, 10, 10, 12, 12, 12, 15];
 const BIOMES = ['spring', 'spring', 'spring', 'desert', 'desert', 'desert', 'winter', 'winter', 'winter', 'mixed'];
-/** archer / wizard / barracks / bomb caps per level (bomb Lv3 unlocks on level 6). */
+/** archer / wizard / barracks / bomb caps per level: L1 all Lv1, L2 all Lv2, L3 onwards all four towers Lv3. */
 const CAPS = [
   [1, 1, 1, 1],
   [2, 2, 2, 2],
-  [3, 2, 2, 2],
-  [3, 3, 2, 2],
-  [3, 3, 3, 2],
+  [3, 3, 3, 3],
+  [3, 3, 3, 3],
+  [3, 3, 3, 3],
   [3, 3, 3, 3],
   [3, 3, 3, 3],
   [3, 3, 3, 3],
@@ -65,7 +66,8 @@ describe('campaign levels', () => {
   });
 
   it('gives a hint at (and only at) levels that introduce an enemy, shown the wave before it appears', () => {
-    const introLevels = new Set([2, 3, 4, 5, 7, 10]);
+    // new enemies (2, 3, 4, 5, 7, 10) and the levels that unlock specializations (4-7)
+    const introLevels = new Set([2, 3, 4, 5, 6, 7, 10]);
     LEVELS.forEach((l, i) => {
       if (i === 0) return;
       const n = i + 1;
@@ -87,6 +89,25 @@ describe('campaign levels', () => {
       const count = first.groups.filter((g) => g.enemy === id).reduce((s, g) => s + g.count, 0);
       expect(count, `${l.id} first ${id} wave`).toBeLessThanOrEqual(4);
     });
+  });
+
+  it('unlocks specializations two per level on levels 4-7, from two different tower kinds, every spec exactly once', () => {
+    const seen: SpecId[] = [];
+    LEVELS.forEach((l, i) => {
+      const n = i + 1;
+      if (n < 4 || n > 7) {
+        expect(l.newSpecs ?? [], l.id).toEqual([]);
+        return;
+      }
+      expect(l.newSpecs!.length, l.id).toBe(2);
+      expect(new Set(l.newSpecs!.map((id) => SPECS[id].tower)).size, `${l.id} pair is from two different tower kinds`).toBe(2);
+      expect(l.newSpecsWhy, `${l.id} has a map reason`).toBeTruthy();
+      seen.push(...l.newSpecs!);
+    });
+    expect([...seen].sort()).toEqual([...SPEC_IDS].sort());
+    // cumulative helper: nothing before level 4, +2 per level, all eight from level 7 on
+    LEVELS.forEach((l, i) => expect(unlockedSpecsFor(l).length, l.id).toBe(Math.max(0, Math.min(8, (i - 2) * 2))));
+    LEVELS.forEach((l) => l.newSpecs?.forEach((id) => expect(specUnlockLevel(id)).toBe(Number(l.id.slice(-2)))));
   });
 
   it('has the designed map features', () => {
@@ -182,12 +203,22 @@ describe('balance sanity', () => {
     }
   }, 120_000);
 
-  it('the competent plans build bomb towers on (almost) every level, and the bomb cap schedule gates level 3 until level 6', () => {
+  it('specializations are effectively required from the level they unlock: the no-spec bot is clearly worse (L7-L10 by a wide margin)', () => {
+    for (const l of LEVELS.slice(3)) {
+      const avg = (bot: string) => [1, 2, 3, 4].reduce((t, seed) => t + runBot(l, BOTS[bot], PLANS[l.id], seed).lives, 0) / 4;
+      const comp = avg('competent');
+      const ns = avg('nospec');
+      const n = Number(l.id.slice(-2));
+      expect(ns, `${l.id} nospec ${ns} vs competent ${comp}`).toBeLessThanOrEqual(comp - (n >= 7 ? 4 : 2));
+    }
+  }, 120_000);
+
+  it('the competent plans build bomb towers on (almost) every level, and every tower kind (bomb included) reaches Lv3 on level 3', () => {
     const withBomb = LEVELS.filter((l) => PLANS[l.id].competent.some((a) => a.do === 'build' && a.kind === 'bomb'));
     expect(withBomb.length).toBeGreaterThanOrEqual(8);
     for (const l of LEVELS) {
       const n = Number(l.id.slice(-2));
-      expect(l.towerCap.bomb, l.id).toBe(n === 1 ? 1 : n < 6 ? 2 : 3);
+      expect(l.towerCap.bomb, l.id).toBe(n === 1 ? 1 : n === 2 ? 2 : 3);
     }
   });
 

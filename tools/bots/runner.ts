@@ -49,7 +49,7 @@ export function levelNumber(level: LevelDef): number {
 
 export function runBot(level: LevelDef, cfg: BotConfig, plan: LevelPlan | undefined, seed: number): RunResult {
   const upgrades = upgradesForStars(starBudget(levelNumber(level), cfg.starsPerLevel));
-  const sim = new Sim(level, { seed, upgrades, events: false });
+  const sim = new Sim(level, { seed, upgrades, events: false, specs: cfg.availSpecs });
   const actions = cfg.style === 'plan' ? (cfg.planKind === 'expert' ? plan?.expert ?? plan?.competent : plan?.competent) ?? [] : [];
   const bot = new Bot(cfg, level, cfg.style === 'plan' ? withSpecs(actions, level, cfg) : actions);
   const log: WaveLogEntry[] = [];

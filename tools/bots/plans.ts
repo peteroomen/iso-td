@@ -73,10 +73,8 @@ export const PLANS: Record<string, LevelPlan> = {
       up(5, 9), up(7, 11), up(10, 5), up(10, 11), up(6, 7), up(5, 1), up(8, 3), up(1, 6), up(8, 13), up(3, 8),
       up(10, 8), up(12, 8), up(3, 11),
     ],
-    expert: [
-      b(8, 5, 'archer'), b(5, 9, 'archer'), up(5, 9), up(5, 9), b(6, 7, 'wizard'), b(10, 5, 'barracks'), b(10, 11, 'archer'), b(3, 11, 'archer'),
-      b(3, 8, 'wizard'), up(6, 7), up(3, 8), b(8, 13, 'barracks'), b(1, 6, 'wizard'), up(8, 5), b(10, 8, 'bomb'), up(1, 6), up(10, 11), up(3, 8),
-      up(10, 8), up(10, 5), up(3, 11), b(8, 3, 'archer'), b(7, 11, 'archer'), up(10, 5), up(1, 6), b(12, 8, 'bomb'), up(8, 3), b(5, 1, 'barracks'),
+expert: [
+      b(8, 5, 'archer'), up(8, 5), b(5, 9, 'bomb'), up(5, 9), b(3, 8, 'bomb'), b(10, 5, 'wizard'), up(5, 9), up(10, 5), b(10, 8, 'barracks'), b(10, 11, 'archer'), b(3, 11, 'wizard'), up(10, 5), b(6, 7, 'barracks'), up(3, 8), b(8, 13, 'archer'), up(3, 11), b(7, 11, 'barracks'), b(1, 6, 'bomb'), b(12, 8, 'wizard'), up(10, 11), up(7, 11), up(8, 13), b(8, 3, 'archer'), b(5, 1, 'bomb'), up(5, 1), up(8, 5), up(10, 8),
     ],
   },
   level07: {
@@ -87,11 +85,8 @@ export const PLANS: Record<string, LevelPlan> = {
       up(7, 5), up(3, 8), up(11, 6), up(3, 5), up(7, 8), up(11, 2), up(3, 2), up(7, 10), up(3, 11), up(10, 11),
       up(7, 1),
     ],
-    expert: [
-      b(7, 5, 'wizard'), b(10, 11, 'archer'), b(3, 5, 'wizard'), b(3, 8, 'archer'), b(7, 8, 'archer'), b(11, 6, 'archer'), up(11, 6),
-      b(7, 1, 'archer'), b(11, 2, 'wizard'), up(11, 6), b(3, 11, 'archer'), up(11, 2), up(7, 8), b(3, 2, 'archer'),
-      up(7, 5), up(3, 11), up(7, 5), up(3, 8), up(7, 8), b(7, 10, 'barracks'), up(3, 8),
-      up(10, 11), up(7, 10), up(3, 2), up(11, 2), up(10, 11), up(3, 5),
+expert: [
+      b(3, 8, 'barracks'), b(7, 5, 'archer'), b(11, 6, 'barracks'), b(3, 5, 'wizard'), up(3, 5), b(3, 2, 'barracks'), b(11, 2, 'barracks'), up(7, 5), up(11, 6), b(10, 11, 'archer'), up(3, 8), up(11, 6), b(3, 11, 'barracks'), up(3, 2), b(7, 1, 'barracks'), up(10, 11), b(7, 8, 'bomb'), up(3, 2), up(3, 5), up(7, 5), up(11, 2), up(3, 8),
     ],
   },
   level08: {

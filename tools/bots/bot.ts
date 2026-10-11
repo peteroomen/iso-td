@@ -77,7 +77,7 @@ export class Bot {
         }
       } else if (a.do === 'spec') {
         const t = sim.towerAtSpot(this.spotId(a.at));
-        if (t && t.level >= 3 && t.spec === null) {
+        if (t && t.level >= 3 && t.spec === null && !this.cfg.skipSpecBuy) {
           const r = sim.specialize(t.id, a.spec);
           if (!r.ok && r.reason === 'gold') return;
         }
@@ -110,7 +110,7 @@ export class Bot {
       }
       if (a.do === 'spec') {
         const t = sim.towerAtSpot(this.spotId(a.at));
-        if (t && t.level >= 3 && t.spec === null) return sim.canAfford(sim.specCostOf(a.spec));
+        if (t && t.level >= 3 && t.spec === null && !this.cfg.skipSpecBuy) return sim.canAfford(sim.specCostOf(a.spec));
       }
       this.idx++;
     }

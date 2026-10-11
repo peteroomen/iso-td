@@ -41,6 +41,10 @@ export interface BotConfig {
   specs: 'auto' | 'none';
   /** Comparison variants: every Lv3 tower of this spec's kind buys exactly this spec (and nothing else is specialized). */
   forceSpec?: SpecId;
+  /** Measurement only (tools/specmap.ts): the specializations available instead of the level's own cumulative unlock set. */
+  availSpecs?: readonly SpecId[];
+  /** Measurement only: keep the early Lv3 upgrades of the spec slots but never buy the specialization itself (control group of tools/specmap.ts). */
+  skipSpecBuy?: boolean;
 }
 
 export type { Vec2 };

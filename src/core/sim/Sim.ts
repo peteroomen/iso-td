@@ -9,7 +9,8 @@ import {
   MAX_TOWER_LEVEL,
   RALLY_PATH_TOLERANCE,
 } from '../data/rules';
-import { SPECS, SPEC_TUNING, specCost } from '../data/specs';
+import { unlockedSpecsFor } from '../data/levels';
+import { SPECS, SPEC_IDS, SPEC_TUNING, specCost } from '../data/specs';
 import { BOMB, KNIGHT, TOWERS, splashFactor } from '../data/towers';
 import { emptyUpgrades, resolveModifiers, type Modifiers } from '../data/upgrades';
 import { deriveSpots, levelHeight, levelWidth, validateLevel, waveGapOf } from '../level';
@@ -53,8 +54,8 @@ export interface SimOptions {
   upgrades?: UpgradeState;
   /** Overrides `level.towerCap`. */
   towerCap?: TowerCap;
-  /** Overrides `level.specsUnlocked` (tests / tools). */
-  specs?: boolean;
+  /** Overrides the specializations the level unlocks (tests / tools): true = all, false = none, or an explicit list. */
+  specs?: boolean | readonly SpecId[];
   /** Set false to skip recording events (e.g. headless balance runs). Default true. */
   events?: boolean;
 }
@@ -127,8 +128,12 @@ export class Sim {
   readonly upgrades: UpgradeState;
   readonly modifiers: Modifiers;
   readonly towerCap: TowerCap;
-  /** True if tower specializations can be bought on this level (`LevelDef.specsUnlocked`, or `SimOptions.specs`). */
-  readonly specsUnlocked: boolean;
+  /** Specializations that can be bought on this level (cumulative `LevelDef.newSpecs`, or `SimOptions.specs`). */
+  readonly unlockedSpecs: ReadonlySet<SpecId>;
+  /** True if at least one specialization is available on this level (UI: Lv3 towers show a spec option or "from level 4"). */
+  get specsUnlocked(): boolean {
+    return this.unlockedSpecs.size > 0;
+  }
   readonly width: number;
   readonly height: number;
 
@@ -155,7 +160,7 @@ export class Sim {
     this.upgrades = { ...emptyUpgrades(), ...(options.upgrades ?? {}) };
     this.modifiers = resolveModifiers(this.upgrades);
     this.towerCap = { ...(options.towerCap ?? level.towerCap) };
-    this.specsUnlocked = options.specs ?? level.specsUnlocked ?? false;
+    this.unlockedSpecs = new Set(options.specs === undefined ? unlockedSpecsFor(level) : options.specs === true ? SPEC_IDS : options.specs === false ? [] : options.specs);
     this.width = levelWidth(level);
     this.height = levelHeight(level);
     this.rng = new Rng(options.seed ?? 1);
@@ -397,16 +402,16 @@ export class Sim {
   }
 
   /**
-   * Can this tower buy this specialization right now? Failure reasons, in check order: 'ended', 'no_tower', 'locked' (level
-   * without specializations), 'wrong_kind' (spec belongs to another tower kind / unknown spec), 'not_max_level' (tower below
+   * Can this tower buy this specialization right now? Failure reasons, in check order: 'ended', 'no_tower', 'wrong_kind' (spec belongs
+   * to another tower kind / unknown spec), 'locked' (this level has not unlocked that spec yet), 'not_max_level' (tower below
    * level 3), 'already_specialized', 'gold'.
    */
   canSpecialize(towerId: number, specId: SpecId): CommandResult {
     if (this.ended()) return fail('ended');
     const t = this.towerById.get(towerId);
     if (!t) return fail('no_tower');
-    if (!this.specsUnlocked) return fail('locked');
     if (SPECS[specId]?.tower !== t.kind) return fail('wrong_kind');
+    if (!this.unlockedSpecs.has(specId)) return fail('locked');
     if (t.level < MAX_TOWER_LEVEL) return fail('not_max_level');
     if (t.spec !== null) return fail('already_specialized');
     if (this.s.gold < specCost(specId)) return fail('gold');

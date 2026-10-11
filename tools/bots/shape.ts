@@ -8,9 +8,11 @@
  *   - competent bot wins every run and averages about `--target` lives;
  *   - from level 4 on, archer-only, wizard-only and bomb-only average clearly fewer lives than competent, and at least one of
  *     archer/wizard loses (or nearly loses);
- *   - competent finishes with little gold left and is not maxed before the last third of the level.
+ *   - competent finishes with little gold left and is not maxed before the last third of the level;
+ *   - from level 4 on the specializations matter: the `nospec` bot averages clearly fewer lives than competent (3 on L4-L6, 4 from L7);
+ *   - the naive bot loses from level 3 on.
  *
- *   npx tsx tools/bots/shape.ts --level 7 [--iters 120] [--target 13.5] [--seeds 21,22,...] [--save p.json] [--start p.json (continue from)] [--load p.json (evaluate only)] [--write]
+ *   npx tsx tools/bots/shape.ts --level 7 [--iters 120] [--target 13.5] [--bounds skimmer=0.5:1.5,...] [--seeds 21,22,...] [--save p.json] [--start p.json (continue from)] [--load p.json (evaluate only)] [--write]
  *
  * With --write the best numbers are baked into src/core/data/levels/levelNN.ts (like tune.ts does).
  */
@@ -58,6 +60,8 @@ interface Eval {
   a: number;
   w: number;
   bm: number;
+  ns: number;
+  naiveWins: number;
   score: number;
 }
 
@@ -81,6 +85,16 @@ export function evaluate(l: LevelDef, n: number, seeds: number[], target: number
   let a = 0;
   let w = 0;
   let bm = 0;
+  let ns = NaN;
+  let naiveWins = 0;
+  if (n >= 3 && mono && Math.abs(c - target) < 4) {
+    naiveWins = runs(l, 'naive', seeds).filter((r) => r.status === 'won').length;
+    score += 30 * naiveWins;
+  }
+  if (n >= 4 && mono && Math.abs(c - target) < 4) {
+    ns = avg(runs(l, 'nospec', seeds).map((r) => r.lives));
+    score += 1.5 * Math.pow(Math.max(0, ns - (c - (n >= 7 ? 4 : 3))), 2);
+  }
   if (n >= 4 && mono && Math.abs(c - target) < 4) {
     a = avg(runs(l, 'archer-only', seeds).map((r) => r.lives));
     w = avg(runs(l, 'wizard-only', seeds).map((r) => r.lives));
@@ -94,7 +108,7 @@ export function evaluate(l: LevelDef, n: number, seeds: number[], target: number
     w = NaN;
     bm = NaN;
   }
-  return { c, cMin: Math.min(...rc.map((r) => r.lives)), wins, gold, maxedFrac, a, w, bm, score };
+  return { c, cMin: Math.min(...rc.map((r) => r.lives)), wins, gold, maxedFrac, a, w, bm, ns, naiveWins, score };
 }
 
 function main(): void {
@@ -104,6 +118,13 @@ function main(): void {
   const target = Number(arg('target', '13.5'));
   const seeds = arg('seeds', '21,22,23,24,25,26').split(',').map(Number);
   const rng = new Rng(Number(arg('rngseed', '3')));
+  // --bounds plated=0.6:1.8,skimmer=0.5:1.5 keeps a class multiplier inside a range (default 0.2..5), so a level keeps its character
+  const bounds = Object.fromEntries(CLASSES.map((c) => [c, [0.2, 5] as [number, number]])) as Record<Cls, [number, number]>;
+  for (const part of arg('bounds', '').split(',').filter(Boolean)) {
+    const [c, r] = part.split('=');
+    const [lo, hi] = r.split(':').map(Number);
+    bounds[c as Cls] = [lo, hi];
+  }
   const reg = (p: Params) => 0.4 * (Math.pow(Math.log(p.k), 2) + CLASSES.reduce((s, c) => s + Math.pow(Math.log(p.m[c]), 2), 0));
   let cur: Params = { k: 1, m: { plated: 1, prism: 1, skimmer: 1, fodder: 1, carrier: 1, dread: 1 } };
   const cache = new Map<string, Eval>();
@@ -124,7 +145,7 @@ function main(): void {
   if (startPath) cur = JSON.parse(readFileSync(startPath, 'utf8')) as Params;
   let best = score(cur);
   const show = (p: Params, e: Eval) =>
-    `K=${p.k.toFixed(2)} ${CLASSES.map((c) => `${c}=${p.m[c].toFixed(2)}`).join(' ')} | comp ${e.c.toFixed(1)} (min ${e.cMin}, ${e.wins}/${seeds.length}) gold ${Math.round(e.gold)} maxed@${(e.maxedFrac * 100).toFixed(0)}% arch ${e.a.toFixed(1)} wiz ${e.w.toFixed(1)} bomb ${e.bm.toFixed(1)} score ${e.score.toFixed(1)}`;
+    `K=${p.k.toFixed(2)} ${CLASSES.map((c) => `${c}=${p.m[c].toFixed(2)}`).join(' ')} | comp ${e.c.toFixed(1)} (min ${e.cMin}, ${e.wins}/${seeds.length}) gold ${Math.round(e.gold)} maxed@${(e.maxedFrac * 100).toFixed(0)}% arch ${e.a.toFixed(1)} wiz ${e.w.toFixed(1)} bomb ${e.bm.toFixed(1)} nospec ${e.ns.toFixed(1)} naiveWins ${e.naiveWins} score ${e.score.toFixed(1)}`;
   console.error(`L${n} start: ${show(cur, best)}`);
   for (let it = 0; it < (loadPath ? 0 : iters); it++) {
     const cand: Params = { k: cur.k, m: { ...cur.m } };
@@ -133,7 +154,7 @@ function main(): void {
       const pick = rng.int(0, CLASSES.length); // CLASSES.length = K itself
       const step = Math.exp((rng.next() - 0.5) * (rng.next() < 0.3 ? 1.4 : 0.5));
       if (pick === CLASSES.length) cand.k = Math.min(Number(arg('kmax', '2.2')), Math.max(0.2, cand.k * step));
-      else cand.m[CLASSES[pick]] = Math.min(5, Math.max(0.2, cand.m[CLASSES[pick]] * step));
+      else cand.m[CLASSES[pick]] = Math.min(bounds[CLASSES[pick]][1], Math.max(bounds[CLASSES[pick]][0], cand.m[CLASSES[pick]] * step));
     }
     const e = score(cand);
     if (e.score <= best.score) {
@@ -146,7 +167,7 @@ function main(): void {
   if (arg('save', '')) writeFileSync(arg('save', ''), JSON.stringify(cur));
   const final = apply(level, cur);
   const check = evaluate(final, n, [1, 2, 3, 4, 5], target);
-  console.log(`   report seeds 1-5: comp ${check.c.toFixed(1)} (min ${check.cMin}) gold ${Math.round(check.gold)} maxed@${(check.maxedFrac * 100).toFixed(0)}% arch ${check.a.toFixed(1)} wiz ${check.w.toFixed(1)} bomb ${check.bm.toFixed(1)}`);
+  console.log(`   report seeds 1-5: comp ${check.c.toFixed(1)} (min ${check.cMin}) gold ${Math.round(check.gold)} maxed@${(check.maxedFrac * 100).toFixed(0)}% arch ${check.a.toFixed(1)} wiz ${check.w.toFixed(1)} bomb ${check.bm.toFixed(1)} nospec ${check.ns.toFixed(1)} naiveWins ${check.naiveWins}`);
   if (process.argv.includes('--write')) {
     bake(new URL(`../../src/core/data/levels/level${String(n).padStart(2, '0')}.ts`, import.meta.url), final.waves);
     console.log('written');

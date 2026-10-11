@@ -7,7 +7,7 @@
  *
  *   npx tsx tools/specbench.ts [--seeds 6] [--md]       # --md prints the markdown table used in docs/BALANCE.md
  */
-import { SPECS_BY_TOWER } from '../src/core/data/specs';
+import { SPECS_BY_TOWER, SPEC_IDS } from '../src/core/data/specs';
 import { FIXED_DT } from '../src/core/data/rules';
 import { Sim } from '../src/core/sim/Sim';
 import type { EnemyId, LevelDef, SpecId, TowerKind, WaveDef } from '../src/core/types';
@@ -26,7 +26,7 @@ function arena(waves: WaveDef[]): LevelDef {
     lives: 9999,
     waveGap: 18,
     towerCap: { archer: 3, wizard: 3, barracks: 3, bomb: 3 },
-    specsUnlocked: true,
+    newSpecs: SPEC_IDS,
     waves,
   };
 }

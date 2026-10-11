@@ -7,8 +7,8 @@ export type Biome = 'spring' | 'desert' | 'winter';
 export type TowerKind = 'archer' | 'wizard' | 'barracks' | 'bomb';
 export type EnemyId = 'scout' | 'dart' | 'skimmer' | 'plated' | 'prism' | 'carrier' | 'dread' | 'mothership';
 /**
- * Tower specializations (docs/DESIGN.md section 12). Two per tower kind, bought once per Lv3 tower on levels with
- * `LevelDef.specsUnlocked` (levels 7-10), permanent.
+ * Tower specializations (docs/DESIGN.md section 12). Two per tower kind, bought once per Lv3 tower once a level has
+ * unlocked them (`LevelDef.newSpecs`, campaign levels 4-7, cumulative and also on replays), permanent.
  */
 export type SpecId =
   | 'eagle_eye' | 'hunting_nets' // archer
@@ -55,7 +55,7 @@ export interface TowerCap {
   archer: number;
   wizard: number;
   barracks: number;
-  /** Bomb tower cap (1..3). Lv3 (Cluster Bomb) unlocks on level 6. */
+  /** Bomb tower cap (1..3). Lv3 (Cluster Bomb) unlocks on level 3 together with the other Lv3 towers. */
   bomb: number;
 }
 
@@ -88,10 +88,13 @@ export interface LevelDef {
   waveGap?: number;
   towerCap: TowerCap;
   /**
-   * Tower specializations can be bought on this level (campaign: true on levels 7-10, absent/false before). Because it is a
-   * property of the level, replays of a level behave exactly like the first play. `SimOptions.specs` overrides it.
+   * Specializations this level unlocks for the first time (campaign: two specs of two different tower kinds on each of levels
+   * 4-7). The set available on a level is the union of `newSpecs` over this level and every earlier one in campaign order
+   * (`unlockedSpecsFor`), so replays of a level behave exactly like the first play. `SimOptions.specs` overrides it.
    */
-  specsUnlocked?: boolean;
+  newSpecs?: readonly SpecId[];
+  /** One line shown with the unlock announcement: why the `newSpecs` pair is useful on THIS map ("because ..."). */
+  newSpecsWhy?: string;
   waves: WaveDef[];
   hints?: LevelHint[];
 }

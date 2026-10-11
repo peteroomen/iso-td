@@ -8,7 +8,7 @@ import type { EnemyState, SpecId, TowerKind, UpgradeState } from '../src/core/ty
 import { Recorder, makeSim, straightLevel, wave } from './helpers';
 
 const up = (o: Partial<UpgradeState>): UpgradeState => ({ ...emptyUpgrades(), ...o });
-const lvl = (over: Parameters<typeof straightLevel>[0] = {}) => straightLevel({ specsUnlocked: true, startGold: 3000, ...over });
+const lvl = (over: Parameters<typeof straightLevel>[0] = {}) => straightLevel({ newSpecs: SPEC_IDS, startGold: 3000, ...over });
 
 /** Builds a tower of `kind` on `spot`, upgrades it to level 3 and (optionally) buys `spec`. */
 function lv3(sim: Sim, kind: TowerKind, spot = 1, spec?: SpecId): number {
@@ -35,30 +35,69 @@ describe('specializations: data', () => {
 });
 
 describe('specializations: gating', () => {
-  it('is locked on levels 1-6 and allowed on levels 7-10 (also with a different tower cap on replays)', () => {
-    LEVELS.forEach((l, i) => {
-      const sim = new Sim({ ...l, startGold: 5000 });
-      expect(sim.specsUnlocked, l.id).toBe(i >= 6);
-      if (i < 6) return;
-      const spot = sim.spots[0].id;
-      sim.build(spot, 'archer');
+  /** A Lv3 archer on spot 0 of campaign level `l` (rich start) and the result of trying each spec of every kind on a matching tower. */
+  function tryAll(l: (typeof LEVELS)[number]): Record<SpecId, string> {
+    const out = {} as Record<SpecId, string>;
+    for (const kind of ['archer', 'wizard', 'barracks', 'bomb'] as TowerKind[]) {
+      const sim = new Sim({ ...l, startGold: 9000 });
+      sim.build(sim.spots[0].id, kind);
       const t = sim.state.towers[0];
       sim.upgrade(t.id);
       sim.upgrade(t.id);
-      expect(sim.canSpecialize(t.id, 'eagle_eye').ok, l.id).toBe(true);
+      for (const id of SPECS_BY_TOWER[kind]) out[id] = sim.canSpecialize(t.id, id).ok ? 'ok' : sim.canSpecialize(t.id, id).reason!;
+    }
+    return out;
+  }
+
+  it('unlocks the specs cumulatively: nothing on levels 1-3, two more per level on 4-7, all eight on 7-10 (replays behave the same)', () => {
+    LEVELS.forEach((l, i) => {
+      const sim = new Sim({ ...l, startGold: 5000 });
+      const want = LEVELS.slice(0, i + 1).flatMap((x) => x.newSpecs ?? []);
+      expect([...sim.unlockedSpecs].sort(), l.id).toEqual([...want].sort());
+      expect(sim.specsUnlocked, l.id).toBe(i >= 3);
+      if (i < 2) return; // levels 1-2 cap the towers below Lv3
+      const res = tryAll(l);
+      for (const id of SPEC_IDS) expect(res[id], `${l.id} ${id}`).toBe(want.includes(id) ? 'ok' : 'locked');
+      // a second Sim on the same level (a replay) is identical
+      expect([...new Sim({ ...l, startGold: 1 }).unlockedSpecs].sort(), `${l.id} replay`).toEqual([...want].sort());
     });
-    const sim6 = new Sim({ ...LEVELS[5], startGold: 5000 });
-    sim6.build(sim6.spots[0].id, 'archer');
-    const t6 = sim6.state.towers[0];
-    sim6.upgrade(t6.id);
-    sim6.upgrade(t6.id);
-    expect(sim6.specialize(t6.id, 'eagle_eye')).toEqual({ ok: false, reason: 'locked' });
-    expect(t6.spec).toBeNull();
+    expect(LEVELS[2] && tryAll(LEVELS[2])).toEqual(Object.fromEntries(SPEC_IDS.map((id) => [id, 'locked'])));
   });
 
-  it('option SimOptions.specs overrides the level flag', () => {
-    expect(makeSim(straightLevel(), { specs: true }).specsUnlocked).toBe(true);
+  it('a tower whose other option is still locked can buy the unlocked one (level 4: Chain Lightning yes, Fire Mages locked)', () => {
+    const lv3 = (l: (typeof LEVELS)[number], kind: TowerKind) => {
+      const sim = new Sim({ ...l, startGold: 5000 });
+      sim.build(sim.spots[0].id, kind);
+      const t = sim.state.towers[0];
+      sim.upgrade(t.id);
+      sim.upgrade(t.id);
+      return { sim, t };
+    };
+    const { sim, t } = lv3(LEVELS[3], 'wizard');
+    expect(sim.specialize(t.id, 'fire_mages')).toEqual({ ok: false, reason: 'locked' });
+    expect(t.spec).toBeNull();
+    expect(sim.specialize(t.id, 'chain_lightning').ok).toBe(true);
+    expect(t.spec).toBe('chain_lightning');
+    // archers have nothing on level 4, Hunting Nets on level 5, Eagle Eye only on level 7
+    expect(lv3(LEVELS[3], 'archer').sim.canSpecialize(1, 'hunting_nets').reason).toBe('locked');
+    const a5 = lv3(LEVELS[4], 'archer');
+    expect(a5.sim.canSpecialize(a5.t.id, 'eagle_eye').reason).toBe('locked');
+    expect(a5.sim.specialize(a5.t.id, 'hunting_nets').ok).toBe(true);
+    const a7 = lv3(LEVELS[6], 'archer');
+    expect(a7.sim.specialize(a7.t.id, 'eagle_eye').ok).toBe(true);
+  });
+
+  it('SimOptions.specs overrides the level: true = all, false = none, or an explicit list', () => {
+    expect(makeSim(straightLevel(), { specs: true }).unlockedSpecs.size).toBe(8);
     expect(makeSim(lvl(), { specs: false }).specsUnlocked).toBe(false);
+    const some = makeSim(lvl(), { specs: ['fire_mages'] });
+    expect([...some.unlockedSpecs]).toEqual(['fire_mages']);
+    some.build(1, 'wizard');
+    const id = some.state.towers[0].id;
+    some.upgrade(id);
+    some.upgrade(id);
+    expect(some.specialize(id, 'chain_lightning').reason).toBe('locked');
+    expect(some.specialize(id, 'fire_mages').ok).toBe(true);
   });
 
   it('reasons: no_tower, wrong_kind, not_max_level, gold, already_specialized', () => {
@@ -84,10 +123,11 @@ describe('specializations: gating', () => {
     expect(sim.upgrade(id).reason).toBe('max_level');
   });
 
-  it('locked is reported before the other reasons', () => {
+  it('locked is reported before the level / gold reasons (but after wrong_kind)', () => {
     const sim = makeSim(straightLevel());
     sim.build(1, 'archer');
     expect(sim.specialize(sim.state.towers[0].id, 'eagle_eye').reason).toBe('locked');
+    expect(sim.specialize(sim.state.towers[0].id, 'fire_mages').reason).toBe('wrong_kind');
   });
 
   it('costs gold, is part of the investment and 60% of it is refunded on sale', () => {
