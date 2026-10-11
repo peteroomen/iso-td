@@ -1,4 +1,4 @@
-import { LEVELS, TOWER_KINDS, hasFlag, type Biome, type LevelDef, type SaveData, type TowerKind } from '../../core';
+import { LEVELS, SPECS, TOWER_KINDS, hasFlag, type Biome, type LevelDef, type SaveData, type SpecId, type TowerKind } from '../../core';
 import { getSave } from '../services/save';
 
 /** Data helpers shared by the meta scenes (level map, upgrades). */
@@ -117,6 +117,10 @@ export interface TowerUnlock {
   title: string;
   /** One-line description of the new tier. */
   text: string;
+  /** kind 'spec': the two specializations this level unlocks (two different tower kinds). */
+  specs?: SpecId[];
+  /** kind 'spec': why the pair is useful on this map (one line, no leading capital). */
+  why?: string;
 }
 
 const KIND_NAMES: Record<TowerIconKind, string> = { archer: 'Archer', wizard: 'Wizard', barracks: 'Barracks', bomb: 'Bomb' };
@@ -128,8 +132,21 @@ const TIER_TEXT: Record<TowerIconKind, Record<number, string>> = {
   bomb: { 2: 'Heavier shells, bigger blast', 3: 'Cluster Bomb: shells burst into bomblets' },
 };
 
-/** Level 7 brings tower specializations (see docs/DESIGN.md section 12). */
-const SPEC_UNLOCK: TowerUnlock = { kind: 'spec', level: 3, title: 'Tower Specializations', text: 'Lv3 towers can specialize (choose 1 of 2)' };
+/** "Eagle Eye (Archer) & Hunting Nets (Archer)": the title of a specialization unlock. */
+export function specPairTitle(specs: readonly SpecId[]): string {
+  return specs.map((id) => `${SPECS[id].name} (${KIND_NAMES[SPECS[id].tower]})`).join(' & ');
+}
+
+/** First campaign level that unlocks specializations (4). */
+export function firstSpecLevel(): number {
+  return Math.max(1, LEVELS.findIndex((l) => l.newSpecs?.length) + 1);
+}
+
+/** Specializations are unlocked two per level from level 4 on (`LevelDef.newSpecs`, docs/DESIGN.md sections 1 and 12). */
+function specUnlock(def: LevelDef): TowerUnlock[] {
+  if (!def.newSpecs?.length) return [];
+  return [{ kind: 'spec', level: 3, title: specPairTitle(def.newSpecs), text: def.newSpecsWhy ?? 'Lv3 towers can specialize', specs: [...def.newSpecs], why: def.newSpecsWhy }];
+}
 
 /** All tower kinds in menu order (archer, wizard, barracks, bomb). */
 export const KINDS: readonly TowerIconKind[] = TOWER_KINDS;
@@ -142,7 +159,7 @@ export function levelUnlocks(index: number): TowerUnlock[] {
   const nodes = levelNodes();
   const def = nodes[index]?.def;
   if (!def || index === 0) return [];
-  const spec: TowerUnlock[] = def.specsUnlocked && !nodes.slice(0, index).some((n) => n.def?.specsUnlocked) ? [SPEC_UNLOCK] : [];
+  const spec = specUnlock(def);
   const prev: Record<TowerIconKind, number> = { archer: 1, wizard: 1, barracks: 1, bomb: 1 };
   for (let i = 0; i < index; i++) {
     const d = nodes[i].def;
@@ -153,7 +170,7 @@ export function levelUnlocks(index: number): TowerUnlock[] {
   if (gains.length === 0) return spec;
   const lv = def.towerCap[gains[0]];
   if (gains.length === KINDS.length && gains.every((k) => def.towerCap[k] === lv)) {
-    return [{ kind: 'all', level: lv, title: `All Lv${lv} towers`, text: 'Archers, Wizards, Barracks and Bombs can reach Lv' + lv }, ...spec];
+    return [{ kind: 'all', level: lv, title: `All Lv${lv} towers`, text: lv === 3 ? `All four towers reach Lv3. Specializations follow from level ${firstSpecLevel()}` : 'Archers, Wizards, Barracks and Bombs can reach Lv' + lv }, ...spec];
   }
   return [
     ...gains.map((k) => {

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { KNIGHT, MAX_TOWER_LEVEL, RALLY_PATH_TOLERANCE, SPECS, SPECS_BY_TOWER, TOWERS, TOWER_KINDS, type AbilityId, type FailReason, type Sim, type SpecId, type TowerKind, type TowerState } from '../../core';
+import { KNIGHT, MAX_TOWER_LEVEL, RALLY_PATH_TOLERANCE, SPECS, SPECS_BY_TOWER, SPEC_IDS, TOWERS, TOWER_KINDS, specUnlockLevel, type AbilityId, type FailReason, type Sim, type SpecId, type TowerKind, type TowerState } from '../../core';
 import type { GroundMarkers } from '../render/GroundMarkers';
 import type { IsoView } from '../render/iso';
 import type { SimRenderer } from '../render/SimRenderer';
@@ -31,7 +31,7 @@ const REASON: Record<FailReason, string> = {
   no_more_waves: 'No more waves',
   not_running: 'Start the first wave first',
   ended: 'The battle is over',
-  locked: 'Specializations unlock on level 7',
+  locked: 'This specialization is not unlocked yet',
   not_max_level: 'Upgrade to level 3 first',
   already_specialized: 'Already specialized',
 };
@@ -347,8 +347,9 @@ export class InteractionController {
       cost: () => sim.specCostOf(id),
       state: () => {
         const r = sim.canSpecialize(towerId, id);
-        return r.ok ? 'ok' : r.reason === 'gold' ? 'poor' : 'ok';
+        return r.ok ? 'ok' : r.reason === 'gold' ? 'poor' : r.reason === 'locked' ? 'locked' : 'ok';
       },
+      role: sim.unlockedSpecs.has(id) ? SPEC_ROLE[id] : `Level ${specUnlockLevel(id) ?? '?'}`,
       tip: () => this.specTip(towerId, id, false),
       onHover: (over) => {
         const cur = sim.getTower(towerId);
@@ -356,13 +357,13 @@ export class InteractionController {
         const st = sim.statsFor(cur.kind, cur.level, id);
         markers.range2 = over && Math.abs(st.range - cur.range) > 0.01 ? { gx: cur.x, gy: cur.y, r: st.range, color: 0xffe27a } : null;
       },
-      role: SPEC_ROLE[id],
       onSelect: () => {
         const r = sim.specialize(towerId, id);
         if (r.ok) {
           this.closeMenu();
           this.flashRange(towerId);
-        } else this.fail(r.reason, a.x, a.y - 110);
+        } else if (r.reason === 'locked') this.d.hud.toast(`Unlocks on level ${specUnlockLevel(id) ?? '?'}`, a.x, a.y - 110);
+        else this.fail(r.reason, a.x, a.y - 110);
       },
     };
   }
@@ -381,23 +382,26 @@ export class InteractionController {
     };
   }
 
-  /** Lv3 tower on a level before 7: a locked placeholder that explains where specializations come from. */
+  /** Lv3 tower on a level where none of its two specializations is unlocked yet: a locked placeholder that explains where they come from. */
   private lockedSpecItem(kind: TowerKind): RadialItem {
+    const kindFrom = Math.min(...SPECS_BY_TOWER[kind].map((id) => specUnlockLevel(id) ?? 99));
+    // before any spec is unlocked the tooltip announces where specializations start at all; afterwards, this kind's first level
+    const from = this.d.sim.unlockedSpecs.size === 0 ? Math.min(...SPEC_IDS.map((id) => specUnlockLevel(id) ?? 99)) : kindFrom;
     return {
       icon: TEX.upgrade,
       iconH: 40,
       color: 0x3f7f45,
       state: () => 'locked',
-      role: 'Lv 7+',
+      role: `Level ${from}`,
       tip: () => ({
-        title: 'Specialize (from level 7)',
+        title: `Specialize (from level ${from})`,
         titleColor: '#ffb35c',
-        rows: SPECS_BY_TOWER[kind].map((id) => ({ text: SPECS[id].name, icon: SPEC_TEX[id], iconH: 28 })),
-        note: 'Max level reached. From level 7 on, a Lv3 tower can specialize: choose 1 of these 2 permanent powers.',
+        rows: SPECS_BY_TOWER[kind].map((id) => ({ text: SPECS[id].name, right: `level ${specUnlockLevel(id) ?? '?'}`, icon: SPEC_TEX[id], iconH: 28 })),
+        note: `Max level reached. From level ${from} on, a Lv3 ${TOWERS[kind].name} can specialize: choose 1 of these 2 permanent powers.`,
         noteColor: '#ffb35c',
         minWidth: 240,
       }),
-      onSelect: () => this.fail('locked'),
+      onSelect: () => this.d.hud.toast(`Specializations unlock from level ${from}`, undefined, undefined, '#ffb35c'),
     };
   }
 
@@ -444,6 +448,16 @@ export class InteractionController {
     }
     const cost = sim.specCostOf(id);
     const tower = sim.getTower(towerId);
+    if (!owned && !sim.unlockedSpecs.has(id)) {
+      return {
+        title: SPECS[id].name,
+        titleColor: '#ffb35c',
+        rows: [{ text: `${TOWERS[kind].name} specialization (locked)`, icon: SPEC_TEX[id], iconH: 30, color: '#ffb35c', size: 15 }],
+        note: `Unlocks on level ${specUnlockLevel(id) ?? '?'}. ${note}`,
+        noteColor: '#ffb35c',
+        minWidth: 250,
+      };
+    }
     return {
       title: SPECS[id].name,
       titleColor: owned ? '#9bf06a' : COLORS.textGold,

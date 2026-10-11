@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { applyViewCamera } from '../ui/viewport';
-import { getLevel, hasFlag, isLevelUnlocked, starsAvailable, starsEarned, withFlag, type Biome, type SaveData } from '../../core';
+import { SPEC_IDS, getLevel, hasFlag, unlockedSpecsFor, isLevelUnlocked, starsAvailable, starsEarned, withFlag, type Biome, type SaveData } from '../../core';
 import { Audio } from '../services/audio';
 import { getSave, updateSave } from '../services/save';
 import { COLORS, SAFE, UI_SCALE, textStyle, viewH, viewW } from '../ui/theme';
@@ -23,7 +23,7 @@ import {
   speechBubble,
   type SpeechBubble,
 } from '../ui/widgets';
-import { unlockBanner, unlockToast } from '../ui/unlockUi';
+import { unlockBanner, unlockBannerHeight, unlockToast } from '../ui/unlockUi';
 import {
   BIOME_COLORS,
   BIOME_NAMES,
@@ -495,12 +495,16 @@ export class LevelSelectScene extends Phaser.Scene {
     // a tower tier that no earlier level offered: highlighted once, until Play is pressed
     const unlocks: TowerUnlock[] = def ? pendingUnlocks(getSave(), n.id) : [];
     const hasNew = unlocks.length > 0;
-    const shift = hasNew ? 100 : 0;
+    const bannerH = hasNew ? unlockBannerHeight(unlocks) : 0;
+    const shift = bannerH;
+    // the specialization banner is taller: the four tower cards (identical on every Lv3 level) shrink to make room
+    const compact = bannerH > 100;
+    const cardH = compact ? 112 : 156;
     const isNew = (kind: string): boolean => unlocks.some((u) => u.kind === 'all' || u.kind === kind);
     openModal(this, {
       title: `${n.number}. ${n.name}`,
       width: 680,
-      height: 548 + shift,
+      height: 548 + shift - (compact ? 44 : 0),
       closeOnBackdrop: true,
       onClose: () => (this.modalOpen = false),
       build: (m) => {
@@ -525,7 +529,7 @@ export class LevelSelectScene extends Phaser.Scene {
         root.add(info);
 
         if (hasNew) {
-          const banner = unlockBanner(this, 0, top + 226, 600, unlocks);
+          const banner = unlockBanner(this, 0, top + 176 + bannerH / 2, 600, unlocks);
           banner.setScale(0.6).setAlpha(0);
           root.add(banner);
           this.tweens.add({ targets: banner, scale: 1, alpha: 1, duration: 420, delay: 260, ease: 'Back.easeOut' });
@@ -533,7 +537,8 @@ export class LevelSelectScene extends Phaser.Scene {
         }
 
         if (def) {
-          const label = this.add.text(0, top + 196 + shift, def.specsUnlocked ? 'TOWERS AVAILABLE  -  Lv3 towers can specialize' : 'TOWERS AVAILABLE', textStyle(20, '#b9a9d6', { strokeThickness: 0 })).setOrigin(0.5);
+          const specCount = unlockedSpecsFor(def).length;
+          const label = this.add.text(0, top + 196 + shift, specCount > 0 ? `TOWERS AVAILABLE  -  ${specCount} of ${SPEC_IDS.length} specializations unlocked` : 'TOWERS AVAILABLE', textStyle(20, '#b9a9d6', { strokeThickness: 0 })).setOrigin(0.5);
           root.add(label);
           const cap = def.towerCap;
           const cards: [TowerIconKind, number, string][] = KINDS.map((k) => [k, cap[k], towerName(k)]);
@@ -541,28 +546,29 @@ export class LevelSelectScene extends Phaser.Scene {
           const step = CW + 12;
           cards.forEach(([kind, lv, name], i) => {
             const x = (i - (cards.length - 1) / 2) * step;
-            const y = top + 306 + shift;
+            const y = top + (compact ? 280 : 306) + shift;
             const fresh = isNew(kind);
             const g = this.add.graphics();
-            drawOutlinedRect(g, x - CW / 2, y - 78, CW, 156, 18, fresh ? 0x4b3a2a : 0x2a2038, 4);
+            drawOutlinedRect(g, x - CW / 2, y - cardH / 2, CW, cardH, 18, fresh ? 0x4b3a2a : 0x2a2038, 4);
             if (fresh) {
               g.lineStyle(3, COLORS.gold, 1);
-              g.strokeRoundedRect(x - CW / 2 + 4, y - 74, CW - 8, 148, 15);
+              g.strokeRoundedRect(x - CW / 2 + 4, y - cardH / 2 + 4, CW - 8, cardH - 8, 15);
             }
-            const img = fitImage(this.add.image(x, y - 16, towerSprite(kind, lv)), 88, 88);
-            const nameT = this.add.text(x, y + 44, `${name} Lv${lv}`, textStyle(19, COLORS.textGold, { strokeThickness: 4 })).setOrigin(0.5);
+            const imgSize = compact ? 60 : 88;
+            const img = fitImage(this.add.image(x, y - (compact ? 14 : 16), towerSprite(kind, lv)), imgSize, imgSize);
+            const nameT = this.add.text(x, y + (compact ? 26 : 44), `${name} Lv${lv}`, textStyle(19, COLORS.textGold, { strokeThickness: 4 })).setOrigin(0.5);
             if (nameT.width > CW - 14) nameT.setScale((CW - 14) / nameT.width);
             // little pips for the level
             const pips = this.add.graphics();
             for (let k = 0; k < 3; k++) {
               pips.fillStyle(COLORS.ink, 1);
-              pips.fillCircle(x - 18 + k * 18, y + 66, 6);
+              pips.fillCircle(x - 18 + k * 18, y + (compact ? 46 : 66), 6);
               pips.fillStyle(k < lv ? 0xffd34e : 0x5a4d68, 1);
-              pips.fillCircle(x - 18 + k * 18, y + 66, 4);
+              pips.fillCircle(x - 18 + k * 18, y + (compact ? 46 : 66), 4);
             }
             root.add([g, img, nameT, pips]);
             if (fresh) {
-              const tag = this.add.container(x + CW / 2 - 20, y - 70);
+              const tag = this.add.container(x + CW / 2 - 20, y - cardH / 2 + 8);
               const tg = this.add.graphics();
               drawOutlinedRect(tg, -27, -13, 54, 26, 13, 0xe5484d, 3);
               tag.add([tg, this.add.text(0, 0, 'NEW', textStyle(16, COLORS.text, { strokeThickness: 3 })).setOrigin(0.5)]);
@@ -571,7 +577,7 @@ export class LevelSelectScene extends Phaser.Scene {
               this.tweens.add({ targets: tag, scale: 1.12, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
             }
             img.setScale(0);
-            this.tweens.add({ targets: img, scale: Math.min(88 / img.width, 88 / img.height), duration: 350, delay: 200 + i * 90, ease: 'Back.easeOut' });
+            this.tweens.add({ targets: img, scale: Math.min(imgSize / img.width, imgSize / img.height), duration: 350, delay: 200 + i * 90, ease: 'Back.easeOut' });
           });
         }
       },
