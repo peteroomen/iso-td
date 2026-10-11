@@ -43,44 +43,82 @@ re-run it after changing any number in `src/core/data/*` or a level.
   sanity check), 70-150 iterations per level. Always re-check with `npm run balance`.
 * Seeds 1-5 are used for reporting; the expert plan search used 101-108.
 
-## Specializations (levels 7-10): what changed and how it was balanced
+## Unlock schedule: towers Lv3 on L3, two specializations per level on L4-L7
 
-* **Mechanics** are in DESIGN section 12 (numbers in `SPEC_TUNING`, `src/core/data/specs.ts`). Specs cost 300 g each, so on the gold-starved
-  levels a spec always displaces upgrades/towers: that is the intended trade-off.
-* **Wizard Lv3** lost the Arc Bolt chain (now the Chain Lightning spec). Compensation: 45-70 / 1.3 s -> 54-82 / 1.25 s (about +23% dps). Levels 4-6
-  (the only ones with a base Lv3 wizard and no specs) give the same competent / expert / mono results as before (12.8 / 13.6 / 13.6 competent),
-  and L10 got ~3 lives easier because single-target damage matters against the Mothership.
-* **Numbers after tuning with `tools/specbench.ts`** (first drafts in brackets): Eagle Eye range x1.3 [1.4], damage x1.2 [1.3]; Hunting Nets every
-  6.5 s [9], radius 1.2 [1.0], root 3 s [2.5]; Chain Lightning 50/35/20% within 1.5 t [70/50/35%, 1.6]; Fire Mages 40 true dps [6]; Bigger Bombs
-  radius x1.4 [1.5], damage x1.25 [1.4]; Homing Missiles every 5 s [6], 90 damage [60], splash 0.7 [0.5]; Bow Training 9-13 every 1.0 s [6-9 / 1.2].
-  The drafts made Eagle Eye and Chain Lightning dominant and Nets, Fire Mages, Homing Missiles and Bow Training marginal.
-* **Bots**: the competent / expert plans buy specs through per-level "slots" (`tools/bots/specs.ts`: which kind, which spec, after how many builds);
-  `nospec` never specializes; the eight `spec:<id>` bots force one option for every slot of its tower kind (and make sure two towers of that kind are
-  specialized), so the two options of a tower are compared on the same economy and waves.
-* **Levels 7-10 were re-tuned** (`shape.ts`, 6 seeds, kept the shape): with specs the old waves were far too easy. L10 start gold 400 -> 700 (specs
-  cost 1 200 g there and the Mothership fight is a race that is lost if the towers are not maxed); L8/L9 expert plans were re-searched.
-  Without specs the same bot (`nospec`) averages 2.5 / 0.1 / 6.0 / 12.4 lives on L7-L10: from level 7 on specs are close to mandatory.
-* **Result of the comparison** (all tables below): the two options of each tower are within 0.0-0.9 lives (<= 7%) over L7-L10. Many variants are
-  identical on a level because the slot of that kind is not used there (or the level is decided by waves before the spec arrives): the real
-  differences are in the micro-benchmark: Eagle Eye wins armor, Nets win fliers / heavies / mixed / boss; Chain Lightning wins swarms, armor and
-  fliers, Fire Mages wins heavies and the boss; Bigger Bombs wins armor / heavies, Homing Missiles wins fliers; Bow Training wins fliers, Extra
-  Recruits wins swarms / armor / resist.
-* **Known soft spots**: L10 `nospec` equals `competent` (the specs are bought late there, after the towers are maxed, and the lives are decided by
-  earlier waves) and wizard-only is not below competent on L10 (13.0 vs 12.4 over 8 seeds; seed 1, used by the tests, is fine). The L7-L10 bot
-  results are cliff-like (an average of 12 can hide a 6 and an 18).
+Schedule (also DESIGN section 1 / 12): L1 all towers Lv1, L2 all Lv2, **L3 onwards all four towers Lv3**; specializations unlock in cumulative pairs
+(two different tower kinds per level, every spec once): **L4 Chain Lightning + Homing Missiles, L5 Hunting Nets + Bow Training, L6 Bigger Bombs + Extra
+Recruits, L7 Eagle Eye + Fire Mages** (all eight from L7). Data: `LevelDef.newSpecs`, enforced by `sim.specialize` (`locked`).
+
+**How the pairs were chosen** (`npx tsx tools/specmap.ts`, waves of each map as they were before the retune):
+
+1. *Arena benefit* (`specmap` default): the real map, the real road and the competent plan's first 9 towers all at Lv3 from the start (4 archers / 3 wizards /
+   1 barracks / 1 bomb), the level's waves enlarged until the plain kit leaks ~100 lives (spawn counts x K, intervals / K), no abilities. Two towers of the spec's kind buy the spec for free;
+   the benefit is the number of lives NOT leaked (8 seeds). This isolates what a spec does on that road with that wave mix; it saturates at the plain leak (~100).
+
+   | spec | L4 | L5 | L6 | L7 |
+   |---|---|---|---|---|
+   | Eagle Eye | +45 | +44 | +50 | +34 |
+   | Hunting Nets | **+100** | **+81** | **+93** | **+89** |
+   | Chain Lightning | +75 | +60 | +82 | +60 |
+   | Fire Mages | +19 | +36 | +38 | +67 |
+   | Bigger Bombs | +47 | +53 | +72 | +58 |
+   | Homing Missiles | +76 | +53 | +59 | +34 |
+   | Bow Training | -2 | +22 | +15 | -1 |
+   | Extra Recruits | -1 | -3 | +12 | +3 |
+
+   Nets are the strongest spec on every map (a held UFO stream is a dream for static towers), the barracks specs are weak everywhere (one barracks in the kit),
+   Fire Mages only shine on the Dreadnought map (L7), Missiles on L4. An exhaustive search over all assignments (two specs of two different kinds per level, every spec once)
+   has the optimum at 466.5 (L4 Nets + Missiles, L5 Eagle + Bow, L6 Chain + Bigger, L7 Fire + Extra); ties within ~5 points exist.
+2. *Bot check* (`--bots`, and `--context` after the retune): the same question asked of the competent bot. With the original waves the benefit was ~0 or negative for
+   every spec: a 300 g spec has to beat the next tower upgrade in a gold-starved plan, and the waves were too easy for specs to matter. That is why the waves were retuned (below) and
+   why the bot check is only used to confirm the final schedule: `Nets` and `Eagle Eye` are the specs the bot uses best (it does not exploit nets with knights), so Nets
+   are not placed on the Dreadnought level where the bot would prefer Eagle Eye.
+3. *Final assignment* (arena total 438 = 94% of the optimum): L4 Chain + Missiles (arena +75 / +76, ranks 3 and 2 of 8), L5 Nets + Bow (+81 rank 1, +22 rank 7 =
+   the best the barracks spec gets anywhere), L6 Bigger Bombs + Extra Recruits (+72 rank 3, +12 rank 7 = its best map; the loop crossing is passed twice, so knights
+   holding it keep UFOs inside the blast), L7 Eagle Eye + Fire Mages (Fire +67 rank 2; Eagle Eye +34 in the arena but the strongest archer spec for the bot on the armored
+   heavy waves; Nets, +89, would have crowded out everything else). The optimum was not taken because it puts Extra Recruits on the Dreadnought map (Dreadnoughts crush knights),
+   Eagle Eye on the flier map and lets Nets dominate the earliest spec level.
+
+**Gain of the new pair in context** (`balance` report "Unlock schedule"; competent bot, 8 seeds; "without" = the earlier specs only): L4 12.5 vs 7.1 (+5.4),
+L5 13.6 vs 5.1 (+8.5, all of it from Nets), L6 16.3 vs 16.1 (+0.1), L7 12.4 vs 3.9 (+8.5, Eagle Eye). L6 is the weak spot (see concerns).
+
+**Wave changes** (`tools/bots/shape.ts` now also scores `nospec` and `naive` and takes `--bounds` per UFO class; hand pre-shaping to the narrative first):
+* L3: unchanged (all Lv3 towers: still 13.9 competent).
+* L4 (Chain / Missiles): scouts+darts x1.5 and skimmers x1.4 with 40% shorter spawn intervals (dense flocks), prisms x1.25, then the search (K 0.63): skimmer flocks are ~half of the UFO HP.
+* L5 (Nets / Bow): skimmers x1.3, plated x0.7, then the search: 124 skimmers + 175 darts, plated 23% of the HP.
+* L6 (Bigger Bombs / Extra Recruits): skimmers x0.4, scouts / darts x1.3, plated x1.4, carriers x1.2 and 30% denser plated / scout streams: a ground level (plated 38% of the HP, 570 scouts+darts).
+* L7 (Eagle Eye / Fire Mages): search only (dread x1.57): plated 32% + Dreadnoughts 32% of the HP.
+* L8 x1.0 (K 1.07 after 0.93 re-fit), L9 x1.06 (seed 1 sat on a cliff). **L10: start gold 700 -> 410** with unchanged waves: with the specs bought earlier (rule slots after builds 6 / 8 / 10 / 12 instead of 11-17) the
+  competent bot kept 20 lives up to 3.5x the waves and then fell off a cliff, and scaling the waves instead left thousands of unspent gold; less gold gives 15 lives and the no-spec bot 0.
+* Hints: L4 introduces specializations, L5 / L6 / L7 name their pair (L7 no longer says "NEW: Tower Specializations").
+* Expert plans of L6 and L7 were re-searched (`search.ts`).
+
+**Bots**: spec slots (`tools/bots/specs.ts`) respect the level's cumulative unlock set: a slot whose spec is not unlocked uses the other option of its kind, else it is dropped; `spec:<id>` bots
+only run where the spec exists. Measurement options: `BotConfig.availSpecs` (override the unlocked set), `skipSpecBuy` (control group).
+
+**No-spec bot** (8 seeds): L4 7.1 vs 12.5, L5 5.1 vs 13.6, L6 13.1 vs 16.5 (weak), L7 0 vs 12.4, L8 ~1 vs 13.4, L9 8.1 vs 13.9, L10 0 vs 15.1: from L7 on specs are required.
+
+## Specializations (levels 4-10): mechanics and option balance (unchanged numbers)
+
+* **Mechanics** are in DESIGN section 12 (numbers in `SPEC_TUNING`, `src/core/data/specs.ts`). Specs cost 300 g each, so on the gold-starved levels a spec always displaces upgrades/towers.
+* **Wizard Lv3** lost the Arc Bolt chain (now the Chain Lightning spec); compensation 54-82 / 1.25 s (about +23% dps).
+* Tuning with `tools/specbench.ts` (first drafts in brackets): Eagle Eye range x1.3 [1.4], damage x1.2 [1.3]; Hunting Nets every 6.5 s [9], radius 1.2 [1.0], root 3 s [2.5]; Chain Lightning
+  50/35/20% within 1.5 t [70/50/35%, 1.6]; Fire Mages 40 true dps [6]; Bigger Bombs radius x1.4 [1.5], damage x1.25 [1.4]; Homing Missiles every 5 s [6], 90 damage [60], splash 0.7 [0.5]; Bow Training 9-13 every 1.0 s [6-9 / 1.2].
+* The A/B table in the report compares the options on L7-L10 where both exist: within 0-1.8 lives except Nets (11.8 vs Eagle Eye 13.7 for the bot). The micro-benchmark shows the real strengths
+  (Eagle Eye armor; Nets fliers / heavies / boss; Chain swarms / armor / fliers; Fire heavies / boss; Bigger Bombs armor / heavies; Missiles fliers; Bow Training fliers; Extra Recruits swarms / resist).
 
 ## Targets and how they are met
 
-| target | result |
+| target | result (8 seeds, report below) |
 |---|---|
-| competent wins everything, 10-17 lives on average | L3-L10: 12.2-16.6 (L1-L2 are deliberately gentle: 20 / 20). |
-| expert reaches 18+ (3 stars) everywhere | yes, 19.4-20.0 average on every level (L4 and L10 have single seeds at 17). |
-| naive loses from L4 onward | yes (0 wins on L3-L10); it still wins L1 and some L2 runs. |
+| competent wins everything, ~10-17 lives on average (L3+) | L3-L10: 12.4-16.3 (L1-L2 are deliberately gentle: 20 / 20). L8 has a cliff seed (min 3). |
+| expert reaches 18+ (3 stars) everywhere | 18.5-20.0 on L3-L10 (L5 18.5 is the lowest, single seeds at 17). |
+| naive loses from L3 onward | yes (0 wins on L3-L10); it still wins L1 and some L2 runs. |
 | idle always loses | yes, on wave 1-4. |
-| every single-kind bot is worse than competent from L4 on, and archer-only or wizard-only loses (or nearly) | yes on every level L4-L10 (see the variants table), bomb-only included: it loses everything from L2 on. |
-| competent ends with <= ~600 gold and keeps investing into the last third | yes: 56-485 gold left on every level, last purchase at 90-100% of the run. L9 (7 spots) is the only level that reaches "everything maxed" before the end (91% of the run); L1 reaches it at 90%. |
-| the competent bot builds bomb towers on most levels, but they are not dominant | 9 of 10 plans contain bombs (not L9, 7 spots and armor-heavy). Replacing every bomb by an archer changes the average lives by +4.4 (L4), +1.3 (L5), -3.0 (L6), +0.2 (L7), -0.3 (L8), -0.4 (L10) and ~0 on L1-L3: a useful swarm specialist on the ground-swarm levels, a slight liability on the flier-heavy ones. |
-| the Mothership dies late on the road | competent 85%, expert 84% (seeds 1-5). |
+| every single-kind bot is below competent from L4, archer or wizard-only loses (or nearly) | yes on every level L4-L10 (variants table); bomb-only and barracks-only lose everything from L2-L3. |
+| competent ends with <= ~600 gold and keeps investing late | 59-635 left (L9 635, 7 spots, everything maxed at 90% of the run); last purchase at 90-100%. |
+| specs are effectively required from L4 on, L7-L10 clearly | see "No-spec bot" above. |
+| the Mothership dies late on the road | competent 89%, expert 87%. |
 
 ## Changes to global data (and why)
 
@@ -94,7 +132,7 @@ re-run it after changing any number in `src/core/data/*` or a level.
   **cost** was the biggest lever, then damage and cooldown, then radius. The shipped numbers give the bomb the same price as the
   wizard (100 / 160 / 240), a bit more damage per second and a larger blast, in exchange for being ground-only, physical (armor
   applies: plated take 20%, dread 40%) and dodgeable.
-* **Star track 'bombs'** (+20% blast radius, +15% damage, 5 bomblets at 35%) and the tower cap schedule (L1 1, L2-L5 2, L6+ 3) are as
+* **Star track 'bombs'** (+20% blast radius, +15% damage, 5 bomblets at 35%) and the tower cap schedule (L1 1, L2 2, L3+ 3, changed from the old one-tower-per-level Lv3 unlocks) are as
   designed; they were not changed by the balancing.
 * Plated armor 0.5 -> 0.8, prism magic resistance 0.5 -> 0.7, dreadnought 0.3/0.3 -> 0.6/0.4 and bounty 70 -> 40, Mothership
   0.8/0.8 -> 0.4/0.4 and HP 6000 -> 14000 (earlier balance pass, unchanged): these are what make archers, wizards and bombs
@@ -111,19 +149,9 @@ re-run it after changing any number in `src/core/data/*` or a level.
 
 ## What each introduction does
 
-Single-tower variants (competent plan/stars/abilities, every tower forced to one kind), from the table below:
-
-* **Skimmer (L2)**: barracks-only goes from 19.8 lives (L1) to a loss on wave 5. Knights cannot block fliers. Bomb-only loses too
-  (shells cannot hit fliers), as it does on every later level.
-* **Plated (L3)**: archer-only drops to ~11 lives (competent 16.6), still a clean win - L3 is early and only the archer reaches level 3
-  there. Wizard-only is fine (18.2).
-* **Prism (L4)**: wizard-only and bomb-only lose every run, archer-only wins 1/5 (the new star order delays armor piercing, which the
-  plated-heavy waves need).
-* **Carrier (L5)**: 2 lives and 3 Darts on death; archer-only and wizard-only win 2/5 with 0.8 / 1.6 lives.
-* **L6-L8**: mono builds average 0.6-8.6 lives (archer-only 8.6 / 0.0 / 0.6, wizard-only 2.6 / 8.2 / 5.0).
-* **Dreadnought (L7)**: 800 HP, 3 lives, 25 melee damage - archer-only cannot stop it (0 wins), wizard-only wins 5/5 with 8.2.
-* **L9**: the tight 7-spot map; archer-only wins but with 9.6 lives vs 12.2 for the mix, wizard-only 4.2.
-* **Mothership (L10)**: archer-only 3.8 (2/5 wins), wizard-only loses on the final wave.
+Current single-tower numbers are in the "Single-tower-type variants" table of the report. Short version: skimmer (L2) kills barracks-only and bomb-only for good; plated (L3) takes
+archer-only to ~5 lives; prism (L4) kills wizard-only and nearly archer-only (0.3); carriers (L5) kill wizard-only (0.9); from L6 every mono build is at or near 0 on most levels; the
+Dreadnought (L7) kills archer-only (0.0); on L8-L10 only the wizard-only (8.3 / 10.6 / 0.9) or archer-only (4.5 / 4.3 / 3.5) builds survive, with 5-10 fewer lives than the mix.
 
 ### The Mothership fight (L10)
 
@@ -146,6 +174,12 @@ reach "everything built and maxed" at 90-91% of the run. Level 9 is the exceptio
 gold each) to stay in line, hence its 485 gold left.
 
 ## Concerns / degenerate strategies
+
+* **L6 pair is weak for the bot** (+0.1 lives): the loop crossing has no build spot within bomb range, and the bot never places a barracks to hold UFOs inside a bomb blast. The waves are
+  ground-heavy so a human who builds that combination benefits (arena +72 / +12), but the report cannot show it. Barracks specs are weak everywhere (Bow Training alone costs the bot lives on L5).
+* **Hunting Nets dominate the arena** on every map; the bot uses them well only on the flier level (L5). If players find them too strong, move the cooldown or root time, not the schedule.
+* **Seed noise.** L6 / L8 / L10 competent results swing by 6-10 lives between seeds (L8 has a 3-life seed in the 8); the tests average over several seeds where a single seed was a cliff.
+* **Expert leaves gold** on L4, L6, L8, L9 (plans do not fill every spot); only the competent bot is held to the leftover-gold goal.
 
 * **Seed noise / cliffs.** Waves sit on a cliff for the mechanical bots (a few % more enemies flips 17 lives into 5), most of
   all on L8 (two entrances), L9 (two leaked dreadnoughts = 6 lives) and L10 (the wizard-only bot jumps between 0 and 20 lives with tiny
@@ -173,7 +207,7 @@ Generated by `npm run balance` (tools/balance.ts). Every number comes from runni
 
 Seeds per bot and level: 8. Cells show: wins / lives left (min/avg/max over all seeds, 0 = lost) / average wave number reached by the lost runs / average gold left unspent at the end (g).
 
-Targets (docs/DESIGN.md section 8): competent wins every level with 10-17 lives on average; expert reaches 18+ (3 stars); naive loses from L4 onward; idle always loses.
+Targets (docs/DESIGN.md section 8): competent wins every level with ~10-17 lives on average (L3 onwards); expert reaches 18+ (3 stars); naive loses from L3 onward; idle always loses; the no-spec bot is clearly worse than competent from L4 on.
 
 ## Bots
 
@@ -219,13 +253,13 @@ Star upgrades by level (competent / expert; A archers, W wizards, B barracks, O 
 | 1 Meadow Landing | 8/8 win / 20/20.0/20 / - / g57 | 8/8 win / 20/20.0/20 / - / g111 | 8/8 win / 20/20.0/20 / - / g106 | 0/8 win / 0/0.0/0 / 3.0 / g300 |
 | 2 Blossom Bend | 8/8 win / 20/20.0/20 / - / g107 | 8/8 win / 20/20.0/20 / - / g67 | 5/8 win / 0/3.1/8 / 6.0 / g44 | 0/8 win / 0/0.0/0 / 2.0 / g320 |
 | 3 Twin Creeks | 8/8 win / 13/13.9/15 / - / g114 | 8/8 win / 18/19.5/20 / - / g150 | 0/8 win / 0/0.0/0 / 4.0 / g11 | 0/8 win / 0/0.0/0 / 1.0 / g340 |
-| 4 Dune Crossing | 8/8 win / 11/15.6/18 / - / g127 | 8/8 win / 20/20.0/20 / - / g439 | 0/8 win / 0/0.0/0 / 6.0 / g55 | 0/8 win / 0/0.0/0 / 2.0 / g360 |
-| 5 Oasis Crossroads | 8/8 win / 16/17.1/19 / - / g34 | 8/8 win / 17/19.1/20 / - / g2310 | 0/8 win / 0/0.0/0 / 2.0 / g26 | 0/8 win / 0/0.0/0 / 1.0 / g400 |
-| 6 Scorpion Loop | 8/8 win / 11/15.9/19 / - / g90 | 8/8 win / 20/20.0/20 / - / g2341 | 0/8 win / 0/0.0/0 / 4.0 / g34 | 0/8 win / 0/0.0/0 / 3.0 / g420 |
-| 7 Frostbite Pass | 8/8 win / 14/16.1/20 / - / g120 | 8/8 win / 20/20.0/20 / - / g86 | 0/8 win / 0/0.0/0 / 7.0 / g76 | 0/8 win / 0/0.0/0 / 4.0 / g440 |
-| 8 Glacier Junction | 8/8 win / 11/15.1/18 / - / g244 | 8/8 win / 20/20.0/20 / - / g2480 | 0/8 win / 0/0.0/0 / 3.8 / g40 | 0/8 win / 0/0.0/0 / 1.0 / g450 |
-| 9 Icebound Bastion | 8/8 win / 10/13.5/17 / - / g573 | 8/8 win / 20/20.0/20 / - / g1545 | 0/8 win / 0/0.0/0 / 5.3 / g85 | 0/8 win / 0/0.0/0 / 4.0 / g450 |
-| 10 The Mothership | 8/8 win / 14/14.8/17 / - / g100 | 8/8 win / 20/20.0/20 / - / g193 | 0/8 win / 0/0.0/0 / 7.0 / g42 | 0/8 win / 0/0.0/0 / 4.0 / g700 |
+| 4 Dune Crossing | 8/8 win / 11/12.5/14 / - / g70 | 8/8 win / 19/19.5/20 / - / g1314 | 0/8 win / 0/0.0/0 / 5.0 / g24 | 0/8 win / 0/0.0/0 / 2.0 / g360 |
+| 5 Oasis Crossroads | 8/8 win / 13/13.6/15 / - / g59 | 8/8 win / 17/18.5/20 / - / g90 | 0/8 win / 0/0.0/0 / 4.0 / g58 | 0/8 win / 0/0.0/0 / 2.0 / g400 |
+| 6 Scorpion Loop | 8/8 win / 12/16.3/18 / - / g380 | 8/8 win / 19/19.9/20 / - / g2832 | 0/8 win / 0/0.0/0 / 3.1 / g39 | 0/8 win / 0/0.0/0 / 2.0 / g420 |
+| 7 Frostbite Pass | 8/8 win / 11/12.4/14 / - / g116 | 8/8 win / 20/20.0/20 / - / g42 | 0/8 win / 0/0.0/0 / 7.0 / g42 | 0/8 win / 0/0.0/0 / 4.0 / g440 |
+| 8 Glacier Junction | 8/8 win / 3/13.4/17 / - / g318 | 8/8 win / 20/20.0/20 / - / g2567 | 0/8 win / 0/0.0/0 / 2.0 / g9 | 0/8 win / 0/0.0/0 / 1.0 / g450 |
+| 9 Icebound Bastion | 8/8 win / 13/13.9/14 / - / g635 | 8/8 win / 20/20.0/20 / - / g1599 | 0/8 win / 0/0.0/0 / 5.0 / g91 | 0/8 win / 0/0.0/0 / 4.0 / g450 |
+| 10 The Mothership | 8/8 win / 10/15.1/17 / - / g88 | 8/8 win / 20/20.0/20 / - / g67 | 0/8 win / 0/0.0/0 / 7.0 / g43 | 0/8 win / 0/0.0/0 / 4.0 / g410 |
 
 ### Single-tower-type variants
 
@@ -236,36 +270,39 @@ Competent bot (same plan, stars and abilities) but every tower is forced to one 
 | 1 Meadow Landing | 8/8 win / 20/20.0/20 / - / g156 | 8/8 win / 20/20.0/20 / - / g22 | 8/8 win / 20/20.0/20 / - / g116 | 8/8 win / 19/19.3/20 / - / g15 |
 | 2 Blossom Bend | 8/8 win / 20/20.0/20 / - / g170 | 8/8 win / 15/19.0/20 / - / g33 | 0/8 win / 0/0.0/0 / 5.4 / g25 | 0/8 win / 0/0.0/0 / 5.5 / g124 |
 | 3 Twin Creeks | 8/8 win / 1/5.1/9 / - / g70 | 8/8 win / 10/12.0/15 / - / g105 | 0/8 win / 0/0.0/0 / 4.0 / g31 | 0/8 win / 0/0.0/0 / 6.3 / g65 |
-| 4 Dune Crossing | 4/8 win / 0/1.1/3 / 9.0 / g82 | 0/8 win / 0/0.0/0 / 7.8 / g69 | 0/8 win / 0/0.0/0 / 5.5 / g70 | 0/8 win / 0/0.0/0 / 6.1 / g57 |
-| 5 Oasis Crossroads | 8/8 win / 11/12.9/14 / - / g125 | 7/8 win / 0/3.9/7 / 5.0 / g142 | 0/8 win / 0/0.0/0 / 2.0 / g19 | 0/8 win / 0/0.0/0 / 4.0 / g112 |
-| 6 Scorpion Loop | 8/8 win / 8/12.6/17 / - / g532 | 7/8 win / 0/4.4/11 / 6.0 / g136 | 0/8 win / 0/0.0/0 / 3.4 / g35 | 0/8 win / 0/0.0/0 / 4.0 / g29 |
-| 7 Frostbite Pass | 5/8 win / 0/3.3/8 / 11.0 / g78 | 8/8 win / 9/11.9/14 / - / g157 | 0/8 win / 0/0.0/0 / 6.5 / g60 | 0/8 win / 0/0.0/0 / 7.0 / g50 |
-| 8 Glacier Junction | 2/8 win / 0/1.4/10 / 4.0 / g419 | 8/8 win / 3/9.8/13 / - / g182 | 0/8 win / 0/0.0/0 / 2.0 / g21 | 0/8 win / 0/0.0/0 / 4.0 / g107 |
-| 9 Icebound Bastion | 7/8 win / 0/6.4/14 / 7.0 / g1241 | 8/8 win / 7/11.0/14 / - / g703 | 0/8 win / 0/0.0/0 / 5.8 / g28 | 0/8 win / 0/0.0/0 / 5.9 / g50 |
-| 10 The Mothership | 7/8 win / 0/7.3/14 / 7.0 / g1279 | 7/8 win / 0/14.1/20 / 15.0 / g145 | 0/8 win / 0/0.0/0 / 6.0 / g38 | 0/8 win / 0/0.0/0 / 7.3 / g77 |
+| 4 Dune Crossing | 1/8 win / 0/0.3/2 / 6.3 / g49 | 0/8 win / 0/0.0/0 / 5.4 / g125 | 0/8 win / 0/0.0/0 / 4.0 / g85 | 0/8 win / 0/0.0/0 / 5.8 / g36 |
+| 5 Oasis Crossroads | 8/8 win / 6/7.5/11 / - / g75 | 2/8 win / 0/0.9/4 / 6.8 / g63 | 0/8 win / 0/0.0/0 / 4.0 / g57 | 0/8 win / 0/0.0/0 / 4.0 / g39 |
+| 6 Scorpion Loop | 0/8 win / 0/0.0/0 / 4.8 / g39 | 1/8 win / 0/0.3/2 / 5.1 / g105 | 0/8 win / 0/0.0/0 / 3.0 / g71 | 0/8 win / 0/0.0/0 / 5.8 / g90 |
+| 7 Frostbite Pass | 0/8 win / 0/0.0/0 / 11.4 / g66 | 6/8 win / 0/2.6/5 / 9.0 / g84 | 0/8 win / 0/0.0/0 / 6.9 / g57 | 0/8 win / 0/0.0/0 / 7.0 / g84 |
+| 8 Glacier Junction | 5/8 win / 0/4.5/10 / 4.0 / g1012 | 8/8 win / 2/8.3/14 / - / g51 | 0/8 win / 0/0.0/0 / 2.0 / g21 | 0/8 win / 0/0.0/0 / 3.8 / g115 |
+| 9 Icebound Bastion | 3/8 win / 0/4.3/14 / 7.0 / g610 | 8/8 win / 4/10.6/14 / - / g752 | 0/8 win / 0/0.0/0 / 5.5 / g75 | 0/8 win / 0/0.0/0 / 6.8 / g93 |
+| 10 The Mothership | 5/8 win / 0/3.5/13 / 8.7 / g706 | 1/8 win / 0/0.9/7 / 9.6 / g138 | 0/8 win / 0/0.0/0 / 6.0 / g44 | 0/8 win / 0/0.0/0 / 6.9 / g91 |
 
 ## Specializations
 
-Levels 7-10 only. `competent` buys specs by the per-level rule of `tools/bots/specs.ts`; `nospec` is the same bot that never specializes; `spec:<id>` is the competent bot where every tower of that spec's kind that gets a spec uses exactly that option (and two towers of that kind are specialized), i.e. the two options of a tower are compared on the same economy and the same waves.
+Levels 4-10 (a bot only buys specs its level has unlocked, see the schedule below). `competent` buys specs by the per-level rule of `tools/bots/specs.ts`; `nospec` is the same bot that never specializes; `spec:<id>` is the competent bot where every tower of that spec's kind that gets a spec uses exactly that option (and two towers of that kind are specialized), i.e. the two options of a tower are compared on the same economy and the same waves.
 
-Lives left per level (average over the seeds; win rate in brackets):
+Lives left per level (average over the seeds; win rate in brackets; blank = that spec is not unlocked yet; the total row averages only the levels a column has, so compare options in the A/B table below):
 
 | level | competent | nospec | spec:eagle_eye | spec:hunting_nets | spec:chain_lightning | spec:fire_mages | spec:bigger_bombs | spec:homing_missiles | spec:bow_training | spec:extra_recruits |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 7 Frostbite Pass | 16.1 (8/8) | 5.6 (7/8) | 16.1 (8/8) | 11.8 (8/8) | 16.1 (8/8) | 16.1 (8/8) | 16.1 (8/8) | 16.1 (8/8) | 18.0 (8/8) | 18.0 (8/8) |
-| 8 Glacier Junction | 15.1 (8/8) | 0.8 (3/8) | 15.1 (8/8) | 12.8 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) |
-| 9 Icebound Bastion | 13.5 (8/8) | 10.6 (8/8) | 13.5 (8/8) | 13.5 (8/8) | 13.5 (8/8) | 13.5 (8/8) | 13.9 (8/8) | 13.9 (8/8) | 13.5 (8/8) | 13.5 (8/8) |
-| 10 The Mothership | 14.8 (8/8) | 15.1 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) | 14.8 (8/8) |
-| **all of L7-L10** | **14.9** (32/32) | **8.0** (26/32) | **14.9** (32/32) | **13.2** (32/32) | **14.9** (32/32) | **14.9** (32/32) | **15.0** (32/32) | **15.0** (32/32) | **15.3** (32/32) | **15.3** (32/32) |
+| 4 Dune Crossing | 12.5 (8/8) | 7.1 (8/8) | 7.1 (8/8) | 7.1 (8/8) | 10.1 (8/8) | 7.1 (8/8) | 7.1 (8/8) | 12.5 (8/8) | 7.1 (8/8) | 7.1 (8/8) |
+| 5 Oasis Crossroads | 13.6 (8/8) | 4.6 (6/8) | 4.6 (6/8) | 13.6 (8/8) | 13.6 (8/8) | 4.6 (6/8) | 4.6 (6/8) | 13.6 (8/8) | 13.6 (8/8) | 4.6 (6/8) |
+| 6 Scorpion Loop | 16.3 (8/8) | 13.4 (7/8) | 13.4 (7/8) | 16.3 (8/8) | 16.3 (8/8) | 13.4 (7/8) | 16.3 (8/8) | 16.1 (8/8) | 16.3 (8/8) | 16.3 (8/8) |
+| 7 Frostbite Pass | 12.4 (8/8) | 0.0 (0/8) | 12.4 (8/8) | 5.3 (8/8) | 12.4 (8/8) | 12.4 (8/8) | 12.4 (8/8) | 12.4 (8/8) | 13.5 (8/8) | 13.0 (8/8) |
+| 8 Glacier Junction | 13.4 (8/8) | 0.4 (1/8) | 13.4 (8/8) | 14.5 (8/8) | 13.4 (8/8) | 13.3 (8/8) | 13.4 (8/8) | 13.4 (8/8) | 13.4 (8/8) | 13.4 (8/8) |
+| 9 Icebound Bastion | 13.9 (8/8) | 7.3 (8/8) | 13.9 (8/8) | 14.3 (8/8) | 13.9 (8/8) | 13.9 (8/8) | 15.4 (8/8) | 15.4 (8/8) | 13.9 (8/8) | 13.9 (8/8) |
+| 10 The Mothership | 15.1 (8/8) | 0.0 (0/8) | 15.1 (8/8) | 13.4 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) | 15.1 (8/8) |
+| **all of L4-L10** | **13.9** (56/56) | **4.7** (30/56) | **11.4** (53/56) | **12.1** (56/56) | **13.5** (56/56) | **11.4** (53/56) | **12.0** (54/56) | **14.1** (56/56) | **13.3** (56/56) | **11.9** (54/56) |
 
-Option A vs option B of each tower (lives averaged over L7-L10, same seeds; a gap below ~10% of the plain competent result is "balanced"):
+Option A vs option B of each tower, on the levels where BOTH are unlocked (L7-L10; lives averaged over the same seeds; a gap below ~10% of the plain competent result is "balanced"):
 
 | tower | option A | lives (wins) | option B | lives (wins) | gap |
 |---|---|---|---|---|---|
-| archer | eagle_eye | 14.9 (32/32) | hunting_nets | 13.2 (32/32) | 1.7 lives |
-| wizard | chain_lightning | 14.9 (32/32) | fire_mages | 14.9 (32/32) | 0.0 lives |
-| bomb | bigger_bombs | 15.0 (32/32) | homing_missiles | 15.0 (32/32) | 0.0 lives |
-| barracks | bow_training | 15.3 (32/32) | extra_recruits | 15.3 (32/32) | 0.0 lives |
+| archer | eagle_eye | 13.7 (32/32) | hunting_nets | 11.8 (32/32) | 1.8 lives |
+| wizard | chain_lightning | 13.7 (32/32) | fire_mages | 13.7 (32/32) | 0.0 lives |
+| bomb | bigger_bombs | 14.1 (32/32) | homing_missiles | 14.1 (32/32) | 0.0 lives |
+| barracks | bow_training | 14.0 (32/32) | extra_recruits | 13.8 (32/32) | 0.1 lives |
 
 ### Single-tower micro-benchmark
 
@@ -329,30 +366,41 @@ Gold left at the end, total gold earned, the time at which every build spot held
 | 1 Meadow Landing | 57 | 437 | 111 s (90%, 8/8) | 90% | 111 | 491 | 69 s (78%, 8/8) | 78% |
 | 2 Blossom Bend | 107 | 1665 | never | 97% | 67 | 1707 | never | 98% |
 | 3 Twin Creeks | 114 | 1214 | never | 94% | 150 | 1330 | never | 94% |
-| 4 Dune Crossing | 127 | 2327 | never | 96% | 439 | 2499 | never | 88% |
-| 5 Oasis Crossroads | 34 | 4258 | never | 100% | 2310 | 4310 | never | 61% |
-| 6 Scorpion Loop | 90 | 4934 | never | 99% | 2341 | 5035 | never | 57% |
-| 7 Frostbite Pass | 120 | 2709 | never | 98% | 86 | 2770 | never | 99% |
-| 8 Glacier Junction | 244 | 6174 | 394 s (98%, 8/8) | 98% | 2480 | 6240 | never | 70% |
-| 9 Icebound Bastion | 573 | 3743 | 358 s (91%, 8/8) | 91% | 1545 | 3825 | never | 65% |
-| 10 The Mothership | 100 | 6948 | never | 88% | 193 | 7041 | never | 86% |
+| 4 Dune Crossing | 70 | 3510 | never | 99% | 1314 | 3674 | never | 75% |
+| 5 Oasis Crossroads | 59 | 3017 | never | 100% | 90 | 3170 | never | 98% |
+| 6 Scorpion Loop | 380 | 6800 | 392 s (98%, 8/8) | 98% | 2832 | 6876 | never | 71% |
+| 7 Frostbite Pass | 116 | 2780 | never | 98% | 42 | 2892 | never | 92% |
+| 8 Glacier Junction | 318 | 6248 | 394 s (98%, 8/8) | 98% | 2567 | 6327 | never | 69% |
+| 9 Icebound Bastion | 635 | 3805 | 357 s (90%, 8/8) | 90% | 1599 | 3879 | never | 65% |
+| 10 The Mothership | 88 | 6958 | never | 92% | 67 | 7045 | never | 92% |
 
-Mothership (level 10): where on the road the boss was when it died (won runs) or when the run ended (lost runs): competent 84%, expert 82%, archer-only 64%, wizard-only 95%.
+Mothership (level 10): where on the road the boss was when it died (won runs) or when the run ended (lost runs): competent 89%, expert 87%, archer-only 65%, wizard-only 99%.
+
+## Unlock schedule (specializations)
+
+Tower caps: L1 all Lv1, L2 all Lv2, L3 onwards all four towers Lv3. Specializations: two per level on L4-L7 (two different tower kinds), cumulative, also on replays. "Competent lives" = the competent bot with everything unlocked on that level; "without the new pair" = the same bot where only the earlier levels' specs exist (a slot whose spec is missing falls back to the other option of its kind, or is dropped); "each new spec alone" = the bot with the earlier specs plus only that one (two towers of its kind specialized). Lives, average over the seeds (wins).
+
+| level | new specializations | competent lives | without the new pair | gain | each new spec alone |
+|---|---|---|---|---|---|
+| 4 Dune Crossing | Chain Lightning (wizard) + Homing Missiles (bomb) | 12.5 (8/8) | 7.1 (8/8) | +5.4 | Chain Lightning 10.1 (8/8), Homing Missiles 8.4 (8/8) |
+| 5 Oasis Crossroads | Hunting Nets (archer) + Bow Training (barracks) | 13.6 (8/8) | 5.1 (7/8) | +8.5 | Hunting Nets 13.6 (8/8), Bow Training 1.6 (2/8) |
+| 6 Scorpion Loop | Bigger Bombs (bomb) + Extra Recruits (barracks) | 16.3 (8/8) | 16.1 (8/8) | +0.1 | Bigger Bombs 16.3 (8/8), Extra Recruits 16.1 (8/8) |
+| 7 Frostbite Pass | Eagle Eye (archer) + Fire Mages (wizard) | 12.4 (8/8) | 3.9 (7/8) | +8.5 | Eagle Eye 12.4 (8/8), Fire Mages 5.3 (8/8) |
 
 ## Levels
 
-| level | name | biome | waves | start gold | spots | tower caps (A/W/B/X) | new enemies | max units in a wave |
-|---|---|---|---|---|---|---|---|---|
-| 1 | Meadow Landing | spring | 6 | 300 | 8 | 1/1/1/1 | scout, dart | 36 |
-| 2 | Blossom Bend | spring | 7 | 320 | 10 | 2/2/2/2 | skimmer | 77 |
-| 3 | Twin Creeks | spring | 8 | 340 | 12 | 3/2/2/2 | plated | 43 |
-| 4 | Dune Crossing | desert | 9 | 360 | 12 | 3/3/2/2 | prism | 64 |
-| 5 | Oasis Crossroads | desert | 10 | 400 | 14 | 3/3/3/2 | carrier | 133 |
-| 6 | Scorpion Loop | desert | 10 | 420 | 14 | 3/3/3/3 | - | 99 |
-| 7 | Frostbite Pass | winter | 12 | 440 | 11 | 3/3/3/3 | dread | 33 |
-| 8 | Glacier Junction | winter | 12 | 450 | 14 | 3/3/3/3 | - | 121 |
-| 9 | Icebound Bastion | winter | 12 | 450 | 7 | 3/3/3/3 | - | 38 |
-| 10 | The Mothership | mixed | 15 | 700 | 17 | 3/3/3/3 | mothership | 57 |
+| level | name | biome | waves | start gold | spots | tower caps (A/W/B/X) | new specializations | new enemies | max units in a wave |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | Meadow Landing | spring | 6 | 300 | 8 | 1/1/1/1 | - | scout, dart | 36 |
+| 2 | Blossom Bend | spring | 7 | 320 | 10 | 2/2/2/2 | - | skimmer | 77 |
+| 3 | Twin Creeks | spring | 8 | 340 | 12 | 3/3/3/3 | - | plated | 43 |
+| 4 | Dune Crossing | desert | 9 | 360 | 12 | 3/3/3/3 | Chain Lightning + Homing Missiles | prism | 100 |
+| 5 | Oasis Crossroads | desert | 10 | 400 | 14 | 3/3/3/3 | Hunting Nets + Bow Training | carrier | 72 |
+| 6 | Scorpion Loop | desert | 10 | 420 | 14 | 3/3/3/3 | Bigger Bombs + Extra Recruits | - | 141 |
+| 7 | Frostbite Pass | winter | 12 | 440 | 11 | 3/3/3/3 | Eagle Eye + Fire Mages | dread | 32 |
+| 8 | Glacier Junction | winter | 12 | 450 | 14 | 3/3/3/3 | - | - | 122 |
+| 9 | Icebound Bastion | winter | 12 | 450 | 7 | 3/3/3/3 | - | - | 39 |
+| 10 | The Mothership | mixed | 15 | 410 | 17 | 3/3/3/3 | - | mothership | 57 |
 
 <!-- balance:generated:end -->
 

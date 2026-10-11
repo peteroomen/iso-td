@@ -11,16 +11,17 @@ used to tune them and the tuned values live in `src/core/data/*`.
 - 10 campaign levels: 1–3 Spring, 4–6 Desert, 7–9 Winter, 10 = mixed-biome boss level.
 - **Lives**: 20 per level. Leaking enemy costs its `lives` value. 0 lives → defeat.
 - **Stars** on victory: ≥18 lives → 3★, ≥6 → 2★, else 1★. Best result per level is saved. Max 30★ (the star tree costs 36★ in total, so the player has to choose).
-- **Tower level caps** per level (also on replay): L1 all towers max lv1; L2 all max lv2; L3 archer lv3; L4 + wizard lv3;
-  L5 + barracks lv3; L6+ everything lv3. The **bomb** tower is capped 1 on L1, 2 on L2-L5 and 3 (Cluster Bomb) from L6 on.
-  Encoded per level as `towerCap: { archer, wizard, barracks, bomb }`.
+- **Tower level caps** per level (also on replay): L1 all towers max Lv1; L2 all Lv2; **L3 onwards all four towers Lv3**
+  (the bomb tower's Cluster Bomb included). Encoded per level as `towerCap: { archer, wizard, barracks, bomb }`.
 - **Level unlock**: level N+1 unlocks when level N is won.
 - **Waves**: level starts paused-on-wave-0; the player presses the pulsing "incoming" button at a spawn to start wave 1.
   After a wave finishes spawning, a countdown (`waveGap`, default 18 s) starts toward the next wave. Player can call
   early: **bonus gold = floor(remainingSeconds × 1.5)** and **both ability cooldowns are reduced by remainingSeconds × 0.5**.
 - **Victory**: all waves spawned and no enemies alive and lives > 0.
 - **Selling**: refund 60% of total gold invested in that tower (specialization cost included).
-- **Specializations**: unlocked on levels 7–10 (`LevelDef.specsUnlocked`, also on replays), see §12.
+- **Specializations**: from **level 4**, every level up to L7 unlocks one pair of two specializations from two different tower
+  kinds (`LevelDef.newSpecs`); unlocks accumulate (the set on level N is the union of `newSpecs` of levels 1..N, so replays behave the
+  same) and L7–L10 have all eight. The pairs are chosen for the map they arrive on, see the schedule table in §12.
 - **Gold**: start gold per level + kill bounties + early-call bonus.
 - Game speed 1× / 2×, pause. Build spots are fixed (Kingdom Rush style).
 
@@ -80,7 +81,7 @@ within 0.8 t of the impact (seeded RNG, deterministic), explode 0.28 s later wit
 Costs match the wizard (100 / 160 / 240); the first-draft numbers (125 / 200 / 300, 8–15 … 35–55 dmg, 2.5 s … 2.3 s, radius 0.8 … 1.0)
 were re-tuned with the balance tool, see `docs/BALANCE.md`. Sim API: projectile kinds `shell` / `bomblet`, events `explode` / `cluster`, see the source comments in `src/core/types.ts`.
 
-From level 7 on a Lv3 tower may buy a **specialization** (§12). Archer/wizard/barracks/bomb numbers above are the *unspecialized* tiers.
+From level 4 on a Lv3 tower may buy one of the **unlocked specializations** (§12). Archer/wizard/barracks/bomb numbers above are the *unspecialized* tiers.
 
 Knights: walk 1.6 t/s, respawn 10 s after death at the tower, regen 2% max HP/s when not fighting.
 Each knight engages one blockable enemy within 1.0 t of its rally post; an engaged enemy stops moving and fights back.
@@ -136,18 +137,18 @@ sponge instead of an armor wall (HP 6000 -> 14000, armor/resist 0.8 -> 0.4). See
 
 ## 7. Campaign
 
-| L | Name | Biome | Waves | Introduces | Map feature |
-|---|---|---|---|---|---|
-| 1 | Meadow Landing | Spring | 6 | scout, dart | single winding path, includes tutorial hints |
-| 2 | Blossom Bend | Spring | 7 | skimmer | S-curve with two pocket spots covering two road legs each |
-| 3 | Twin Creeks | Spring | 8 | plated | path forks (two branches rejoin) |
-| 4 | Dune Crossing | Desert | 9 | prism | three long switchbacks |
-| 5 | Oasis Crossroads | Desert | 10 | carrier | two entrances; the two roads cross in the middle |
-| 6 | Scorpion Loop | Desert | 10 | – (mix) | long loop: the road crosses itself, the crossing is passed twice |
-| 7 | Frostbite Pass | Winter | 12 | dread | long serpentine pass |
-| 8 | Glacier Junction | Winter | 12 | – | two entrances that merge |
-| 9 | Icebound Bastion | Winter | 12 | – | few, tight build spots |
-| 10 | The Mothership | Mixed spring→desert→winter | 15 | mothership (final wave) | long path through all biomes |
+| L | Name | Biome | Waves | Introduces | Unlocks (towers / specializations, §1 and §12) | Map feature |
+|---|---|---|---|---|---|---|
+| 1 | Meadow Landing | Spring | 6 | scout, dart | all towers Lv1 | single winding path, includes tutorial hints |
+| 2 | Blossom Bend | Spring | 7 | skimmer | all towers Lv2 | S-curve with two pocket spots covering two road legs each |
+| 3 | Twin Creeks | Spring | 8 | plated | **all towers Lv3** | path forks (two branches rejoin) |
+| 4 | Dune Crossing | Desert | 9 | prism | Chain Lightning, Homing Missiles | three long switchbacks |
+| 5 | Oasis Crossroads | Desert | 10 | carrier | Hunting Nets, Bow Training | two entrances; the two roads cross in the middle |
+| 6 | Scorpion Loop | Desert | 10 | – (mix) | Bigger Bombs, Extra Recruits | long loop: the road crosses itself, the crossing is passed twice |
+| 7 | Frostbite Pass | Winter | 12 | dread | Eagle Eye, Fire Mages (all 8 now) | long serpentine pass |
+| 8 | Glacier Junction | Winter | 12 | – | – | two entrances that merge |
+| 9 | Icebound Bastion | Winter | 12 | – | – | few, tight build spots |
+| 10 | The Mothership | Mixed spring→desert→winter | 15 | mothership (final wave) | – | long path through all biomes |
 
 Start gold roughly 250–450, tuned by the balance tool. Grids up to ~14×14; camera fits the map into the play area.
 
@@ -159,10 +160,10 @@ Start gold roughly 250–450, tuned by the balance tool. Grids up to ~14×14; ca
 - **expert**: same plan + optimal early calls and ability timing; assumes 3★ per previous level.
 - **bomb-only** (and archer-only / wizard-only / barracks-only): the competent bot with every build forced to one kind.
 - **naive**: builds only the cheapest tower type on the spots nearest the spawn, upgrades when affordable, no abilities.
-- **nospec** / **spec:<id>** (levels 7–10): the competent bot without / with a forced specialization option (see §12 and BALANCE.md).
+- **nospec** / **spec:<id>** (levels 4–10): the competent bot without / with a forced specialization option; every bot only buys specs its level has unlocked (see §12 and BALANCE.md).
 - **idle**: builds nothing (sanity check — must lose every level, ideally on wave 1–2).
 
-Targets: competent wins with 10–17 lives; expert can reach 18+ (3★); naive loses from L4 onward; idle always loses; from L4 on every
+Targets: competent wins with ~10–17 lives on L3 onwards; expert can reach 18+ (3★); naive loses from L3 onward; idle always loses; from L4 the no-spec bot is clearly worse than competent (specs are effectively required from the level they unlock, and L7–L10 stay that way); from L4 on every
 single-tower-kind build (archer-only / wizard-only / barracks-only / bomb-only variants of the competent bot) scores below the mixed plan and at
 least one of archer-only / wizard-only loses or nearly loses; the competent bot ends every level with <= ~600 gold left and is still
 buying in the last third of the level.
@@ -199,7 +200,7 @@ sim.drainEvents(): SimEvent[]         // 'build','upgrade','sell','shoot','hit',
 // commands return { ok: boolean, reason?: string }
 sim.build(spotId, kind); sim.upgrade(towerId); sim.sell(towerId); sim.setRally(towerId, {x,y});
 sim.castOrbital({x,y}); sim.castReinforcements({x,y}); sim.callNextWave();
-sim.specialize(towerId, specId);       // levels 7-10, Lv3 towers, see §12
+sim.specialize(towerId, specId);       // Lv3 towers, only specs the level has unlocked (`sim.unlockedSpecs`), see §12
 sim.canAfford/costOf helpers for UI.
 ```
 
@@ -227,12 +228,37 @@ Boss sprite: `ufo/mothership.png` (320×271, generated to match the pack style; 
 
 ## 12. Tower specializations
 
-From **level 7** onward (`LevelDef.specsUnlocked`; levels 7–10, also on replays; levels 1–6 are unaffected) a **Lv3** tower can buy
-**one of two** specializations for **300 g** each. The choice is permanent for that tower (different towers of the same kind may
-choose differently); the cost counts as invested gold (sell refund 60%). Passive powers only fire when UFOs are in range. Each
-spec gets a code-drawn emblem on the tower plus its own effects (visuals: later phase).
+From **level 4** onward a **Lv3** tower can buy **one of two** specializations for **300 g** each (L3 already allows Lv3 towers, but no
+spec is unlocked yet). The choice is permanent for that tower (different towers of the same kind may choose differently); the cost counts
+as invested gold (sell refund 60%). Passive powers only fire when UFOs are in range. Each spec has a code-drawn emblem on the tower plus its
+own effects.
 
-Sim API: `sim.specialize(towerId, specId)` / `sim.canSpecialize(...)` (fail reasons `locked`, `wrong_kind`, `not_max_level`,
+### Unlock schedule
+
+Data: `LevelDef.newSpecs` (the pair a level unlocks) + `LevelDef.newSpecsWhy` (the one-line "useful here because ..." shown in the
+announcement). The specs available on a level are the union of `newSpecs` of levels 1..N in campaign order (`unlockedSpecsFor(level)` in
+`src/core/data/levels`), so replays behave like the first play. `SimOptions.specs` (true / false / list) overrides it for tests and tools.
+`sim.specialize` returns `locked` for a spec the level has not unlocked; a tower whose other option is still locked can buy the unlocked
+one, and the radial menu shows the locked option greyed out with "Unlocks on level N". Each level's pair is two specs of two different
+tower kinds, every spec appears exactly once, and the pairs were picked by measuring each spec on each map (method and numbers:
+`docs/BALANCE.md`, "Unlock schedule", tool `tools/specmap.ts`).
+
+| Level | Tower caps | New specializations | Why they fit this map (arena benefit = lives not leaked, rank among the 8 specs on that map) |
+|---|---|---|---|
+| 1 | all Lv1 | – | – |
+| 2 | all Lv2 | – | – |
+| 3 | all four Lv3 | – (Lv3 towers show "Specialize (from level 4)") | – |
+| 4 Dune Crossing | all Lv3 | **Chain Lightning** (wizard) + **Homing Missiles** (bomb) | Skimmer flocks (about half of all UFO HP after the retune) and prism packs walk three long switchbacks in dense streams. Chain +74 (#3) leaps through flocks and swarms; missiles +76 (#2) are physical (prisms have no armor) and hit fliers. |
+| 5 Oasis Crossroads | all Lv3 | **Hunting Nets** (archer) + **Bow Training** (barracks) | Skimmers and dart swarms enter from two sides and cross in the middle. Nets +81 (#1) drag fliers to the ground where knights and bombs hit them; Bow Training +22 (#7 of 8, the best barracks spec on any map) lets the knights at the crossing shoot the fliers. The level was retuned to be flier-heavy so the weak-fit barracks spec has targets. |
+| 6 Scorpion Loop | all Lv3 | **Bigger Bombs** (bomb) + **Extra Recruits** (barracks) | A ground level (plated crowds, scout / dart swarms, carriers; few fliers): every UFO walks through the loop crossing twice. Bigger Bombs +72 (#3) have the clusters at the crossing, Extra Recruits +12 (#7, but best on this map: 4 knights, faster respawn) hold them inside the blast. |
+| 7 Frostbite Pass | all Lv3 | **Eagle Eye** (archer) + **Fire Mages** (wizard) | Dreadnoughts and plated heavies (64% of the UFO HP) crawl a long serpentine: Eagle Eye ignores armor (and is the best spec for the competent bot here), Fire Mages +67 (#2) burn through armor and magic resistance with true damage. |
+| 8-10 | all Lv3 | – (all 8 unlocked) | – |
+
+The pairs were chosen to maximise the summed benefit over L4-L7 (the arena optimum is 466; the shipped schedule reaches 438, 94%) while
+keeping every pair thematically sensible for its map and giving the competent bot a spec it can use there; where the best fit was weak
+(L5 / L6 barracks specs) the waves were tuned so the pair shines.
+
+Sim API: `sim.specialize(towerId, specId)` / `sim.canSpecialize(...)` (fail reasons `wrong_kind`, `locked` (spec not unlocked on this level), `not_max_level`,
 `already_specialized`, `gold`, `no_tower`, `ended`), `sim.specCostOf(id)`, `sim.statsFor(kind, level, spec?)`, `sim.statsOf(towerId)`,
 `TowerState.spec / specCooldown / specCooldownMax / specCounter`, event `specialize`. Details in the comments of `src/core/types.ts`;
 numbers in `SPEC_TUNING` (`src/core/data/specs.ts`).
